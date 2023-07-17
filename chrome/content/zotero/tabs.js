@@ -85,6 +85,14 @@ var Zotero_Tabs = new function () {
 		})));
 		var { tab } = this._getTab(this._selectedID);
 		document.title = (tab.title.length ? tab.title + ' - ' : '') + Zotero.appName;
+		var tabsOptionsNode = document.getElementById('zotero-menu-tabs-popup');
+		tabsOptionsNode.innerHTML = '';
+		this._tabs.forEach(tab => {
+			let menuitem = document.createXULElement('menuitem');
+			menuitem.setAttribute('label', tab.title);
+			tabsOptionsNode.appendChild(menuitem);
+		});
+		
 		this._updateTabBar();
 		// Hide any tab `title` tooltips that might be open
 		window.Zotero_Tooltip.stop();

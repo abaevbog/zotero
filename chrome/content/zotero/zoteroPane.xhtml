@@ -147,7 +147,7 @@
 		<key id="key_findAgain2" keycode="&findAgainCmd.key2;" command="cmd_findAgain"/>
 		<key id="key_findPrevious2" keycode="&findAgainCmd.key2;" modifiers="shift" command="cmd_findPrevious"/>
 	</keyset>
-	
+
 	<vbox id="titlebar">
 		<hbox id="titlebar-buttonbox-container" skipintoolbarset="true">
 			<hbox id="titlebar-buttonbox">
@@ -700,6 +700,21 @@
 	
 	<hbox flex="1" id="browser">
 		<vbox id="appcontent" flex="1">
+			<hbox align="end">
+				<spacer flex="1"/>
+				<toolbarbutton
+				id="zotero-tabs-menu"
+					class="zotero-tb-button"
+					tabindex="-1"
+					tooltiptext="Opened tabs"
+					type="menu"
+					wantdropmarker="true">
+				<menupopup id="zotero-menu-tabs-popup">
+					<menuitem id="zotero-tb-group-add" label="&zotero.toolbar.newGroup;" oncommand="ZoteroPane_Local.newGroup()"/>
+					<menuitem id="zotero-tb-group-add" label="&zotero.toolbar.newGroup;" oncommand="ZoteroPane_Local.newGroup()"/>
+				</menupopup>
+				</toolbarbutton>
+			</hbox>
 			<stack id="zotero-pane-stack" flex="1">
 				<!-- A placeholder to persist pdf-reader sidebar collapse state to avoid introducing another pref -->
 				<box id="zotero-reader-sidebar-pane" hidden="true" collapsed="true" zotero-persist="collapsed width"/>
@@ -1237,12 +1252,12 @@
 						</menupopup>
 					</popupset>
 				</hbox>
-				
+
 				<!-- Barrier to prevent tabbing into Zotero pane when busy -->
 				<box id="zotero-pane-tab-catcher-bottom" hidden="true" align="center" pack="center" style="opacity: 0">
 					<checkbox/>
 				</box>
-				
+
 				<stack id="zotero-pane-overlay" flex="1" hidden="true">
 					<box style="background: black; opacity: .3" flex="1"/>
 					
@@ -1258,7 +1273,7 @@
 						</box>
 					</deck>
 				</stack>
-				
+
 			</stack>
 		</vbox>
 	</hbox>
