@@ -85,15 +85,8 @@ var Zotero_Tabs = new function () {
 		})));
 		var { tab } = this._getTab(this._selectedID);
 		document.title = (tab.title.length ? tab.title + ' - ' : '') + Zotero.appName;
-		var tabsOptionsNode = document.getElementById('zotero-menu-tabs-popup');
-		tabsOptionsNode.innerHTML = '';
-		this._tabs.forEach(tab => {
-			let menuitem = document.createXULElement('menuitem');
-			menuitem.setAttribute('label', tab.title);
-			tabsOptionsNode.appendChild(menuitem);
-		});
-		
 		this._updateTabBar();
+		this.updateOpenedTabsMenuItem();
 		// Hide any tab `title` tooltips that might be open
 		window.Zotero_Tooltip.stop();
 	};
@@ -250,6 +243,34 @@ var Zotero_Tabs = new function () {
 			return;
 		}
 		tab.iconBackgroundImage = icon.style.backgroundImage;
+	};
+
+	/**
+	 * Populates the popup with opened tabs.
+	 */
+	this.updateOpenedTabsMenuItem = () => {
+		let openedTabsMenu = document.getElementById('zotero-opened-tabs-popup');
+		// Empty existing nodes
+		while (openedTabsMenu.firstChild) {
+			openedTabsMenu.removeChild(openedTabsMenu.firstChild);
+		}
+		for (let tab of this._tabs) {
+			// Skip tabs whose title wasn't added yet
+			if (tab.title == "") {
+				continue;
+			}
+			let menuitem = document.createXULElement('menuitem');
+			menuitem.setAttribute('label', tab.title);
+			// Checkbox menu item if tab with this id is selected
+			if (tab.id == this._selectedID) {
+				menuitem.setAttribute('checked', true);
+			}
+			menuitem.addEventListener("command", () => {
+				this.select(tab.id);
+			});
+			menuitem.setAttribute('id', `${tab.id}-menu`);
+			openedTabsMenu.appendChild(menuitem);
+		}
 	};
 
 	/**
