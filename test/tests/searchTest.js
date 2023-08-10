@@ -661,6 +661,15 @@ describe("Zotero.Search", function() {
 			await search.saveTx();
 			assert.isFalse(search.deleted);
 		});
+		it("should move to trash and permanently delete", async function () {
+			var search = await createDataObject('search');
+			assert.isFalse(search.deleted);
+			await search.eraseTx();
+			assert.isTrue(search.deleted);
+			await search.eraseTx({ permanently: true });
+			search = await Zotero.Searches.getAsync(search.id);
+			assert.isFalse(search);
+		});
 	});
 	
 	describe("#toJSON()", function () {

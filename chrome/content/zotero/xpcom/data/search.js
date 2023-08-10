@@ -112,6 +112,34 @@ Zotero.defineProperty(Zotero.Search.prototype, 'treeViewImage', {
 	}
 });
 
+// Some properties to make it easier for a search to "pretend"
+// to be an item for itemTree
+var properties = {
+	isCollection: false,
+	isAnnotation: false,
+	isNote: false,
+	numNotes: false,
+	isAttachment: false,
+	numAttachments: [],
+	getColoredTags: false,
+	isRegularItem: true,
+	isSearch: true,
+	getNotes: [],
+	getAttachments: [],
+	isFileAttachment: false
+};
+
+for (let [name, returnValue] of Object.entries(properties)) {
+	Zotero.Search.prototype[name] = () => returnValue;
+}
+
+Zotero.Search.prototype.getField = function (field, _) {
+	return this['_' + field] || "";
+}
+Zotero.Search.prototype.getDisplayTitle = function () {
+	return this.name;
+}
+
 Zotero.Search.prototype.loadFromRow = function (row) {
 	var primaryFields = this._ObjectsClass.primaryFields;
 	for (let i=0; i<primaryFields.length; i++) {
@@ -275,12 +303,20 @@ Zotero.Search.prototype.clone = function (libraryID) {
 
 Zotero.Search.prototype._eraseData = Zotero.Promise.coroutine(function* (env) {
 	Zotero.DB.requireTransaction();
-	
-	var sql = "DELETE FROM savedSearchConditions WHERE savedSearchID=?";
-	yield Zotero.DB.queryAsync(sql, this.id);
-	
-	var sql = "DELETE FROM savedSearches WHERE savedSearchID=?";
-	yield Zotero.DB.queryAsync(sql, this.id);
+
+	if (env.options.permanently) {
+		var sql = "DELETE FROM savedSearchConditions WHERE savedSearchID=?";
+		yield Zotero.DB.queryAsync(sql, this.id);
+		
+		sql = "DELETE FROM savedSearches WHERE savedSearchID=?";
+		yield Zotero.DB.queryAsync(sql, this.id);
+	}
+	else {
+		yield Zotero.DB.queryAsync('INSERT OR IGNORE INTO deletedSearches (savedSearchID) VALUES (?)', this.id);
+		// Refresh trash itemTree - this hits syncEventListener, so this is a temporary workaround
+		Zotero.Notifier.queue('delete', 'item', this.id, {});
+		yield this.loadDataType('primaryData', true);
+	}
 });
 
 Zotero.Search.prototype._finalizeErase = Zotero.Promise.coroutine(function* (env) {

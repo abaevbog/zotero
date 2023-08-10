@@ -807,6 +807,7 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 						}
 					}
 				}
+				//await this._addSortedRow('search', id, 'T' + search.libraryID);
 				break;
 				
 			case 'feed':
@@ -1095,12 +1096,11 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 	 */
 	async deleteSelection(deleteItems) {
 		var treeRow = this.getRow(this.selection.focused);
-		if (treeRow.isCollection() || treeRow.isFeed()) {
-			await treeRow.ref.eraseTx({ deleteItems, skipUnload: treeRow.isCollection() });
+		var payload = { skipUnload: !treeRow.isFeed() };
+		if (treeRow.isCollection()) {
+			payload.deleteItems = deleteItems;
 		}
-		else if (treeRow.isSearch()) {
-			await Zotero.Searches.erase(treeRow.ref.id);
-		}
+		await treeRow.ref.eraseTx(payload);
 	}
 	
 	unregister() {
@@ -2238,7 +2238,7 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 		var collections = treeRow.getChildren();
 		
 		if (isLibrary) {
-			var savedSearches = await Zotero.Searches.getAll(libraryID);
+			var savedSearches = await Zotero.Searches.getAll(libraryID).filter(s => !s.deleted);
 			// Virtual collections default to showing if not explicitly hidden
 			var showDuplicates = this.hideSources.indexOf('duplicates') == -1
 					&& this._virtualCollectionLibraries.duplicates[libraryID] !== false;

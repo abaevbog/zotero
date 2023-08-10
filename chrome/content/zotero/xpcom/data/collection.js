@@ -111,23 +111,30 @@ Zotero.Collection.prototype.getName = function() {
 
 // Some properties to make it easier for a collection to "pretend"
 // to be an item for itemTree
+var properties = {
+	isCollection: true,
+	isAnnotation: false,
+	isNote: false,
+	numNotes: false,
+	isAttachment: false,
+	numAttachments: [],
+	getColoredTags: false,
+	isRegularItem: true,
+	isSearch: false,
+	getNotes: [],
+	getAttachments: [],
+	isFileAttachment: false
+};
+
+for (let [name, returnValue] of Object.entries(properties)) {
+	Zotero.Collection.prototype[name] = () => returnValue;
+}
+
+Zotero.Collection.prototype.getField = function (field, _) {
+	return this['_' + field] || "";
+}
 Zotero.Collection.prototype.getDisplayTitle = function () {
 	return this.name;
-}
-
-Zotero.Collection.prototype.isNote = function () {
-	return false;
-}
-
-Zotero.Collection.prototype.isAttachment = function () {
-	return false;
-}
-
-Zotero.Collection.prototype.isRegularItem = function () {
-	return false;
-}
-Zotero.Collection.prototype.getField = function (field, unformatted) {
-	return this['_' + field] || "";
 }
 
 

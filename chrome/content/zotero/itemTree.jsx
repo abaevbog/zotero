@@ -214,13 +214,14 @@ var ItemTree = class ItemTree extends LibraryTree {
 			// Get the full set of items we want to show
 			let newSearchItems = await this.collectionTreeRow.getItems();
 			if (this.collectionTreeRow.isTrash()) {
-				// When in trash, also fetch trashed collections
+				// When in trash, also fetch trashed collections and searched
 				// So that they are displayed among deleted items
 				let trashedCollections = await this.collectionTreeRow.getTrashedCollections();
 				newSearchItems = newSearchItems.concat(trashedCollections);
+				newSearchItems = newSearchItems.concat(Zotero.Searches.getLoaded().filter(d => d.deleted));
 			}
 			// TEMP: Hide annotations
-			newSearchItems = newSearchItems.filter(item => item.isCollection() || !item.isAnnotation());
+			newSearchItems = newSearchItems.filter(item => !item.isAnnotation());
 			// Remove notes and attachments if necessary
 			if (this.regularOnly) {
 				newSearchItems = newSearchItems.filter(item => item.isCollection() || item.isRegularItem());
@@ -1907,7 +1908,7 @@ var ItemTree = class ItemTree extends LibraryTree {
 		}
 
 		var item = this.getRow(index).ref;
-		if (item.isCollection() || !item.isRegularItem()) {
+		if (item.isCollection() || item.isSearch() || !item.isRegularItem()) {
 			return true;
 		}
 		var includeTrashed = this.collectionTreeRow.isTrash();
@@ -1999,7 +2000,7 @@ var ItemTree = class ItemTree extends LibraryTree {
 		var format = Zotero.QuickCopy.getFormatFromURL(Zotero.QuickCopy.lastActiveURL);
 
 		// If all items are notes, use one of the note export translators
-		if (items.every(item => !item.isCollection() && item.isNote())) {
+		if (items.every(item => item.isNote())) {
 			format = Zotero.QuickCopy.getNoteFormat();
 		}
 
@@ -2724,7 +2725,7 @@ var ItemTree = class ItemTree extends LibraryTree {
 
 		let tagAriaLabel = '';
 		let tagSpans = '';
-		let coloredTags = !item.isCollection() ? item.getColoredTags() : [];
+		let coloredTags = item.getColoredTags();
 		if (coloredTags.length) {
 			tagSpans = coloredTags.map(x => this._getTagSwatch(x.tag, x.color));
 			tagAriaLabel = tagSpans.length == 1 ? Zotero.getString('searchConditions.tag') : Zotero.getString('itemFields.tags');
@@ -3817,8 +3818,11 @@ var ItemTree = class ItemTree extends LibraryTree {
 		if (!Icons[iconClsName]) {
 			iconClsName = "IconTreeitem";
 		}
-		if (item._ObjectType == "Collection") {
+		if (item.isCollection()) {
 			iconClsName = "IconTreeitemCollection";
+		}
+		if (item.isSearch()) {
+			iconClsName = "IconTreeitemSearch";
 		}
 		var icon = getDOMElement(iconClsName);
 		if (!icon) {
@@ -3829,8 +3833,8 @@ var ItemTree = class ItemTree extends LibraryTree {
 	}
 
 	_canGetBestAttachmentState(item) {
-		return !item.isCollection() && ((item.isRegularItem() && item.numAttachments())
-			|| (item.isFileAttachment() && item.isTopLevelItem()));
+		return (item.isRegularItem() && item.numAttachments())
+			|| (item.isFileAttachment() && item.isTopLevelItem());
 	}
 	
 	_getTagSwatch(tag, color) {
@@ -3877,7 +3881,7 @@ ItemTreeRow.prototype.getField = function(field, unformatted)
 }
 
 ItemTreeRow.prototype.numNotes = function() {
-	if (this.ref.isCollection() || this.ref.isNote()) {
+	if (this.ref.isNote()) {
 		return 0;
 	}
 	if (this.ref.isAttachment()) {

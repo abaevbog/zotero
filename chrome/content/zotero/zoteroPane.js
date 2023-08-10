@@ -1749,11 +1749,16 @@ var ZoteroPane = new function()
 			if (selectedItems.length == 1) {
 				var item = selectedItems[0];
 				
-				if (item._ObjectType == "Collection") {
+				if (item.isCollection()) {
 					// If a collection is selected, it must be in the trash.
 					var subcollectionsCount = item.getDescendents(false, 'collection', true).length;
 					
 					this.setItemPaneMessage(`Deleted collection with ${subcollectionsCount} subcollections.`);
+				}
+				else if (item.isSearch()) {
+					var searchResultCount = (yield item.search()).length;
+					var conditions = Object.keys(item.getConditions()).length;
+					this.setItemPaneMessage(`Deleted search with ${conditions} condition(s) and ${searchResultCount} match(es)`);
 				}
 				else if (item.isNote()) {
 					ZoteroItemPane.onNoteSelected(item, this.collectionsView.editable);
