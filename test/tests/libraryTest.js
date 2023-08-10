@@ -303,10 +303,10 @@ describe("Zotero.Library", function() {
 			let c2 = yield createDataObject('collection', { libraryID });
 			assert.isTrue(library.hasCollections());
 			
-			yield c1.eraseTx();
+			yield c1.eraseTx({ permanently: true });
 			assert.isTrue(library.hasCollections());
 			
-			yield c2.eraseTx();
+			yield c2.eraseTx({ permanently: true });
 			assert.isFalse(library.hasCollections());
 		})
 	});
