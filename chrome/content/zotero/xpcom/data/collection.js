@@ -404,10 +404,6 @@ Zotero.Collection.prototype._finalizeSave = Zotero.Promise.coroutine(function* (
 			Zotero.Notifier.queue(
 				'modify', 'collection', this.id, env.notifierData, env.options.notifierQueue
 			);
-			// If we are restoring the collection from trash, this refreshes the itemTree
-			if (env.options.restore) {
-				Zotero.Notifier.queue('delete', 'item', this.id, {});
-			}
 		}
 	}
 	
@@ -730,8 +726,6 @@ Zotero.Collection.prototype._eraseData = Zotero.Promise.coroutine(function* (env
 			}
 		}
 	);
-	// Refresh trash itemTree - this hits syncEventListener, so this is a temporary workaround
-	Zotero.Notifier.queue('delete', 'item', this.id, {});
 
 	env.deletedObjectIDs = collections;
 	

@@ -755,18 +755,11 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 				// If collection isn't currently visible and it isn't in the trash (because it was
 				// undeleted), add it (if possible without opening any containers)
 				else if (!collection.deleted) {
+					await this._addSortedRow('collection', id);
+					await this.selectByID(currentTreeRow.id);
+					// Invalidate parent in case it's become non-empty
 					let parentRow = this.getRowIndexByID("C" + collection.parentID);
-					if (!parentRow || this.isContainerOpen(parentRow)) {
-						// When no parentRow or it's already opened, add the sorted row
-						await this._addSortedRow('collection', id, 'T' + collection.libraryID);
-					}
-					else {
-						// Otherwise, open it and invalidate - new collection will be added
-						// by forceUpdate
-						if(!this.isContainerOpen(parentRow)) {
-							await this.toggleOpenState(parentRow);
-						}
-						// Invalidate parent in case it's become non-empty
+					if (parentRow !== false) {
 						this.tree.invalidateRow(parentRow);
 					}
 				}
@@ -807,7 +800,6 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 						}
 					}
 				}
-				//await this._addSortedRow('search', id, 'T' + search.libraryID);
 				break;
 				
 			case 'feed':
@@ -2378,7 +2370,7 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 	 * @param {String} moveToID - optional ID of collectionTree entry to select after row is added
 	 * @return {Integer|false} - Index at which the row was added, or false if it wasn't added
 	 */
-	async _addSortedRow(objectType, id, moveToID) {
+	async _addSortedRow(objectType, id) {
 		let beforeRow;
 		if (objectType == 'collection') {
 			let collection = await Zotero.Collections.getAsync(id);
@@ -2497,17 +2489,7 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 				beforeRow
 			);
 		}
-		if (moveToID) {
-			this.selectByID(moveToID);
-			return beforeRow;
-		}
-		let moveSelect = beforeRow + 1;
-		if (moveSelect <= this.selection.focused) {
-			while (!this.isSelectable(moveSelect)) {
-				moveSelect++;
-			}
-			this.selection.select(moveSelect);
-		}
+
 		return beforeRow;
 	}
 	

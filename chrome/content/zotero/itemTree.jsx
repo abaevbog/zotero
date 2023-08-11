@@ -103,7 +103,7 @@ var ItemTree = class ItemTree extends LibraryTree {
 		
 		this._unregisterID = Zotero.Notifier.registerObserver(
 			this,
-			['item', 'collection-item', 'item-tag', 'share-items', 'bucket', 'feedItem', 'search', 'itemtree'],
+			['item', 'collection-item', 'item-tag', 'share-items', 'bucket', 'feedItem', 'search', 'itemtree', 'collection'],
 			'itemTreeView',
 			50
 		);
@@ -373,10 +373,17 @@ var ItemTree = class ItemTree extends LibraryTree {
 			return;
 		}
 
-		if (type == 'search' && action == 'modify') {
-			// TODO: Only refresh on condition change (not currently available in extraData)
-			await this.refresh();
-			return;
+		// If a collection with subcollections is deleted/restored, ids will include subcollections
+		// though they are not showing in itemTree. So we filter them out
+		if (type == 'collection') {
+			const deletedParents = new Set();
+			const collections = [];
+			for (let id of ids) {
+				const collection = Zotero.Collections.get(id);
+				deletedParents.add(collection.key);
+				collections.push(collection);
+			}
+			ids = collections.filter(c => !c._parentKey || !deletedParents.has(c._parentKey)).map(c => c.id);
 		}
 
 		// Clear item type icon and tag colors when a tag is added to or removed from an item
@@ -555,7 +562,7 @@ var ItemTree = class ItemTree extends LibraryTree {
 				madeChanges = true;
 			}
 		}
-		else if (type == 'item' && action == 'modify')
+		else if (['item', 'collection', 'search'].includes(type) && action == 'modify')
 		{
 			// Clear row caches
 			for (const id of ids) {

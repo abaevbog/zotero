@@ -261,7 +261,6 @@ Zotero.Search.prototype._saveData = Zotero.Promise.coroutine(function* (env) {
 		}
 		else {
 			sql = "DELETE FROM deletedSearches WHERE savedSearchID=?";
-			Zotero.Notifier.queue('delete', 'item', this.id, {});
 		}
 		yield Zotero.DB.queryAsync(sql, searchID);
 		
@@ -316,7 +315,6 @@ Zotero.Search.prototype._eraseData = Zotero.Promise.coroutine(function* (env) {
 		yield Zotero.DB.queryAsync('INSERT OR IGNORE INTO deletedSearches (savedSearchID) VALUES (?)', this.id);
 		this._markForReload('primaryData');
 	}
-	Zotero.Notifier.queue('delete', 'item', this.id, {});
 });
 
 Zotero.Search.prototype._finalizeErase = Zotero.Promise.coroutine(function* (env) {
