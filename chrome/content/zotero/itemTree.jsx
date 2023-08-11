@@ -1743,6 +1743,10 @@ var ItemTree = class ItemTree extends LibraryTree {
 				if (trashedCollectionIds.length > 0) {
 					await Zotero.Collections.erase(trashedCollectionIds, { permanently: true });
 				}
+				var trashedSearches = Array.from(this.selection.selected).filter(index => this.getRow(index).ref.isSearch()).map(index => this.getRow(index).id);
+				if (trashedSearches.length > 0) {
+					await Zotero.Searches.erase(trashedSearches, { permanently: true });
+				}
 				if (ids.length > 0) {
 					await Zotero.Items.erase(ids);
 				}

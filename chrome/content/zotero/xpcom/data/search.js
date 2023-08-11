@@ -261,6 +261,7 @@ Zotero.Search.prototype._saveData = Zotero.Promise.coroutine(function* (env) {
 		}
 		else {
 			sql = "DELETE FROM deletedSearches WHERE savedSearchID=?";
+			Zotero.Notifier.queue('delete', 'item', this.id, {});
 		}
 		yield Zotero.DB.queryAsync(sql, searchID);
 		
@@ -313,15 +314,14 @@ Zotero.Search.prototype._eraseData = Zotero.Promise.coroutine(function* (env) {
 	}
 	else {
 		yield Zotero.DB.queryAsync('INSERT OR IGNORE INTO deletedSearches (savedSearchID) VALUES (?)', this.id);
-		// Refresh trash itemTree - this hits syncEventListener, so this is a temporary workaround
-		Zotero.Notifier.queue('delete', 'item', this.id, {});
-		yield this.loadDataType('primaryData', true);
+		this._markForReload('primaryData');
 	}
+	Zotero.Notifier.queue('delete', 'item', this.id, {});
 });
 
 Zotero.Search.prototype._finalizeErase = Zotero.Promise.coroutine(function* (env) {
 	yield Zotero.Search._super.prototype._finalizeErase.call(this, env);
-	
+	yield this.reload();
 	// Update library searches status
 	yield Zotero.Libraries.get(this.libraryID).updateSearches();
 });
