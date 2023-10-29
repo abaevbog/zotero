@@ -83,7 +83,35 @@ var Zotero_QuickFormat = new function () {
 			qfbHeight = qfb.scrollHeight;
 			referencePanel = document.querySelector(".citation-dialog.reference-panel");
 			referenceBox = document.querySelector(".citation-dialog.reference-list");
-			
+			// Explicitly set the focused reference as the selected item. Screenreaders may focus
+			// on the richlistitem, announce it but not actually select it.
+			document.addEventListener('focus', (_) => {
+				if (document.activeElement.tagName == "richlistitem") {
+					referenceBox.selectedItem = document.activeElement;
+				}
+			}, true);
+			// Navigation within the reference panel
+			referenceBox.addEventListener("keydown", (event) => {
+				// Space or enter selects the reference
+				if (event.key === " " || event.keyCode == event.DOM_VK_RETURN) {
+					event.target.closest("richlistitem").click();
+				}
+				// Shift-tab will move focus back to the input field
+				else if (event.keyCode === event.DOM_VK_TAB && event.shiftKey) {
+					event.preventDefault();
+					event.stopPropagation();
+					qfiDocument.querySelector("body").focus();
+				}
+				// Arrows will move focus onto the selected field so that screenreaders
+				// always announce it.
+				else if (event.keyCode == event.DOM_VK_DOWN || event.keyCode == event.DOM_VK_UP) {
+					// Timeout to focus on the entry after the selected attribute changes.
+					setTimeout(() => {
+						let selected = referenceBox.querySelector("[selected]");
+						selected.focus();
+					});
+				}
+			});
 			if (Zotero.isWin) {
 				referencePanel.style.marginTop = "-29px";
 				if (Zotero.Prefs.get('integration.keepAddCitationDialogRaised')) {
@@ -115,7 +143,32 @@ var Zotero_QuickFormat = new function () {
 				panelLocator = document.getElementById("locator");
 				panelInfo = document.getElementById("citation-properties-info");
 				panelLibraryLink = document.getElementById("citation-properties-library-link");
-
+				// Panel's keyboard navigation
+				panel.addEventListener("keypress", (event) => {
+					// Tabbing through the fields
+					if (event.keyCode == event.DOM_VK_TAB) {
+						event.preventDefault();
+						let tabIndex = parseInt(event.target.closest("[tabindex]").getAttribute("tabindex"));
+						tabIndex += event.shiftKey ? -1 : 1;
+						if (tabIndex == 8) {
+							tabIndex = 1;
+						}
+						if (tabIndex == 0) {
+							tabIndex = 7;
+						}
+		
+						panel.querySelector(`[tabindex='${tabIndex}']`).focus();
+					}
+					// Space or enter triggers a click
+					if (event.key == ' ' || event.keyCode == event.DOM_VK_RETURN) {
+						if (event.target.tagName == "button") {
+							event.target.click();
+						}
+						if (event.target.tagName == "menulist") {
+							event.target.firstChild.openPopup();
+						}
+					}
+				});
 				// add labels to popup
 				var locators = Zotero.Cite.labels;
 				var labelList = document.getElementById("locator-label-popup");
@@ -792,6 +845,7 @@ var Zotero_QuickFormat = new function () {
 		var bubble = qfiDocument.createElement("span");
 		bubble.setAttribute("class", "citation-dialog bubble");
 		bubble.setAttribute("draggable", "true");
+		bubble.setAttribute("tabindex", 0);
 		bubble.textContent = str;
 		bubble.addEventListener("click", _onBubbleClick, false);
 		bubble.addEventListener("dragstart", _onBubbleDrag, false);
@@ -1051,11 +1105,11 @@ var Zotero_QuickFormat = new function () {
 	}
 	
 	/**
-	 * Move cursor to end of the textbox
+	 * Move cursor to end of the textbox or to the end of a given bubble
 	 */
-	function _moveCursorToEnd() {
+	function _moveCursorToEnd(node = qfe.lastChild) {
 		var nodeRange = qfiDocument.createRange();
-		nodeRange.selectNode(qfe.lastChild);
+		nodeRange.selectNode(node);
 		nodeRange.collapse(false);
 		
 		var selection = qfiWindow.getSelection();
@@ -1112,7 +1166,9 @@ var Zotero_QuickFormat = new function () {
 		document.getElementById("citation-properties-title").textContent = item.getDisplayTitle();
 		while(panelInfo.hasChildNodes()) panelInfo.removeChild(panelInfo.firstChild);
 		_buildItemDescription(item, panelInfo);
-		
+		// Aria label for the info panel to be visible to the screen readers
+		let description = Array.from(panelInfo.childNodes).map(label => label.value).join(".");
+		panelInfo.setAttribute('aria-label', description);
 		panelLibraryLink.hidden = !item.id;
 		if(item.id) {
 			var libraryName = item.libraryID ? Zotero.Libraries.getName(item.libraryID)
@@ -1123,7 +1179,6 @@ var Zotero_QuickFormat = new function () {
 		target.setAttribute("selected", "true");
 		panel.openPopup(target, "after_start",
 			target.clientWidth/2, 0, false, false, null);
-		panelLocator.focus();
 	}
 	
 	/**
@@ -1179,11 +1234,17 @@ var Zotero_QuickFormat = new function () {
 	/**
 	 * Get bubbles within the current selection
 	 */
-	function _getSelectedBubble(right) {
+	function _getSelectedBubble(right, canUseFocusedBubble = true) {
 		var selection = qfiWindow.getSelection(),
 			range = selection.getRangeAt(0);
 		qfe.normalize();
 		
+		let focusedBubble = null;
+		// A bubble may not be picked up when using a screenreader.
+		// In that case, try to use the bubble that's currently focused.
+		if (canUseFocusedBubble && qfiDocument.activeElement.classList.contains("bubble")) {
+			focusedBubble = qfiDocument.activeElement;
+		}
 		// Check whether the bubble is selected
 		// Not sure whether this ever happens anymore
 		var container = range.startContainer;
@@ -1202,7 +1263,7 @@ var Zotero_QuickFormat = new function () {
 					return container.parentNode;
 				}
 			}
-			return null;
+			return focusedBubble;
 		}
 
 		// Check whether there is a bubble anywhere to the left of this one
@@ -1210,7 +1271,7 @@ var Zotero_QuickFormat = new function () {
 			childNodes = qfe.childNodes,
 			node = childNodes[offset-(right ? 0 : 1)];
 		if (node && node.dataset && node.dataset.citationItem) return node;
-		return null;
+		return focusedBubble;
 	}
 
 	/**
@@ -1247,6 +1308,10 @@ var Zotero_QuickFormat = new function () {
 			var selection = qfiWindow.getSelection();
 			selection.removeAllRanges();
 			selection.addRange(nodeRange);
+			// If the click is on the input field, focus the bubble next to it
+			if (event.target.classList.contains("editor")) {
+				bubble.focus();
+			}
 		}
 	}
 	
@@ -1272,11 +1337,11 @@ var Zotero_QuickFormat = new function () {
 			// Handled in the event handler up, but we have to cancel it here
 			// so that we do not issue another _quickFormat call
 			return;
-		} else if(keyCode === event.DOM_VK_TAB || event.charCode === 59 /* ; */) {
+		} else if(event.charCode === 59 /* ; */) {
 			event.preventDefault();
 			Zotero_QuickFormat._bubbleizeSelected();
 		} else if(keyCode === event.DOM_VK_BACK_SPACE || keyCode === event.DOM_VK_DELETE) {
-			var bubble = _getSelectedBubble(keyCode === event.DOM_VK_DELETE);
+			var bubble = _getSelectedBubble(keyCode === event.DOM_VK_DELETE, false);
 
 			if(bubble) {
 				event.preventDefault();
@@ -1288,7 +1353,7 @@ var Zotero_QuickFormat = new function () {
 		} else if(keyCode === event.DOM_VK_LEFT || keyCode === event.DOM_VK_RIGHT) {
 			locatorLocked = true;
 			var right = keyCode === event.DOM_VK_RIGHT,
-				bubble = _getSelectedBubble(right);
+				bubble = _getSelectedBubble(right, false);
 			if(bubble) {
 				event.preventDefault();
 
@@ -1299,6 +1364,14 @@ var Zotero_QuickFormat = new function () {
 				var selection = qfiWindow.getSelection();
 				selection.removeAllRanges();
 				selection.addRange(nodeRange);
+				// During arrow navigation, place focus on the bubble to announce it.
+				let focusOn = _getSelectedBubble(false);
+				if (focusOn) {
+					focusOn.focus();
+				}
+			}
+			else {
+				qfiDocument.querySelector("body").focus();
 			}
 		} else if (["Home", "End"].includes(event.key)) {
 			locatorLocked = true;
@@ -1330,7 +1403,7 @@ var Zotero_QuickFormat = new function () {
 			// If found, change to that
 			if(previousSibling) {
 				referenceBox.selectedItem = previousSibling;
-				
+				previousSibling.focus();
 				// If there are separators before this item, ensure that they are visible
 				var visibleItem = previousSibling;
 
@@ -1361,10 +1434,44 @@ var Zotero_QuickFormat = new function () {
 				if(nextSibling){
 					referenceBox.selectedItem = nextSibling;
 					referenceBox.ensureElementIsVisible(nextSibling);
+					nextSibling.focus();
 				};
 				event.preventDefault();
 			}
-		} else {
+		}
+		else if (event.key == ' ') {
+			// Space on a bubble moves focus right after it - this is required for voiceover
+			// that does not let go of a focused span on an arrow click if there's not another span
+			// after it
+			if (event.target.tagName == "SPAN") {
+				let bubble = _getSelectedBubble();
+				_moveCursorToEnd(bubble);
+				event.preventDefault();
+			}
+			// Space on toolbarbutton opens the popup
+			else if (event.target.tagName == "toolbarbutton") {
+				event.target.firstChild.openPopup();
+			}
+			// Otherwise - it's an actual space character
+		}
+		else if (keyCode == event.DOM_VK_TAB) {
+			// Tab when the reference panel is opened creates a bubble
+			if (referencePanel.state === "open" && referenceBox.selectedItem && !event.shiftKey) {
+				Zotero_QuickFormat._bubbleizeSelected();
+			}
+			// Shift-Tab from the input field focuses on zotero icon dropdown
+			else if (event.shiftKey) {
+				document.getElementById("zotero-icon").focus();
+			}
+			// Otherwise, Tab places focus on the very first bubble
+			else {
+				let firstBubble = qfiDocument.querySelector(".bubble");
+				_moveCursorToEnd(firstBubble);
+				firstBubble.focus();
+			}
+			event.preventDefault();
+		}
+		else {
 			isPaste = false;
 			_resetSearchTimer();
 		}
