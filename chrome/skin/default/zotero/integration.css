@@ -108,6 +108,18 @@
 	padding: 0;
 }
 
+.citation-dialog.editor > input {
+	outline: none;
+	width: 30px;
+	border: none;
+}
+
+#dragged-bubble {
+	opacity: 0.3;
+	overflow: clip;
+	width: 50px;
+}
+
 .citation-dialog.bubble {
 	border-radius: 8px;
 	background-color: #dee7f8;
