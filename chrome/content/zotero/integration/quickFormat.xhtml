@@ -52,7 +52,7 @@
 		<deck class="citation-dialog deck" selectedIndex="0" flex="1">
 			<hbox class="citation-dialog search" flex="1" align="start">
 				<hbox flex="1">
-					<toolbarbutton id="zotero-icon" type="menu" tabindex="0">
+					<toolbarbutton id="zotero-icon" type="menu" tabindex="0" disabled="true" aria-disabled="true">
 						<menupopup>
 							<menuitem id="keep-sorted" label="&zotero.citation.keepSorted.label;"
 									  oncommand="Zotero_QuickFormat.onKeepSortedCommand()" type="checkbox"
@@ -91,24 +91,24 @@
 		   onkeypress="Zotero_QuickFormat.onPanelKeyPress(event)"
 		   onpopuphidden="Zotero_QuickFormat.onCitationPropertiesClosed(event)">
 		<vbox flex="1">
-			<description id="citation-properties-title"/>
-			<hbox id="citation-properties-info" tabindex="1"/>
+			<description id="citation-properties-title" tabindex="1"/>
+			<hbox id="citation-properties-info" tabindex="2"/>
 		</vbox>
 		<html:div id="citation-properties-grid">
-			<menulist id="locator-label" sizetopopup="none" tabindex="2"
+			<menulist id="locator-label" sizetopopup="none" tabindex="3"
 					  oncommand="Zotero_QuickFormat.onCitationPropertiesChanged(event)" native="true">
 				<menupopup id="locator-label-popup"/>
 			</menulist>
-			<html:input type="text" aria-labelledby="locator-label" tabindex="3" id="locator"
+			<html:input type="text" aria-labelledby="locator-label" tabindex="4" id="locator"
 					 oninput="window.setTimeout(function(event) { Zotero_QuickFormat.onCitationPropertiesChanged(event) }, 0)"/>
 			<label id="prefix-label" value="&zotero.citation.prefix.label;"/>
-			<html:input type="text" aria-labelledby="prefix-label" tabindex="4" class="citation-textbox" id="prefix" flex="1"
+			<html:input type="text" aria-labelledby="prefix-label" tabindex="5" class="citation-textbox" id="prefix" flex="1"
 					 oninput="window.setTimeout(function(event) { Zotero_QuickFormat.onCitationPropertiesChanged(event) }, 0)"/>
 			<label id="suffix-label" value="&zotero.citation.suffix.label;"/>
-			<html:input type="text" aria-labelledby="suffix-label" tabindex="5" class="citation-textbox" id="suffix" flex="1"
+			<html:input type="text" aria-labelledby="suffix-label" tabindex="6" class="citation-textbox" id="suffix" flex="1"
 					 oninput="window.setTimeout(function(event) { Zotero_QuickFormat.onCitationPropertiesChanged(event) }, 0)"/>
 			<html:div>
-				<html:input type="checkbox" id="suppress-author" native="true" tabindex="6"
+				<html:input type="checkbox" id="suppress-author" native="true" tabindex="7"
 							onchange="Zotero_QuickFormat.onCitationPropertiesChanged(event)"/>
 				<html:label for="suppress-author">
 					&zotero.citation.suppressAuthor.label;
@@ -116,7 +116,7 @@
 			</html:div>
 		</html:div>
 		<vbox flex="1" align="center">
-			<button id="citation-properties-library-link" tabindex="7" onclick="Zotero_QuickFormat.showInLibrary()"/>
+			<button id="citation-properties-library-link" tabindex="8" onclick="Zotero_QuickFormat.showInLibrary()"/>
 		</vbox>
 	</panel>
 	<guidance-panel class="citation-dialog guidance" about="quickFormat"

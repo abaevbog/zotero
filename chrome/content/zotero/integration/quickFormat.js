@@ -91,20 +91,21 @@ var Zotero_QuickFormat = new function () {
 				}
 			}, true);
 			// Navigation within the reference panel
-			referenceBox.addEventListener("keydown", (event) => {
-				// Space or enter selects the reference
-				if (event.key === " " || event.keyCode == event.DOM_VK_RETURN) {
+			referenceBox.addEventListener("keypress", (event) => {
+				// Space, enter, tab or ; selects the reference
+				if ([" ", "Return"].includes(event.key) || event.charCode == 59 || (event.key == "Tab" && !event.shiftKey)) {
+					event.preventDefault();
 					event.target.closest("richlistitem").click();
 				}
 				// Shift-tab will move focus back to the input field
-				else if (event.keyCode === event.DOM_VK_TAB && event.shiftKey) {
+				else if (event.key === "Tab" && event.shiftKey) {
 					event.preventDefault();
 					event.stopPropagation();
-					qfiDocument.querySelector("body").focus();
+					qfiDocument.querySelector("input").focus();
 				}
 				// Arrows will move focus onto the selected field so that screenreaders
 				// always announce it.
-				else if (event.keyCode == event.DOM_VK_DOWN || event.keyCode == event.DOM_VK_UP) {
+				else if (["ArrowUp", "ArrowDown"].includes(event.key)) {
 					// Timeout to focus on the entry after the selected attribute changes.
 					setTimeout(() => {
 						let selected = referenceBox.querySelector("[selected]");
@@ -132,7 +133,12 @@ var Zotero_QuickFormat = new function () {
 					keepSorted.setAttribute("checked", "true");
 				}
 			}
-			
+			// Make icon focusable only if there's a visible menuitem
+			for (let menuitemID of ["keep-sorted", "show-editor", "classic-view"]) {
+				if (document.getElementById(menuitemID).getAttribute("hidden") != "true") {
+					document.getElementById("zotero-icon").removeAttribute("disabled");
+				}
+			}
 			// Nodes for citation properties panel
 			panel = document.getElementById("citation-properties");
 			if (panel) {
@@ -145,22 +151,23 @@ var Zotero_QuickFormat = new function () {
 				panelLibraryLink = document.getElementById("citation-properties-library-link");
 				// Panel's keyboard navigation
 				panel.addEventListener("keypress", (event) => {
-					// Tabbing through the fields
-					if (event.keyCode == event.DOM_VK_TAB) {
+					// Tabbing through the fields. This should not be necessary but for some reason
+					// without manually handling focus, the buttons are skipped during tabbing
+					if (event.key === "Tab") {
 						event.preventDefault();
 						let tabIndex = parseInt(event.target.closest("[tabindex]").getAttribute("tabindex"));
 						tabIndex += event.shiftKey ? -1 : 1;
-						if (tabIndex == 8) {
+						if (tabIndex == 9) {
 							tabIndex = 1;
 						}
 						if (tabIndex == 0) {
-							tabIndex = 7;
+							tabIndex = 8;
 						}
 		
 						panel.querySelector(`[tabindex='${tabIndex}']`).focus();
 					}
 					// Space or enter triggers a click
-					if (event.key == ' ' || event.keyCode == event.DOM_VK_RETURN) {
+					if (event.key == ' ' || event.key === "Return") {
 						if (event.target.tagName == "button") {
 							event.target.click();
 						}
@@ -281,6 +288,7 @@ var Zotero_QuickFormat = new function () {
 				qfiDocument.querySelector("br")?.remove();
 			}
 		});
+		newInput.addEventListener("keypress", onInputPress);
 		newInput.addEventListener("paste", _onPaste, false);
 		return newInput;
 	}
@@ -847,6 +855,7 @@ var Zotero_QuickFormat = new function () {
 		bubble.addEventListener("click", _onBubbleClick, false);
 		bubble.addEventListener("dragstart", _onBubbleDrag, false);
 		bubble.addEventListener("dragend", onBubbleDragEnd);
+		bubble.addEventListener("keypress", onBubblePress);
 		bubble.dataset.citationItem = JSON.stringify(citationItem);
 		qfe.insertBefore(bubble, (nextNode ? nextNode : null));
 		return bubble;
@@ -1309,6 +1318,93 @@ var Zotero_QuickFormat = new function () {
 		newInput.focus();
 	};
 	
+
+	var onInputPress = function (event) {
+		if (event.charCode === 59 /* ; */ || event.key === "Return" || (event.key == "Tab" && !event.shiftKey)) {
+			event.preventDefault();
+			Zotero_QuickFormat._bubbleizeSelected();
+		}
+		else if (["ArrowLeft", "ArrowRight"].includes(event.key)) {
+			locatorLocked = true;
+			if (!this.value.length) {
+				event.preventDefault();
+				if (event.key === "ArrowLeft") {
+					if (movedFocusBack(this)) {
+						this.remove();
+					}
+				}
+				else if (event.key === "ArrowRight") {
+					if (movedFocusForward(this)) {
+						this.remove();
+					}
+				}
+			}
+		}
+		else if (["Backspace", "Delete"].includes(event.key) && !this.value) {
+			event.preventDefault();
+			movedFocusBack(this);
+			this.remove();
+		}
+		else if (["ArrowDown", "ArrowUp"].includes(event.key) && referencePanel.state === "open") {
+			locatorLocked = true;
+			if (referencePanel.state === "open") {
+				var e = new KeyboardEvent('keypress', {
+					key: event.key,
+					code: event.code,
+					keyCode: event.keyCode,
+					bubbles: true
+				});
+				let input = _getInput();
+				input.setAttribute("prevent_blur_deletion", true);
+				referenceBox.dispatchEvent(e);
+				event.preventDefault();
+			}
+		}
+	};
+
+	var onBubblePress = function(event) {
+		if (event.key == "ArrowDown" && (Zotero.isMac ? event.metaKey : event.ctrlKey)) {
+			// If meta key is held down, show the citation properties panel
+			_showCitationProperties(this);
+			event.preventDefault();
+		}
+		else if (event.key == " ") {
+			// Open an input field after the bubble and focus on it
+			let newInput = _createInputField();
+			if (this.nextSibling) {
+				qfiDocument.body.insertBefore(newInput, this.nextSibling);
+			}
+			else {
+				qfiDocument.body.appendChild(newInput);
+			}
+			newInput.focus();
+			event.preventDefault();
+		}
+		else if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+			event.preventDefault();
+			if (["ArrowLeft", "Home"].includes(event.key)) {
+				if (!movedFocusBack(this)) {
+					let input = _createInputField();
+					qfiDocument.body.prepend(input);
+					input.focus();
+				}
+				return;
+			}
+			if (!movedFocusForward(this)) {
+				let input = _createInputField();
+				qfiDocument.body.appendChild(input);
+				input.focus();
+			}
+		}
+		else if (["Backspace", "Delete"].includes(event.key)) {
+			event.preventDefault();
+			if (!movedFocusBack(this)) {
+				movedFocusForward(this);
+			}
+			this.parentNode.removeChild(this);
+		}
+	};
+
 	/**
 	 * Handle return or escape
 	 */
@@ -1332,140 +1428,16 @@ var Zotero_QuickFormat = new function () {
 			// Handled in the event handler up, but we have to cancel it here
 			// so that we do not issue another _quickFormat call
 			return;
-		} 
-		else if(event.charCode === 59 /* ; */) {
-			event.preventDefault();
-			Zotero_QuickFormat._bubbleizeSelected();
-		} else if(keyCode === event.DOM_VK_BACK_SPACE || keyCode === event.DOM_VK_DELETE) {
-			let bubble = _getSelectedBubble();
-			let activeInput = _getInput();
-			if (bubble) {
-				event.preventDefault();
-				if (!movedFocusBack(bubble)) {
-					movedFocusForward(bubble);
-				}
-				bubble.parentNode.removeChild(bubble);
-			}
-			else if (activeInput && !activeInput.value.length) {
-				event.preventDefault();
-				movedFocusBack(activeInput);
-				activeInput.remove();
-			}
-		}
-		else if (keyCode === event.DOM_VK_LEFT || keyCode === event.DOM_VK_RIGHT || ["Home", "End"].includes(event.key)) {
-			locatorLocked = true;
-			let bubble = _getSelectedBubble();
-			if (bubble) {
-				event.preventDefault();
-				if (keyCode === event.DOM_VK_LEFT || event.key == "Home") {
-					if (!movedFocusBack(bubble)) {
-						let input = _createInputField();
-						qfiDocument.body.prepend(input);
-						input.focus();
-					}
-				}
-				else if (keyCode === event.DOM_VK_RIGHT || event.key == "End") {
-					if (!movedFocusForward(bubble)) {
-						let input = _createInputField();
-						qfiDocument.body.appendChild(input);
-						input.focus();
-					}
-				}
-			}
-			let input = _getInput();
-			if (input && !input.value.length) {
-				if (keyCode === event.DOM_VK_LEFT) {
-					if (movedFocusBack(input)) {
-						input.remove();
-					}
-				}
-				else if (keyCode === event.DOM_VK_RIGHT) {
-					if (movedFocusForward(input)) {
-						input.remove();
-					}
-				}
-			}
-		}
-		else if(keyCode === event.DOM_VK_UP && referencePanel.state === "open") {
-			locatorLocked = true;
-			var selectedItem = referenceBox.selectedItem;
-
-			var previousSibling;
-			let input = _getInput();
-			input.setAttribute("prevent_blur_deletion", true);
-
-			// Seek the closet previous sibling that is not disabled
-			while((previousSibling = selectedItem.previousSibling) && previousSibling.hasAttribute("disabled")) {
-				selectedItem = previousSibling;
-			}
-			// If found, change to that
-			if(previousSibling) {
-				referenceBox.selectedItem = previousSibling;
-				previousSibling.focus();
-				// If there are separators before this item, ensure that they are visible
-				var visibleItem = previousSibling;
-
-				while(visibleItem.previousSibling && visibleItem.previousSibling.hasAttribute("disabled")) {
-					visibleItem = visibleItem.previousSibling;
-				}
-				referenceBox.ensureElementIsVisible(visibleItem);
-			}
-			event.preventDefault();
-		} else if(keyCode === event.DOM_VK_DOWN) {
-			locatorLocked = true;
-			if((Zotero.isMac ? event.metaKey : event.ctrlKey)) {
-				// If meta key is held down, show the citation properties panel
-				var bubble = _getSelectedBubble();
-
-				if(bubble) _showCitationProperties(bubble);
-				event.preventDefault();
-			} else if (referencePanel.state === "open") {
-				var selectedItem = referenceBox.selectedItem;
-				var nextSibling;
-				let input = _getInput();
-				input.setAttribute("prevent_blur_deletion", true);
-				// Seek the closet next sibling that is not disabled
-				while((nextSibling = selectedItem.nextSibling) && nextSibling.hasAttribute("disabled")) {
-					selectedItem = nextSibling;
-				}
-				// If found, change to that
-				if(nextSibling){
-					referenceBox.selectedItem = nextSibling;
-					referenceBox.ensureElementIsVisible(nextSibling);
-					nextSibling.focus();
-				};
-				event.preventDefault();
-			}
 		}
 		else if (event.key == ' ') {
-			// Space on a bubble moves focus right after it - this is required for voiceover
-			// that does not let go of a focused span on an arrow click if there's not another span
-			// after it
-			if (event.target.tagName == "SPAN") {
-				let bubble = _getSelectedBubble();
-				let newInput = _createInputField();
-				if (bubble.nextSibling) {
-					qfiDocument.body.insertBefore(newInput, bubble.nextSibling);
-				}
-				else {
-					qfiDocument.body.appendChild(newInput);
-				}
-				newInput.focus();
-				event.preventDefault();
-			}
 			// Space on toolbarbutton opens the popup
-			else if (event.target.tagName == "toolbarbutton") {
+			if (event.target.tagName == "toolbarbutton") {
 				event.target.firstChild.openPopup();
 			}
-			// Otherwise - it's an actual space character
 		}
 		else if (keyCode == event.DOM_VK_TAB) {
-			// Tab when the reference panel is opened creates a bubble
-			if (referencePanel.state === "open" && referenceBox.selectedItem && !event.shiftKey) {
-				Zotero_QuickFormat._bubbleizeSelected();
-			}
 			// Shift-Tab from the input field focuses on zotero icon dropdown
-			else if (event.shiftKey) {
+			if (event.shiftKey) {
 				document.getElementById("zotero-icon").focus();
 			}
 			// Otherwise, Tab places focus on the very first bubble

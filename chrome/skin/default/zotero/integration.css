@@ -146,7 +146,8 @@
 	visibility: hidden;
 }
 
-.citation-dialog.bubble:hover:before {
+.citation-dialog.bubble:hover:before,
+.citation-dialog.bubble:focus-visible:before {
 	visibility: visible;
 }
 
