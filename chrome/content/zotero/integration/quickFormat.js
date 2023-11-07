@@ -36,7 +36,7 @@ var Zotero_QuickFormat = new function () {
 	
 	var initialized, io, qfs, qfi, qfiWindow, qfiDocument, qfe, qfb, qfbHeight, qfGuidance,
 		keepSorted, showEditor, referencePanel, referenceBox, referenceHeight = 0,
-		separatorHeight = 0, currentLocator, currentLocatorLabel, currentSearchTime, dragging,
+		separatorHeight = 0, currentLocator, currentLocatorLabel, currentSearchTime, dragPlaceholder,
 		panel, panelPrefix, panelSuffix, panelSuppressAuthor, panelLocatorLabel, panelLocator,
 		panelLibraryLink, panelInfo, panelRefersToBubble, panelFrameHeight = 0, accepted = false,
 		isPaste = false;
@@ -194,8 +194,8 @@ var Zotero_QuickFormat = new function () {
 			qfb.addEventListener("click", _onQuickSearchClick, false);
 			qfb.addEventListener("keypress", _onQuickSearchKeyPress, false);
 			qfe = qfiDocument.querySelector(".citation-dialog.editor");
+			qfe.addEventListener("dragover", _onBubbleDragOver);
 			qfe.addEventListener("drop", _onBubbleDrop, false);
-			qfe.addEventListener("paste", _onPaste, false);
 			if (Zotero_QuickFormat.citingNotes) {
 				_quickFormat();
 			}
@@ -271,13 +271,17 @@ var Zotero_QuickFormat = new function () {
 		}
 		let newInput = qfiDocument.createElement("input");
 		newInput.addEventListener("input", (_) => {
-			_quickFormat();
+			_resetSearchTimer();
+			// Expand the input field if needed
+			newInput.style.width = newInput.scrollWidth + 'px';
 		});
 		newInput.addEventListener("blur", (_) => {
 			if (!newInput.getAttribute("prevent_blur_deletion")) {
 				newInput.remove();
+				qfiDocument.querySelector("br")?.remove();
 			}
 		});
+		newInput.addEventListener("paste", _onPaste, false);
 		return newInput;
 	}
 	
@@ -842,8 +846,7 @@ var Zotero_QuickFormat = new function () {
 		bubble.textContent = str;
 		bubble.addEventListener("click", _onBubbleClick, false);
 		bubble.addEventListener("dragstart", _onBubbleDrag, false);
-		bubble.addEventListener("dragover", _onBubbleDragOver, false);
-		bubble.addEventListener("dragend", onBubbleDragEnd, false);
+		bubble.addEventListener("dragend", onBubbleDragEnd);
 		bubble.dataset.citationItem = JSON.stringify(citationItem);
 		qfe.insertBefore(bubble, (nextNode ? nextNode : null));
 		return bubble;
@@ -914,13 +917,13 @@ var Zotero_QuickFormat = new function () {
 		// handling to maintain the correct locator node in
 		// _showCitation()
 		let input = _getInput();
-		locatorNode = _insertBubble(citationItem, input.previousElementSibling);
+		locatorNode = _insertBubble(citationItem, input);
 		input.remove();
 		isPaste = false;
 		_clearEntryList();
 		yield _previewAndSort();
 		_refocusQfe();
-		
+		locatorNode.focus();
 		return true;
 	});
 	
@@ -1217,6 +1220,10 @@ var Zotero_QuickFormat = new function () {
 	}
 
 	function movedFocusBack(node) {
+		// Skip line break if it's before the node
+		if (node.previousElementSibling?.tagName == "BR") {
+			node = node.previousElementSibling;
+		}
 		if (node.previousElementSibling?.focus) {
 			node.previousElementSibling.focus();
 			return true;
@@ -1252,22 +1259,32 @@ var Zotero_QuickFormat = new function () {
 	function lastSpanBeforePoint(x, y) {
 		let spans = qfiDocument.querySelectorAll('span');
 		let lastSpan = null;
+		let newline = false;
 		for (let i = 0; i < spans.length; i++) {
 			let rect = spans[i].getBoundingClientRect();
 			// If within the vertical range of the span
-			if (x >= rect.top && y <= rect.bottom) {
-				// If the click is to the right of the span
+			if (y >= rect.top && y <= rect.bottom) {
+				// If the click is to the right of the span, it is a candidate
 				if (x > rect.right) {
 					lastSpan = i;
 				}
-				// Handle the edge case where the click is at the very beginning of the line
+				// Otherwise, stop and return the last span we saw if any
 				else {
-					lastSpan = lastSpan !== null ? i - 1 : null;
+					if (i == 0) {
+						lastSpan = null;
+					}
+					else {
+						newline = lastSpan === null;
+						lastSpan = Math.max(i - 1, 0);
+					}
 					break;
 				}
 			}
 		}
-		return lastSpan;
+		if (lastSpan !== null) {
+			lastSpan = spans[lastSpan];
+		}
+		return { lastSpan: lastSpan, newline: newline };
 	}
 	
 	function _onQuickSearchClick(event) {
@@ -1275,13 +1292,16 @@ var Zotero_QuickFormat = new function () {
 		if (!event.target.classList.contains("editor")) {
 			return;
 		}
-		let spans = qfiDocument.querySelectorAll('span');
 		let clickX = event.clientX;
 		let clickY = event.clientY;
-		let lastSpan = lastSpanBeforePoint(clickX, clickY);
+		let { lastSpan, newline } = lastSpanBeforePoint(clickX, clickY);
 		let newInput = _createInputField();
 		if (lastSpan !== null) {
-			spans[lastSpan].after(newInput);
+			lastSpan.after(newInput);
+			if (newline) {
+				let lineBreak = qfiDocument.createElement("br");
+				lastSpan.after(lineBreak);
+			}
 		}
 		else {
 			qfiDocument.body.prepend(newInput);
@@ -1331,9 +1351,6 @@ var Zotero_QuickFormat = new function () {
 				movedFocusBack(activeInput);
 				activeInput.remove();
 			}
-
-			_resize();
-			_resetSearchTimer();
 		}
 		else if (keyCode === event.DOM_VK_LEFT || keyCode === event.DOM_VK_RIGHT || ["Home", "End"].includes(event.key)) {
 			locatorLocked = true;
@@ -1467,7 +1484,6 @@ var Zotero_QuickFormat = new function () {
 		}
 		else {
 			isPaste = false;
-			_resetSearchTimer();
 		}
 	});
 	
@@ -1475,9 +1491,12 @@ var Zotero_QuickFormat = new function () {
 	 * Adds a dummy element to make dragging work
 	 */
 	function _onBubbleDrag(event) {
-		dragging = event.target;
+		dragPlaceholder = event.target.cloneNode(true);
+		dragPlaceholder.setAttribute("id", "dragged-placeholder");
+		this.style.cursor = "grabbing";
 		setTimeout(() => {
 			this.setAttribute("id", "dragged-bubble");
+			this.style.display = "none";
 		});
 		let index = _getBubbleIndex(this);
 		event.dataTransfer.setData("zotero/citation_bubble", index);
@@ -1487,18 +1506,25 @@ var Zotero_QuickFormat = new function () {
 	function _onBubbleDragOver(event) {
 		event.preventDefault();
 		let bubbleIndex = event.dataTransfer.getData("zotero/citation_bubble");
-		if (!bubbleIndex) {
+		let bubble = event.target;
+		if (bubble.classList?.contains("editor")) {
+			let { lastSpan, _ } = lastSpanBeforePoint(event.clientX, event.clientY);
+			if (!lastSpan) {
+				return false;
+			}
+			bubble = lastSpan;
+		}
+		if (isNaN(parseInt(bubbleIndex)) || !bubble.classList?.contains("bubble")) {
 			return false;
 		}
-		let bubble = event.target;
-		if (bubble.getAttribute("id") == "dragged-bubble") {
+		if (bubble.getAttribute("id") == "dragged-placeholder") {
 			return true;
 		}
-		let placeholder = qfiDocument.getElementById("dragged-bubble");
 
+		let placeholder = dragPlaceholder;
 		let bubbleRect = bubble.getBoundingClientRect();
 		let midpoint = (bubbleRect.right + bubbleRect.left) / 2;
-		if (event.clientX > midpoint && bubble.nextElementSibling?.id !== "dragged-bubble") {
+		if (event.clientX > midpoint && bubble.nextElementSibling?.id !== "dragged-placeholder") {
 			if (bubble.nextElementSibling) {
 				qfiDocument.body.insertBefore(placeholder, bubble.nextElementSibling);
 			}
@@ -1506,18 +1532,31 @@ var Zotero_QuickFormat = new function () {
 				qfiDocument.body.appendChild(placeholder);
 			}
 		}
-		else if (event.clientX < midpoint && bubble.previousElementSibling?.id !== "dragged-bubble") {
+		else if (event.clientX < midpoint && bubble.previousElementSibling?.id !== "dragged-placeholder") {
+			let previousBubbleRect = bubble.previousElementSibling?.getBoundingClientRect();
+			if (previousBubbleRect?.top && previousBubbleRect.top !== bubbleRect.top) {
+				let linebreak = qfiDocument.querySelector("br");
+				if (!linebreak) {
+					linebreak = qfiDocument.createElement("br");
+				}
+				qfiDocument.body.insertBefore(linebreak, bubble);
+			}
 			qfiDocument.body.insertBefore(placeholder, bubble);
 		}
-
 		return false;
 	}
 
-	function onBubbleDragEnd(event) {
-		let dragged = qfiDocument.getElementById("dragged-bubble");
-		if (dragged) {
-			dragged.style = "";
-			dragged.removeAttribute("id");
+	function onBubbleDragEnd(_) {
+		if (dragPlaceholder) {
+			dragPlaceholder.remove();
+		}
+		let bubble = qfiDocument.getElementById("dragged-bubble");
+		if (bubble) {
+			bubble.style = "";
+			bubble.removeAttribute("id");
+		}
+		for (let linebreak of qfiDocument.querySelectorAll("br")) {
+			linebreak.remove();
 		}
 	}
 
@@ -1542,15 +1581,10 @@ var Zotero_QuickFormat = new function () {
 		event.preventDefault();
 		event.stopPropagation();
 		let oldPosition = parseInt(event.dataTransfer.getData("zotero/citation_bubble"));
-		if (!oldPosition) return;
-		// Find old position in list
 		let bubble = qfiDocument.getElementById("dragged-bubble");
-		if (!bubble) {
-			return;
-		}
-		bubble.style = "";
-		bubble.removeAttribute("id");
-		dragging = null;
+		if (isNaN(oldPosition) || !bubble) return;
+
+		dragPlaceholder.after(bubble);
 
 		// If moved out of order, turn off "Keep Sources Sorted"
 		if(io.sortable && keepSorted && keepSorted.hasAttribute("checked") && oldPosition !== -1 &&
@@ -1558,13 +1592,31 @@ var Zotero_QuickFormat = new function () {
 			keepSorted.removeAttribute("checked");
 		}
 
+		onBubbleDragEnd();
+
 		yield _previewAndSort();
+		let spans = qfiDocument.body.querySelectorAll("span");
+		let lastSpanRect = spans[spans.length - 1].getBoundingClientRect();
+		let editorRect = qfi.getBoundingClientRect();
+		// During reordering, a bubble can be moved to a new lower row
+		// so we need to expand the search field to see it.
+		// Calling _resize causes a glitch that prevents the next drag event from
+		// properly executing, so this sets the new height manually
+		if (lastSpanRect.bottom > editorRect.bottom) {
+			let qfsHeight = qfs.getBoundingClientRect().height;
+			qfs.height = `${qfsHeight + 27}px`;
+		}
 	});
 	
 	/**
 	 * Handle a click on a bubble
 	 */
 	function _onBubbleClick(event) {
+		// If citation properties dialog is opened for another bubble, just close it.
+		if (panelRefersToBubble && panelRefersToBubble.getAttribute("selected")) {
+			Zotero_QuickFormat.onCitationPropertiesClosed();
+			return;
+		}
 		_showCitationProperties(event.currentTarget);
 	}
 
@@ -1580,7 +1632,6 @@ var Zotero_QuickFormat = new function () {
 			isPaste = true;
 			let input = _getInput();
 			input.value = str.replace(/[\r\n]/g, " ").trim();
-			_resetSearchTimer();
 		}
 	}
 	
@@ -1624,6 +1675,9 @@ var Zotero_QuickFormat = new function () {
 	 * Handle closing citation properties panel
 	 */
 	this.onCitationPropertiesClosed = function(event) {
+		if (!panelRefersToBubble) {
+			return;
+		}
 		panelRefersToBubble.removeAttribute("selected");
 		Zotero_QuickFormat.onCitationPropertiesChanged();
 	}

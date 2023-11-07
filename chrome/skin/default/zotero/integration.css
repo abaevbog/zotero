@@ -112,12 +112,12 @@
 	outline: none;
 	width: 30px;
 	border: none;
+	max-width: 200px;
+	box-sizing: border-box; 
 }
 
-#dragged-bubble {
+#dragged-placeholder {
 	opacity: 0.3;
-	overflow: clip;
-	width: 50px;
 }
 
 .citation-dialog.bubble {
@@ -126,13 +126,34 @@
 	border-style: solid;
 	border-width: 1px;
 	border-color: #a8c0ec;
-	padding: 0 6px 0 6px;
+	padding: 0 11px 0 6px;
 	margin: -1px 2px 0 2px;
 	display: inline-block;
 	white-space: nowrap;
 	line-height: normal;
 	color: #000;
 	-moz-user-select: all;
+	cursor: pointer;
+}
+
+.citation-dialog.bubble::before {
+	background: url("searchbar-dropmarker@2x.png") no-repeat center / contain;
+	display: inline-block;
+	content: "";
+	width: 5px;
+	height: 8px;
+	margin-right: 2px;
+	visibility: hidden;
+}
+
+.citation-dialog.bubble:hover:before {
+	visibility: visible;
+}
+
+.citation-dialog.bubble[selected="true"]:before {
+	visibility: visible;
+	/* Temporary trick to make the dropmarker lighter */
+	filter: invert(100%); 
 }
 
 .citation-dialog.bubble:hover {
@@ -165,6 +186,7 @@
 	overflow: hidden;
 	outline: none;
 	line-height: 2em;
+	cursor: text;
 }
 
 .citation-dialog.spinner {

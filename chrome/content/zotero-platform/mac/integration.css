@@ -97,7 +97,3 @@ panel button:hover:active {
 panel button:-moz-focusring {
   box-shadow: 0 0 1px -moz-mac-focusring inset, 0 0 4px 1px -moz-mac-focusring, 0 0 2px 1px -moz-mac-focusring;
 }
-
-.citation-dialog.bubble {
-	padding: 1px 6px 1px 6px;
-}
