@@ -271,22 +271,39 @@ var Zotero_QuickFormat = new function () {
 		qfe.focus();
 	}
 
+
+	function _clearInput() {
+		let input = qfiDocument.querySelector("input");
+		if (input) {
+			input.remove();
+			qfiDocument.querySelector("br")?.remove();
+			_updateItemList({ citedItems: [] });
+		}
+	}
+
 	function _createInputField() {
 		let openedInput = qfiDocument.querySelector("input");
 		if (openedInput) {
-			openedInput.remove();
+			_clearInput();
 		}
 		let newInput = qfiDocument.createElement("input");
+		const inputID = "new-bubble-input";
+		newInput.id = inputID;
 		newInput.addEventListener("input", (_) => {
 			_resetSearchTimer();
 			// Expand the input field if needed
 			newInput.style.width = newInput.scrollWidth + 'px';
 		});
 		newInput.addEventListener("blur", (_) => {
-			if (!newInput.getAttribute("prevent_blur_deletion")) {
-				newInput.remove();
-				qfiDocument.querySelector("br")?.remove();
-			}
+			// After focus shifted, clear and remove input unless the focus moved onto the
+			// reference box to select a reference item
+			setTimeout(() => {
+				if (document.activeElement?.classList.contains("item")
+				&& qfiDocument.activeElement.id == inputID) {
+					return;
+				}
+				_clearInput();
+			});
 		});
 		newInput.addEventListener("keypress", onInputPress);
 		newInput.addEventListener("paste", _onPaste, false);
@@ -1436,22 +1453,26 @@ var Zotero_QuickFormat = new function () {
 			}
 		}
 		else if (keyCode == event.DOM_VK_TAB) {
-			// Shift-Tab from the input field focuses on zotero icon dropdown
+			// Shift-Tab from the input field tries to focus on zotero icon dropdown
 			if (event.shiftKey) {
-				document.getElementById("zotero-icon").focus();
+				let icon = document.getElementById("zotero-icon");
+				if (icon.getAttribute("disabled") != "true") {
+					icon.focus();
+					event.preventDefault();
+					return;
+				}
 			}
 			// Otherwise, Tab places focus on the very first bubble
-			else {
-				let firstBubble = qfiDocument.querySelector(".bubble");
-				if (firstBubble) {
-					firstBubble.focus();
-				}
-				else {
-					let newInput = _createInputField();
-					qfiDocument.appendChild(newInput);
-					newInput.focus();
-				}
+			let firstBubble = qfiDocument.querySelector(".bubble");
+			if (firstBubble) {
+				firstBubble.focus();
 			}
+			else {
+				let newInput = _createInputField();
+				qfiDocument.appendChild(newInput);
+				newInput.focus();
+			}
+			
 			event.preventDefault();
 		}
 		else {
@@ -1589,6 +1610,7 @@ var Zotero_QuickFormat = new function () {
 			Zotero_QuickFormat.onCitationPropertiesClosed();
 			return;
 		}
+		_clearInput();
 		_showCitationProperties(event.currentTarget);
 	}
 
