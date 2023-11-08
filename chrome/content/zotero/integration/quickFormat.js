@@ -868,12 +868,21 @@ var Zotero_QuickFormat = new function () {
 		bubble.setAttribute("class", "citation-dialog bubble");
 		bubble.setAttribute("draggable", "true");
 		bubble.setAttribute("tabindex", 0);
-		//bubble.setAttribute("role", "listitem");
+		// VoiceOver works better without it
+		if (!Zotero.isMac) {
+			bubble.setAttribute("aria-label", str);
+		}
 		bubble.textContent = str;
 		bubble.addEventListener("click", _onBubbleClick, false);
 		bubble.addEventListener("dragstart", _onBubbleDrag, false);
 		bubble.addEventListener("dragend", onBubbleDragEnd);
 		bubble.addEventListener("keypress", onBubblePress);
+		// If focus leaves the dialog and lands on a bubble, make sure citation properties close.
+		bubble.addEventListener("focus", (_) => {
+			if (panelRefersToBubble) {
+				document.getElementById("citation-properties").hidePopup();
+			}
+		});
 		bubble.dataset.citationItem = JSON.stringify(citationItem);
 		qfe.insertBefore(bubble, (nextNode ? nextNode : null));
 		return bubble;
@@ -1177,6 +1186,10 @@ var Zotero_QuickFormat = new function () {
 		target.setAttribute("selected", "true");
 		panel.openPopup(target, "after_start",
 			target.clientWidth/2, 0, false, false, null);
+		// Focus on title after the dialog is displayed
+		setTimeout(() => {
+			document.getElementById("citation-properties-title").focus();
+		}, 300);
 	}
 	
 	/**
@@ -1228,15 +1241,6 @@ var Zotero_QuickFormat = new function () {
 			window.close();
 		}
 	};
-
-	/**
-	 * Get bubbles within the current selection
-	 */
-	function _getSelectedBubble(right) {
-		if (qfiDocument.activeElement.tagName == "SPAN") {
-			return qfiDocument.activeElement;
-		}
-	}
 
 	function movedFocusForward(node) {
 		if (node.nextElementSibling?.focus) {
@@ -1381,7 +1385,7 @@ var Zotero_QuickFormat = new function () {
 	};
 
 	var onBubblePress = function(event) {
-		if (event.key == "ArrowDown" && (Zotero.isMac ? event.metaKey : event.ctrlKey)) {
+		if (event.key == "ArrowDown") {
 			// If meta key is held down, show the citation properties panel
 			_showCitationProperties(this);
 			event.preventDefault();
@@ -1621,7 +1625,7 @@ var Zotero_QuickFormat = new function () {
 	function _onBubbleClick(event) {
 		// If citation properties dialog is opened for another bubble, just close it.
 		if (panelRefersToBubble && panelRefersToBubble.getAttribute("selected")) {
-			Zotero_QuickFormat.onCitationPropertiesClosed();
+			document.getElementById("citation-properties").hidePopup();
 			return;
 		}
 		// Clear input in case focus remains on bubble (e.g. when the ref panel is opened)
@@ -1689,6 +1693,7 @@ var Zotero_QuickFormat = new function () {
 		}
 		panelRefersToBubble.removeAttribute("selected");
 		Zotero_QuickFormat.onCitationPropertiesChanged();
+		panelRefersToBubble = null;
 	}
 	
 	/**
