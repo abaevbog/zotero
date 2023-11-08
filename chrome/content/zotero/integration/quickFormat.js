@@ -93,7 +93,7 @@ var Zotero_QuickFormat = new function () {
 			// Navigation within the reference panel
 			referenceBox.addEventListener("keypress", (event) => {
 				// Space, enter, tab or ; selects the reference
-				if ([" ", "Return"].includes(event.key) || event.charCode == 59 || (event.key == "Tab" && !event.shiftKey)) {
+				if ([" ", "Enter"].includes(event.key) || event.charCode == 59 || (event.key == "Tab" && !event.shiftKey)) {
 					event.preventDefault();
 					event.target.closest("richlistitem").click();
 				}
@@ -149,33 +149,6 @@ var Zotero_QuickFormat = new function () {
 				panelLocator = document.getElementById("locator");
 				panelInfo = document.getElementById("citation-properties-info");
 				panelLibraryLink = document.getElementById("citation-properties-library-link");
-				// Panel's keyboard navigation
-				panel.addEventListener("keypress", (event) => {
-					// Tabbing through the fields. This should not be necessary but for some reason
-					// without manually handling focus, the buttons are skipped during tabbing
-					if (event.key === "Tab") {
-						event.preventDefault();
-						let tabIndex = parseInt(event.target.closest("[tabindex]").getAttribute("tabindex"));
-						tabIndex += event.shiftKey ? -1 : 1;
-						if (tabIndex == 9) {
-							tabIndex = 1;
-						}
-						if (tabIndex == 0) {
-							tabIndex = 8;
-						}
-		
-						panel.querySelector(`[tabindex='${tabIndex}']`).focus();
-					}
-					// Space or enter triggers a click
-					if (event.key == ' ' || event.key === "Return") {
-						if (event.target.tagName == "button") {
-							event.target.click();
-						}
-						if (event.target.tagName == "menulist") {
-							event.target.firstChild.openPopup();
-						}
-					}
-				});
 				// add labels to popup
 				var locators = Zotero.Cite.labels;
 				var labelList = document.getElementById("locator-label-popup");
@@ -1342,8 +1315,10 @@ var Zotero_QuickFormat = new function () {
 	
 
 	var onInputPress = function (event) {
-		if (event.charCode === 59 /* ; */ || event.key === "Return" || (event.key == "Tab" && !event.shiftKey)) {
+		if (accepted) return;
+		if (event.charCode === 59 /* ; */ || event.key === "Enter" || (event.key == "Tab" && !event.shiftKey)) {
 			event.preventDefault();
+			event.stopPropagation();
 			Zotero_QuickFormat._bubbleizeSelected();
 		}
 		else if (["ArrowLeft", "ArrowRight"].includes(event.key)) {
@@ -1385,6 +1360,7 @@ var Zotero_QuickFormat = new function () {
 	};
 
 	var onBubblePress = function(event) {
+		if (accepted) return;
 		if (event.key == "ArrowDown") {
 			// If meta key is held down, show the citation properties panel
 			_showCitationProperties(this);
@@ -1442,9 +1418,7 @@ var Zotero_QuickFormat = new function () {
 		var keyCode = event.keyCode;
 		if (keyCode === event.DOM_VK_RETURN) {
 			event.preventDefault();
-			if(!(yield Zotero_QuickFormat._bubbleizeSelected()) && !_getEditorContent()) {
-				Zotero_QuickFormat._accept();
-			}
+			Zotero_QuickFormat._accept();
 		}
 		else if (keyCode === event.DOM_VK_ESCAPE) {
 			// Handled in the event handler up, but we have to cancel it here
@@ -1474,7 +1448,7 @@ var Zotero_QuickFormat = new function () {
 			}
 			else {
 				let newInput = _createInputField();
-				qfiDocument.appendChild(newInput);
+				qfiDocument.body.appendChild(newInput);
 				newInput.focus();
 			}
 			
@@ -1624,7 +1598,7 @@ var Zotero_QuickFormat = new function () {
 	 */
 	function _onBubbleClick(event) {
 		// If citation properties dialog is opened for another bubble, just close it.
-		if (panelRefersToBubble && panelRefersToBubble.getAttribute("selected")) {
+		if (panelRefersToBubble) {
 			document.getElementById("citation-properties").hidePopup();
 			return;
 		}
@@ -1683,6 +1657,10 @@ var Zotero_QuickFormat = new function () {
 		panelRefersToBubble.dataset.citationItem = JSON.stringify(citationItem);
 		panelRefersToBubble.textContent = _buildBubbleString(citationItem);
 	};
+
+	this.ignoreEvent = function (event) {
+		event.stopPropagation();
+	};
 	
 	/**
 	 * Handle closing citation properties panel
@@ -1697,12 +1675,41 @@ var Zotero_QuickFormat = new function () {
 	}
 	
 	/**
-	 * Makes "Enter" work in the panel
+	 * Keyboard navigation within citation properties dialog
 	 */
 	this.onPanelKeyPress = function(event) {
-		var keyCode = event.keyCode;
-		if (keyCode === event.DOM_VK_RETURN) {
-			document.getElementById("citation-properties").hidePopup();
+		// Tabbing through the fields. This should not be necessary but for some reason
+		// without manually handling focus, the buttons are skipped during tabbing
+		if (event.key === "Tab") {
+			event.preventDefault();
+			let tabIndex = parseInt(event.target.closest("[tabindex]").getAttribute("tabindex"));
+			tabIndex += event.shiftKey ? -1 : 1;
+			if (tabIndex == 9) {
+				tabIndex = 1;
+			}
+			if (tabIndex == 0) {
+				tabIndex = 8;
+			}
+
+			panel.querySelector(`[tabindex='${tabIndex}']`).focus();
+		}
+		// Space or enter triggers a click on buttons, checkboxes or menulist
+		if (event.key == ' ' || event.key === "Enter") {
+			if (event.target.tagName == "button"
+				|| event.target.getAttribute("type") == "checkbox") {
+				event.target.click();
+				event.stopPropagation();
+				event.preventDefault();
+			}
+			else if (event.target.tagName == "menulist") {
+				event.target.firstChild.openPopup();
+				event.stopPropagation();
+				event.preventDefault();
+			}
+			// Enter anywhere else closes the dialog
+			else if (event.key === "Enter") {
+				document.getElementById("citation-properties").hidePopup();
+			}
 		}
 	};
 	

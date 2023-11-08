@@ -188,6 +188,7 @@
 	outline: none;
 	line-height: 2em;
 	cursor: text;
+	min-height: 28px;
 }
 
 .citation-dialog.spinner {

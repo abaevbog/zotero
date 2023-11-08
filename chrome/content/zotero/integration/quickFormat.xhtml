@@ -97,7 +97,7 @@
 		<html:div id="citation-properties-grid">
 			<menulist id="locator-label" sizetopopup="none" tabindex="3"
 					  oncommand="Zotero_QuickFormat.onCitationPropertiesChanged(event)" native="true">
-				<menupopup id="locator-label-popup"/>
+				<menupopup id="locator-label-popup" onpopuphidden="Zotero_QuickFormat.ignoreEvent(event)"/>
 			</menulist>
 			<html:input type="text" aria-labelledby="locator-label" tabindex="4" id="locator"
 					 oninput="window.setTimeout(function(event) { Zotero_QuickFormat.onCitationPropertiesChanged(event) }, 0)"/>
