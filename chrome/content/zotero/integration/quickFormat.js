@@ -305,6 +305,12 @@ var Zotero_QuickFormat = new function () {
 				_clearInput();
 			});
 		});
+		// No drag-drop reordering when the input is focused
+		newInput.addEventListener("focus", (_) => {
+			for (let bubble of qfiDocument.querySelectorAll(".bubble")) {
+				bubble.setAttribute("draggable", false);
+			}
+		});
 		newInput.addEventListener("keypress", onInputPress);
 		newInput.addEventListener("paste", _onPaste, false);
 		return newInput;

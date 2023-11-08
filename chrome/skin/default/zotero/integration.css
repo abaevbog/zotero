@@ -132,7 +132,7 @@
 	white-space: nowrap;
 	line-height: normal;
 	color: #000;
-	-moz-user-select: all;
+	-moz-user-select: none;
 	cursor: pointer;
 }
 
