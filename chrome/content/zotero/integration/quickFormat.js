@@ -203,6 +203,7 @@ var Zotero_QuickFormat = new function () {
 			qfe = qfiDocument.querySelector(".citation-dialog.editor");
 			qfe.addEventListener("dragover", _onBubbleDragOver);
 			qfe.addEventListener("drop", _onBubbleDrop, false);
+			qfiDocument.addEventListener("mousedown", _onMouseDown);
 			if (Zotero_QuickFormat.citingNotes) {
 				_quickFormat();
 			}
@@ -304,12 +305,6 @@ var Zotero_QuickFormat = new function () {
 				}
 				_clearInput();
 			});
-		});
-		// No drag-drop reordering when the input is focused
-		newInput.addEventListener("focus", (_) => {
-			for (let bubble of qfiDocument.querySelectorAll(".bubble")) {
-				bubble.setAttribute("draggable", false);
-			}
 		});
 		newInput.addEventListener("keypress", onInputPress);
 		newInput.addEventListener("paste", _onPaste, false);
@@ -1485,6 +1480,19 @@ var Zotero_QuickFormat = new function () {
 			isPaste = false;
 		}
 	});
+
+
+	// If an input is opened and one tries to drag a bubble, dragstart fires and hides the bubble
+	// but dragened never fires and actual dragging never starts.
+	// Potentially caused by https://bugzilla.mozilla.org/show_bug.cgi?id=460801.
+	// To avoid it, if mouse is down on a bubble when the input field exists, do nothing.
+	function _onMouseDown(event) {
+		let input = _getInput();
+		if (input && event.target?.classList.contains("bubble")) {
+			event.stopPropagation();
+			event.preventDefault();
+		}
+	}
 	
 	/**
 	 * Adds a dummy element to make dragging work
@@ -1616,6 +1624,7 @@ var Zotero_QuickFormat = new function () {
 			Zotero_QuickFormat.onCitationPropertiesClosed();
 			return;
 		}
+		// Clear input in case focus remains on bubble (e.g. when the ref panel is opened)
 		_clearInput();
 		_showCitationProperties(event.currentTarget);
 	}
