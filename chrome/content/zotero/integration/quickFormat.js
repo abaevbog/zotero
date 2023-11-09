@@ -248,9 +248,10 @@ var Zotero_QuickFormat = new function () {
 		if (openedInput) {
 			_clearInput();
 		}
-		let newInput = qfiDocument.createElement("input");
-		const inputID = "new-bubble-input";
-		newInput.id = inputID;
+		let newInput = MozXULElement.parseXULToFragment(`
+			<html:input aria-description="&zotero.citation.input;"></html:input>
+		`, ['chrome://zotero/locale/zotero.dtd']);
+		newInput = qfiDocument.importNode(newInput.querySelector("input"));
 		newInput.addEventListener("input", (_) => {
 			_resetSearchTimer();
 			// Expand the input field if needed
@@ -261,7 +262,7 @@ var Zotero_QuickFormat = new function () {
 			// reference box to select a reference item
 			setTimeout(() => {
 				if (document.activeElement?.classList.contains("item")
-				&& qfiDocument.activeElement.id == inputID) {
+				&& qfiDocument.activeElement.tagName == "HTML:INPUT") {
 					return;
 				}
 				_clearInput();
@@ -730,9 +731,10 @@ var Zotero_QuickFormat = new function () {
 		_buildItemDescription(item, infoNode);
 		
 		// add to rich list item
-		var rll = document.createXULElement("richlistitem");
-		rll.setAttribute("orient", "vertical");
-		rll.setAttribute("class", "citation-dialog item");
+		let rll = MozXULElement.parseXULToFragment(`
+			<richlistitem class="citation-dialog item" orient="vertical" aria-description="&zotero.citation.item;"></richlistitem>
+		`, ['chrome://zotero/locale/zotero.dtd']);
+		rll = document.importNode(rll.querySelector("richlistitem"));
 		rll.setAttribute("zotero-item", item.cslItemID ? item.cslItemID : item.id);
 		rll.appendChild(titleNode);
 		rll.appendChild(infoNode);
@@ -825,10 +827,10 @@ var Zotero_QuickFormat = new function () {
 	function _insertBubble(citationItem, nextNode) {
 		var str = _buildBubbleString(citationItem);
 		
-		var bubble = qfiDocument.createElement("span");
-		bubble.setAttribute("class", "citation-dialog bubble");
-		bubble.setAttribute("draggable", "true");
-		bubble.setAttribute("tabindex", 0);
+		let bubble = MozXULElement.parseXULToFragment(`
+			<html:div class="citation-dialog bubble" draggable="true" role="button" tabindex="0" aria-description="&zotero.citation.bubble;"></html:div>
+		`, ['chrome://zotero/locale/zotero.dtd']);
+		bubble = qfiDocument.importNode(bubble.querySelector("div"));
 		// VoiceOver works better without it
 		if (!Zotero.isMac) {
 			bubble.setAttribute("aria-label", str);
@@ -1248,35 +1250,37 @@ var Zotero_QuickFormat = new function () {
 			});
 	}
 
-	function lastSpanBeforePoint(x, y) {
-		let spans = qfiDocument.querySelectorAll('span');
-		let lastSpan = null;
+	function lastBubbleBeforePoint(x, y) {
+		let bubbles = qfiDocument.querySelectorAll('.bubble');
+		let lastBubble = null;
 		let newline = false;
-		for (let i = 0; i < spans.length; i++) {
-			let rect = spans[i].getBoundingClientRect();
-			// If within the vertical range of the span
+		for (let i = 0; i < bubbles.length; i++) {
+			let rect = bubbles[i].getBoundingClientRect();
+			// If within the vertical range of a bubble
 			if (y >= rect.top && y <= rect.bottom) {
-				// If the click is to the right of the span, it is a candidate
+				// If the click is to the right of a bubble, it becomes a candidate
 				if (x > rect.right) {
-					lastSpan = i;
+					lastBubble = i;
 				}
-				// Otherwise, stop and return the last span we saw if any
+				// Otherwise, stop and return the last bubble we saw if any
 				else {
 					if (i == 0) {
-						lastSpan = null;
+						lastBubble = null;
 					}
 					else {
-						newline = lastSpan === null;
-						lastSpan = Math.max(i - 1, 0);
+						// If there is no bubble before this one, we'll want to add a newline
+						// so that the placeholder shows up in the same row
+						newline = lastBubble === null;
+						lastBubble = Math.max(i - 1, 0);
 					}
 					break;
 				}
 			}
 		}
-		if (lastSpan !== null) {
-			lastSpan = spans[lastSpan];
+		if (lastBubble !== null) {
+			lastBubble = bubbles[lastBubble];
 		}
-		return { lastSpan: lastSpan, newline: newline };
+		return { lastBubble: lastBubble, newline: newline };
 	}
 	
 	function _onQuickSearchClick(event) {
@@ -1286,20 +1290,20 @@ var Zotero_QuickFormat = new function () {
 		}
 		let clickX = event.clientX;
 		let clickY = event.clientY;
-		let { lastSpan, newline } = lastSpanBeforePoint(clickX, clickY);
+		let { lastBubble, newline } = lastBubbleBeforePoint(clickX, clickY);
 		let newInput = _createInputField();
-		if (lastSpan !== null) {
-			lastSpan.after(newInput);
+		if (lastBubble !== null) {
+			lastBubble.after(newInput);
 			if (newline) {
 				let lineBreak = qfiDocument.createElement("br");
-				lastSpan.after(lineBreak);
+				lastBubble.after(lineBreak);
 			}
 		}
 		else {
 			qfiDocument.body.prepend(newInput);
 		}
 		newInput.focus();
-	};
+	}
 	
 
 	var onInputPress = function (event) {
@@ -1464,7 +1468,7 @@ var Zotero_QuickFormat = new function () {
 	 * Adds a dummy element to make dragging work
 	 */
 	function _onBubbleDrag(event) {
-		dragPlaceholder = event.target.cloneNode(true);
+		dragPlaceholder = this.cloneNode(true);
 		dragPlaceholder.setAttribute("id", "dragged-placeholder");
 		this.style.cursor = "grabbing";
 		setTimeout(() => {
@@ -1481,11 +1485,11 @@ var Zotero_QuickFormat = new function () {
 		let bubbleIndex = event.dataTransfer.getData("zotero/citation_bubble");
 		let bubble = event.target;
 		if (bubble.classList?.contains("editor")) {
-			let { lastSpan, _ } = lastSpanBeforePoint(event.clientX, event.clientY);
-			if (!lastSpan) {
+			let { lastBubble, _ } = lastBubbleBeforePoint(event.clientX, event.clientY);
+			if (!lastBubble) {
 				return false;
 			}
-			bubble = lastSpan;
+			bubble = lastBubble;
 		}
 		if (isNaN(parseInt(bubbleIndex)) || !bubble.classList?.contains("bubble")) {
 			return false;
@@ -1568,14 +1572,14 @@ var Zotero_QuickFormat = new function () {
 		onBubbleDragEnd();
 
 		yield _previewAndSort();
-		let spans = qfiDocument.body.querySelectorAll("span");
-		let lastSpanRect = spans[spans.length - 1].getBoundingClientRect();
+		let bubbles = qfiDocument.body.querySelectorAll(".bubble");
+		let lastBubbleRect = bubbles[bubbles.length - 1].getBoundingClientRect();
 		let editorRect = qfi.getBoundingClientRect();
 		// During reordering, a bubble can be moved to a new lower row
 		// so we need to expand the search field to see it.
 		// Calling _resize causes a glitch that prevents the next drag event from
 		// properly executing, so this sets the new height manually
-		if (lastSpanRect.bottom > editorRect.bottom) {
+		if (lastBubbleRect.bottom > editorRect.bottom) {
 			let qfsHeight = qfs.getBoundingClientRect().height;
 			qfs.height = `${qfsHeight + 27}px`;
 		}

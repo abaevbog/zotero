@@ -204,6 +204,9 @@
 <!ENTITY zotero.citation.prefix.label					"Prefix:">
 <!ENTITY zotero.citation.suffix.label					"Suffix:">
 <!ENTITY zotero.citation.editorWarning.label  		"Warning: If you edit a citation in the editor it will no longer update to reflect changes in your database or the citation style.">
+<!ENTITY zotero.citation.bubble                   		"Space to add a reference after this item. Use arrow down to open citation properties.">
+<!ENTITY zotero.citation.item                   		"Shift-Tab to go back to the search field. Tab, Space, Enter to select this item.">
+<!ENTITY zotero.citation.input                   		"Type to search for your item, use up and down arrows to select the right item after.">
 
 <!ENTITY zotero.richText.italic.label					"Italic">
 <!ENTITY zotero.richText.bold.label						"Bold">
