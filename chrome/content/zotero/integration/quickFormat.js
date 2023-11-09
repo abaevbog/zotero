@@ -211,22 +211,10 @@ var Zotero_QuickFormat = new function () {
 				_refocusQfe();
 			})();
 			
-			window.focus();
-			qfe.focus();
+			_refocusQfe();
 			
 			// load citation data
 			if (io.citation.citationItems.length) {
-				// hack to get spacing right
-				let event = new KeyboardEvent(
-					"keypress",
-					{
-						key: " ",
-						code: "Space",
-						bubbles: true,
-						cancelable: true,
-					}
-				);
-				qfe.dispatchEvent(event);
 				await resizePromise;
 				var node = qfe.firstChild;
 				node.nodeValue = "";
@@ -241,7 +229,7 @@ var Zotero_QuickFormat = new function () {
 	
 	function _refocusQfe() {
 		referencePanel.blur();
-		window.focus();
+		qfi.focus();
 		qfe.focus();
 	}
 
@@ -1709,6 +1697,7 @@ var Zotero_QuickFormat = new function () {
 			// Enter anywhere else closes the dialog
 			else if (event.key === "Enter") {
 				document.getElementById("citation-properties").hidePopup();
+				_refocusQfe();
 			}
 		}
 	};
