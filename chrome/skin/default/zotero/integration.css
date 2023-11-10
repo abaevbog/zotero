@@ -114,6 +114,7 @@
 	border: none;
 	max-width: 200px;
 	box-sizing: border-box; 
+	height: 15px;
 }
 
 #dragged-placeholder {
@@ -127,13 +128,14 @@
 	border-width: 1px;
 	border-color: #a8c0ec;
 	padding: 0 11px 0 6px;
-	margin: -1px 2px 0 2px;
+	margin: 3px 2px 0 2px;
 	display: inline-block;
 	white-space: nowrap;
 	line-height: normal;
 	color: #000;
 	-moz-user-select: none;
 	cursor: pointer;
+	height: 16px;
 }
 
 .citation-dialog.bubble::before {
@@ -184,11 +186,11 @@
 	padding: 0 2px 0 2px;
 	margin: 0;
 	font: -moz-field;
-	overflow: hidden;
 	outline: none;
 	line-height: 2em;
 	cursor: text;
-	min-height: 28px;
+	width: 730px;
+	height: 28px;
 }
 
 .citation-dialog.spinner {
