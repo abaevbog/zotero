@@ -105,7 +105,7 @@ var Zotero_QuickFormat = new function () {
 				else if (event.key === "Tab" && event.shiftKey) {
 					event.preventDefault();
 					event.stopPropagation();
-					document.querySelector("input").focus();
+					document.querySelector(".zotero-bubble-input").focus();
 				}
 				// Arrows will move focus onto the selected field so that screenreaders
 				// always announce it.
@@ -233,8 +233,8 @@ var Zotero_QuickFormat = new function () {
 	}
 
 
-	function _clearInput() {
-		let input = document.querySelector("input");
+	function _clearOpenedInput() {
+		let input = document.querySelector(".zotero-bubble-input");
 		if (input) {
 			input.remove();
 			document.querySelector("br")?.remove();
@@ -243,12 +243,9 @@ var Zotero_QuickFormat = new function () {
 	}
 
 	function _createInputField() {
-		let openedInput = document.querySelector("input");
-		if (openedInput) {
-			_clearInput();
-		}
+		_clearOpenedInput();
 		let newInput = MozXULElement.parseXULToFragment(`
-			<html:input aria-description="&zotero.citation.input;"></html:input>
+			<html:input class="zotero-bubble-input" aria-description="&zotero.citation.input;"></html:input>
 		`, ['chrome://zotero/locale/zotero.dtd']);
 		newInput = document.importNode(newInput.querySelector("input"));
 		newInput.addEventListener("input", (_) => {
@@ -256,17 +253,6 @@ var Zotero_QuickFormat = new function () {
 			// Expand the input field if needed
 			newInput.style.width = newInput.scrollWidth + 'px';
 		});
-		// newInput.addEventListener("blur", (_) => {
-		// 	// After focus shifted, clear and remove input unless the focus moved onto the
-		// 	// reference box to select a reference item
-		// 	setTimeout(() => {
-		// 		if (document.activeElement?.classList.contains("item")
-		// 		&& qfe.activeElement.tagName == "HTML:INPUT") {
-		// 			return;
-		// 		}
-		// 		_clearInput();
-		// 	});
-		// });
 		newInput.addEventListener("keypress", onInputPress);
 		newInput.addEventListener("paste", _onPaste, false);
 		return newInput;
@@ -277,7 +263,7 @@ var Zotero_QuickFormat = new function () {
 	 * @param {Boolean} [clear] If true, also remove these nodes
 	 */
 	function _getEditorContent(clear) {
-		let node = document.querySelector("input");
+		let node = document.querySelector(".zotero-bubble-input");
 		return node ? node.value.trim() : false;
 	}
 
@@ -1210,7 +1196,7 @@ var Zotero_QuickFormat = new function () {
 	}
 
 	function _getInput() {
-		return document.querySelector("input");
+		return document.querySelector(".zotero-bubble-input");
 	}
 
 	/**
@@ -1318,56 +1304,45 @@ var Zotero_QuickFormat = new function () {
 			movedFocusBack(this);
 			this.remove();
 		}
-		else if (["ArrowDown", "ArrowUp"].includes(event.key) && referencePanel.state === "open") {
-			locatorLocked = true;
-			if (referencePanel.state === "open") {
-				var e = new KeyboardEvent('keypress', {
-					key: event.key,
-					code: event.code,
-					keyCode: event.keyCode,
-					bubbles: true
-				});
-				let input = _getInput();
-				input.setAttribute("prevent_blur_deletion", true);
-				referenceBox.dispatchEvent(e);
-				event.preventDefault();
-			}
-		}
 	};
 
 	var onBubblePress = function(event) {
 		if (accepted) return;
-		if (event.key == "ArrowDown") {
-			// If meta key is held down, show the citation properties panel
+		// if (event.key == "ArrowDown") {
+		// 	// If meta key is held down, show the citation properties panel
+		// 	_showCitationProperties(this);
+		// 	event.preventDefault();
+		// }
+		if (event.key == " ") {
+			// On space, open new citation properties panel
 			_showCitationProperties(this);
 			event.preventDefault();
 		}
-		else if (event.key == " ") {
-			// Open an input field after the bubble and focus on it
-			let newInput = _createInputField();
-			if (this.nextSibling) {
-				qfe.insertBefore(newInput, this.nextSibling);
-			}
-			else {
-				qfe.appendChild(newInput);
-			}
-			newInput.focus();
+		else if (["ArrowLeft", "ArrowRight"].includes(event.key)) {
 			event.preventDefault();
-		}
-		else if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
-			event.preventDefault();
-			if (["ArrowLeft", "Home"].includes(event.key)) {
-				if (!movedFocusBack(this)) {
-					let input = _createInputField();
-					qfe.prepend(input);
-					input.focus();
+			let inputExists = _getInput();
+			let newInput;
+			if (!inputExists || !inputExists.value.length) {
+				newInput = _createInputField();
+			}
+			
+			if (["ArrowLeft"].includes(event.key)) {
+				if (newInput) {
+					this.before(newInput);
+					newInput.focus();
 				}
-				return;
+				else {
+					movedFocusBack(this);
+				}
 			}
-			if (!movedFocusForward(this)) {
-				let input = _createInputField();
-				qfe.appendChild(input);
-				input.focus();
+			else if (["ArrowRight"].includes(event.key)) {
+				if (newInput) {
+					this.after(newInput);
+					newInput.focus();
+				}
+				else {
+					movedFocusForward(this);
+				}
 			}
 		}
 		else if (["Backspace", "Delete"].includes(event.key)) {
@@ -1407,6 +1382,18 @@ var Zotero_QuickFormat = new function () {
 				event.target.firstChild.openPopup();
 			}
 		}
+		else if (["ArrowDown", "ArrowUp"].includes(event.key) && referencePanel.state === "open") {
+			// Arrow up/down from wherever will navigate the references panel if that's opened
+			locatorLocked = true;
+			var e = new KeyboardEvent('keypress', {
+				key: event.key,
+				code: event.code,
+				keyCode: event.keyCode,
+				bubbles: true
+			});
+			referenceBox.dispatchEvent(e);
+			event.preventDefault();
+		}
 		else if (keyCode == event.DOM_VK_TAB) {
 			// Shift-Tab from the input field tries to focus on zotero icon dropdown
 			if (event.shiftKey) {
@@ -1434,19 +1421,6 @@ var Zotero_QuickFormat = new function () {
 			isPaste = false;
 		}
 	});
-
-
-	// If an input is opened and one tries to drag a bubble, dragstart fires and hides the bubble
-	// but dragened never fires and actual dragging never starts.
-	// Potentially caused by https://bugzilla.mozilla.org/show_bug.cgi?id=460801.
-	// To avoid it, if mouse is down on a bubble when the input field exists, do nothing.
-	function _onMouseDown(event) {
-		let input = _getInput();
-		if (input && event.target?.classList.contains("bubble")) {
-			event.stopPropagation();
-			event.preventDefault();
-		}
-	}
 	
 	/**
 	 * Adds a dummy element to make dragging work
@@ -1578,8 +1552,6 @@ var Zotero_QuickFormat = new function () {
 			document.getElementById("citation-properties").hidePopup();
 			return;
 		}
-		// Clear input in case focus remains on bubble (e.g. when the ref panel is opened)
-		// _clearInput();
 		_showCitationProperties(this);
 	}
 
