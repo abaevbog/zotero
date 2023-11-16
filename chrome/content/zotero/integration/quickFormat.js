@@ -34,18 +34,21 @@ var Zotero_QuickFormat = new function () {
 	const charRe = /[\w\u007F-\uFFFF]/;
 	const numRe = /^[0-9\-–]+$/;
 	
-	var initialized, io, qfs, qfi, qfiWindow, qfiDocument, qfe, qfb, qfbHeight, qfGuidance,
+	var initialized, io, qfs, qfe, qfb, qfGuidance,
 		keepSorted, showEditor, referencePanel, referenceBox, referenceHeight = 0,
 		separatorHeight = 0, currentLocator, currentLocatorLabel, currentSearchTime, dragPlaceholder,
 		panel, panelPrefix, panelSuffix, panelSuppressAuthor, panelLocatorLabel, panelLocator,
 		panelLibraryLink, panelInfo, panelRefersToBubble, panelFrameHeight = 0, accepted = false,
-		isPaste = false;
+		isPaste = false, lastEnter, lastEscape, throttleEscape = false, throttleEnter = false;
 	var locatorLocked = true;
 	var locatorNode = null;
 	var _searchPromise;
 	
 	const SEARCH_TIMEOUT = 250;
 	const SHOWN_REFERENCES = 7;
+	// Only one Enter/Escape keypress within this time window is processed to prevent
+	// accidental double clicks from closing the dialog
+	const MILISECONDS_BETWEEN_KEYPRESSES = 1000;
 
 	/**
 	 * Pre-initialization, when the dialog has loaded but has not yet appeared
@@ -99,6 +102,7 @@ var Zotero_QuickFormat = new function () {
 				// Enter or ; selects the reference
 				if (event.key == "Enter" || event.charCode == 59) {
 					event.preventDefault();
+					event.stopPropagation();
 					event.target.closest("richlistitem").click();
 				}
 				// Shift-tab will move focus back to the input field
@@ -169,7 +173,14 @@ var Zotero_QuickFormat = new function () {
 					child.setAttribute("label", locatorLabel);
 					labelList.appendChild(child);
 				}
-
+				// If the focus leaves the citation properties panel, close it
+				panel.addEventListener("focusout", (_) => {
+					setTimeout(() => {
+						if (!panel.contains(document.activeElement)) {
+							panel.hidePopup();
+						}
+					});
+				});
 			}
 			
 			// Don't need to set noautohide dynamically on these platforms, so do it now
@@ -278,6 +289,12 @@ var Zotero_QuickFormat = new function () {
 		newInput.addEventListener("paste", _onPaste, false);
 		newInput.addEventListener("focus", (_) => {
 			newInput.setAttribute("keep-focus", true);
+			// If the reference panel was hidden due to click on a bubble,
+			// it will be reopened when the input is focused
+			if (referencePanel.hidden) {
+				referencePanel.hidden = false;
+				_resizeReferencePanel();
+			}
 		});
 		return newInput;
 	}
@@ -849,12 +866,6 @@ var Zotero_QuickFormat = new function () {
 		bubble.addEventListener("dragstart", _onBubbleDrag, false);
 		bubble.addEventListener("dragend", onBubbleDragEnd);
 		bubble.addEventListener("keypress", onBubblePress);
-		// If focus leaves the dialog and lands on a bubble, make sure citation properties close.
-		bubble.addEventListener("focus", (_) => {
-			if (panelRefersToBubble) {
-				document.getElementById("citation-properties").hidePopup();
-			}
-		});
 		bubble.dataset.citationItem = JSON.stringify(citationItem);
 		qfe.insertBefore(bubble, (nextNode ? nextNode : null));
 		return bubble;
@@ -1143,10 +1154,7 @@ var Zotero_QuickFormat = new function () {
 		target.setAttribute("selected", "true");
 		panel.openPopup(target, "after_start",
 			target.clientWidth/2, 0, false, false, null);
-		// Focus on title after the dialog is displayed
-		setTimeout(() => {
-			document.getElementById("citation-properties-title").focus();
-		}, 300);
+		referencePanel.hidden = true;
 	}
 	
 	/**
@@ -1186,16 +1194,48 @@ var Zotero_QuickFormat = new function () {
 		io.accept();
 	}
 	
+	// Flag any duplicate Enter or Escape events coming in within MILISECONDS_BETWEEN_KEYPRESSES
+	// of each other
+	this.throttleEscapeEnter = function (e) {
+		let now = new Date();
+		if (accepted) {
+			e.stopPropagation();
+			e.preventDefault();
+			return;
+		}
+		if (e.key == "Enter") {
+			if (lastEnter && now - lastEnter < MILISECONDS_BETWEEN_KEYPRESSES) {
+				throttleEnter = true;
+				return;
+			}
+			throttleEnter = false;
+			lastEnter = new Date();
+		}
+		else if (e.key == "Escape") {
+			if (lastEscape && now - lastEscape < MILISECONDS_BETWEEN_KEYPRESSES) {
+				throttleEscape = true;
+				return;
+			}
+			lastEscape = new Date();
+			throttleEscape = false;
+		}
+	};
+
 	/**
 	 * Handle escape for entire window
 	 */
-	this.onKeyPress = function (event) {
+	this.onWindowKeyPress = function (event) {
+		if (accepted) return;
 		var keyCode = event.keyCode;
-		if (keyCode === event.DOM_VK_ESCAPE && !accepted) {
+		if (keyCode === event.DOM_VK_ESCAPE && !throttleEscape) {
 			accepted = true;
 			io.citation.citationItems = [];
 			io.accept();
 			window.close();
+		}
+		else if (event.key == "Enter" && !throttleEnter) {
+			event.preventDefault();
+			Zotero_QuickFormat._accept();
 		}
 	};
 
@@ -1316,14 +1356,16 @@ var Zotero_QuickFormat = new function () {
 		}
 		else if (["ArrowLeft", "ArrowRight"].includes(event.key)) {
 			locatorLocked = true;
+			// If input only has whitespaces, count it as empty
+			let inputEmpty = !/\S/.test(this.value);
 			if (event.key === "ArrowLeft" && this.selectionStart === 0) {
-				if (moveFocusBack(this) && !this.value.length) {
+				if (moveFocusBack(this) && inputEmpty) {
 					this.remove();
 				}
 				event.preventDefault();
 			}
 			else if (event.key === "ArrowRight" && this.selectionStart === this.value.length) {
-				if (moveFocusForward(this) && !this.value.length) {
+				if (moveFocusForward(this) && inputEmpty) {
 					this.remove();
 				}
 				event.preventDefault();
@@ -1395,16 +1437,7 @@ var Zotero_QuickFormat = new function () {
 		if(qfGuidance) qfGuidance.hide();
 		
 		var keyCode = event.keyCode;
-		if (keyCode === event.DOM_VK_RETURN) {
-			event.preventDefault();
-			Zotero_QuickFormat._accept();
-		}
-		else if (keyCode === event.DOM_VK_ESCAPE) {
-			// Handled in the event handler up, but we have to cancel it here
-			// so that we do not issue another _quickFormat call
-			return;
-		}
-		else if (event.key == ' ') {
+		if (event.key == ' ') {
 			// Space on toolbarbutton opens the popup
 			if (event.target.tagName == "toolbarbutton") {
 				event.target.firstChild.openPopup();
@@ -1639,7 +1672,8 @@ var Zotero_QuickFormat = new function () {
 	};
 	
 	/**
-	 * Handle closing citation properties panel
+	 * Handle closing citation properties panel. Focus an opened input if any.
+	 * Otherwise, return focus to the bubble.
 	 */
 	this.onCitationPropertiesClosed = function(event) {
 		if (!panelRefersToBubble) {
@@ -1647,6 +1681,13 @@ var Zotero_QuickFormat = new function () {
 		}
 		panelRefersToBubble.removeAttribute("selected");
 		Zotero_QuickFormat.onCitationPropertiesChanged();
+		let input = _getInput();
+		if (input) {
+			input.focus();
+		}
+		else {
+			panelRefersToBubble.focus();
+		}
 		panelRefersToBubble = null;
 	}
 	
@@ -1686,6 +1727,8 @@ var Zotero_QuickFormat = new function () {
 			else if (event.key === "Enter") {
 				document.getElementById("citation-properties").hidePopup();
 				_refocusQfe();
+				event.stopPropagation();
+				event.preventDefault();
 			}
 		}
 	};
@@ -1779,3 +1822,4 @@ var Zotero_QuickFormat = new function () {
 
 window.addEventListener("DOMContentLoaded", Zotero_QuickFormat.onDOMContentLoaded, false);
 window.addEventListener("load", Zotero_QuickFormat.onLoad, false);
+window.addEventListener("keydown", Zotero_QuickFormat.throttleEscapeEnter, true);

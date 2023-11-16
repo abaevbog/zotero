@@ -41,7 +41,7 @@
 	xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
 	persist="screenX screenY"
 	width="800"
-	onkeypress="Zotero_QuickFormat.onKeyPress(event)"
+	onkeypress="Zotero_QuickFormat.onWindowKeyPress(event)"
 	onunload="Zotero_QuickFormat.onUnload()">
 
 	<script src="../include.js"/>
@@ -81,7 +81,8 @@
 	</panel>
 	<panel id="citation-properties" type="arrow" orient="vertical"
 		   onkeypress="Zotero_QuickFormat.onPanelKeyPress(event)"
-		   onpopuphidden="Zotero_QuickFormat.onCitationPropertiesClosed(event)">
+		   onpopuphidden="Zotero_QuickFormat.onCitationPropertiesClosed(event)"
+		   onpopupshown="document.getElementById('locator').focus()">
 		<vbox flex="1">
 			<description id="citation-properties-title" tabindex="1"/>
 			<hbox id="citation-properties-info" tabindex="2"/>
