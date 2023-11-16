@@ -1175,7 +1175,7 @@ var Zotero_QuickFormat = new function () {
 		}
 	};
 
-	function movedFocusForward(node) {
+	function moveFocusForward(node) {
 		if (node.nextElementSibling?.focus) {
 			node.nextElementSibling.focus();
 			return true;
@@ -1183,7 +1183,7 @@ var Zotero_QuickFormat = new function () {
 		return false;
 	}
 
-	function movedFocusBack(node) {
+	function moveFocusBack(node) {
 		// Skip line break if it's before the node
 		if (node.previousElementSibling?.tagName == "BR") {
 			node = node.previousElementSibling;
@@ -1285,34 +1285,28 @@ var Zotero_QuickFormat = new function () {
 		}
 		else if (["ArrowLeft", "ArrowRight"].includes(event.key)) {
 			locatorLocked = true;
-			if (!this.value.length) {
+			if (event.key === "ArrowLeft" && this.selectionStart === 0) {
+				if (moveFocusBack(this) && !this.value.length) {
+					this.remove();
+				}
 				event.preventDefault();
-				if (event.key === "ArrowLeft") {
-					if (movedFocusBack(this)) {
-						this.remove();
-					}
+			}
+			else if (event.key === "ArrowRight" && this.selectionStart === this.value.length) {
+				if (moveFocusForward(this) && !this.value.length) {
+					this.remove();
 				}
-				else if (event.key === "ArrowRight") {
-					if (movedFocusForward(this)) {
-						this.remove();
-					}
-				}
+				event.preventDefault();
 			}
 		}
 		else if (["Backspace", "Delete"].includes(event.key) && !this.value) {
 			event.preventDefault();
-			movedFocusBack(this);
+			moveFocusBack(this);
 			this.remove();
 		}
 	};
 
 	var onBubblePress = function(event) {
 		if (accepted) return;
-		// if (event.key == "ArrowDown") {
-		// 	// If meta key is held down, show the citation properties panel
-		// 	_showCitationProperties(this);
-		// 	event.preventDefault();
-		// }
 		if (event.key == " ") {
 			// On space, open new citation properties panel
 			_showCitationProperties(this);
@@ -1332,7 +1326,7 @@ var Zotero_QuickFormat = new function () {
 					newInput.focus();
 				}
 				else {
-					movedFocusBack(this);
+					moveFocusBack(this);
 				}
 			}
 			else if (["ArrowRight"].includes(event.key)) {
@@ -1341,14 +1335,14 @@ var Zotero_QuickFormat = new function () {
 					newInput.focus();
 				}
 				else {
-					movedFocusForward(this);
+					moveFocusForward(this);
 				}
 			}
 		}
 		else if (["Backspace", "Delete"].includes(event.key)) {
 			event.preventDefault();
-			if (!movedFocusBack(this)) {
-				movedFocusForward(this);
+			if (!moveFocusBack(this)) {
+				moveFocusForward(this);
 			}
 			this.parentNode.removeChild(this);
 		}
