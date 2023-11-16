@@ -46,7 +46,7 @@ var Zotero_QuickFormat = new function () {
 	
 	const SEARCH_TIMEOUT = 250;
 	const SHOWN_REFERENCES = 7;
-	
+
 	/**
 	 * Pre-initialization, when the dialog has loaded but has not yet appeared
 	 */
@@ -89,15 +89,15 @@ var Zotero_QuickFormat = new function () {
 			referenceBox = document.querySelector(".citation-dialog.reference-list");
 			// Explicitly set the focused reference as the selected item. Screenreaders may focus
 			// on the richlistitem, announce it but not actually select it.
-			document.addEventListener('focus', (_) => {
-				if (document.activeElement.tagName == "richlistitem") {
+			referenceBox.addEventListener('focus', (_) => {
+				if (!_sameZoteroItem(document.activeElement, referenceBox.selectedItem)) {
 					referenceBox.selectedItem = document.activeElement;
 				}
 			}, true);
 			// Navigation within the reference panel
 			referenceBox.addEventListener("keypress", (event) => {
-				// Space, enter, tab or ; selects the reference
-				if ([" ", "Enter"].includes(event.key) || event.charCode == 59 || (event.key == "Tab" && !event.shiftKey)) {
+				// Enter or ; selects the reference
+				if (event.key == "Enter" || event.charCode == 59) {
 					event.preventDefault();
 					event.target.closest("richlistitem").click();
 				}
@@ -107,14 +107,18 @@ var Zotero_QuickFormat = new function () {
 					event.stopPropagation();
 					document.querySelector(".zotero-bubble-input").focus();
 				}
-				// Arrows will move focus onto the selected field so that screenreaders
-				// always announce it.
-				else if (["ArrowUp", "ArrowDown"].includes(event.key)) {
-					// Timeout to focus on the entry after the selected attribute changes.
-					setTimeout(() => {
-						let selected = referenceBox.querySelector("[selected]");
-						selected.focus();
-					});
+				// Can keep typing from the reference box
+				else if (event.key.length === 1 || event.key === 'Backspace') {
+					event.preventDefault();
+					let input = _getInput();
+					if (event.key === 'Backspace') {
+						input.value = input.value.slice(0, -1);
+					}
+					else {
+						input.value += event.key;
+					}
+					input.dispatchEvent(new Event('input', { bubbles: true }));
+					input.focus();
 				}
 			});
 			if (Zotero.isWin) {
@@ -174,14 +178,31 @@ var Zotero_QuickFormat = new function () {
 			}
 
 			// Resize whenever a bubble/input is added or removed
-			const resizeObserver = new MutationObserver(function (mutationsList) {
-				for (const mutation of mutationsList) {
+			let resizeObserver = new MutationObserver(function (mutationsList) {
+				for (let mutation of mutationsList) {
 					if (mutation.type === 'childList') {
 						_resize();
 					}
 				}
 			});
 			resizeObserver.observe(qfe, { childList: true });
+
+			// Always focus onto the selected reference item
+			let referenceSelectObserved = new MutationObserver(function (mutationsList) {
+				for (let mutation of mutationsList) {
+					if (mutation.type === 'attributes' && mutation.attributeName === 'selected') {
+						let focused = document.activeElement;
+						if (_sameZoteroItem(focused, referenceBox.selectedItem)) {
+							return;
+						}
+						if (focused.getAttribute("keep-focus")) {
+							return;
+						}
+						referenceBox.selectedItem.focus();
+					}
+				}
+			});
+			referenceSelectObserved.observe(referenceBox, { attributeFilter: ['selected'], subtree: true, attributes: true });
 		}
 	};
 	
@@ -255,6 +276,9 @@ var Zotero_QuickFormat = new function () {
 		});
 		newInput.addEventListener("keypress", onInputPress);
 		newInput.addEventListener("paste", _onPaste, false);
+		newInput.addEventListener("focus", (_) => {
+			newInput.setAttribute("keep-focus", true);
+		});
 		return newInput;
 	}
 	
@@ -1199,6 +1223,13 @@ var Zotero_QuickFormat = new function () {
 		return document.querySelector(".zotero-bubble-input");
 	}
 
+	function _sameZoteroItem(nodeOne, nodeTwo) {
+		if (!nodeOne || !nodeTwo) {
+			return false;
+		}
+		return nodeOne.getAttribute("zotero-item") == nodeTwo.getAttribute("zotero-item");
+	}
+
 	/**
 	 * Reset timer that controls when search takes place. We use this to avoid searching after each
 	 * keypress, since searches can be slow.
@@ -1278,7 +1309,7 @@ var Zotero_QuickFormat = new function () {
 
 	var onInputPress = function (event) {
 		if (accepted) return;
-		if (event.charCode === 59 /* ; */ || event.key === "Enter" || (event.key == "Tab" && !event.shiftKey)) {
+		if (event.charCode === 59 /* ; */ || event.key === "Enter") {
 			event.preventDefault();
 			event.stopPropagation();
 			Zotero_QuickFormat._bubbleizeSelected();
@@ -1302,6 +1333,9 @@ var Zotero_QuickFormat = new function () {
 			event.preventDefault();
 			moveFocusBack(this);
 			this.remove();
+		}
+		else if (["ArrowDown", "ArrowUp"].includes(event.key) && referencePanel.state === "open") {
+			this.removeAttribute("keep-focus");
 		}
 	};
 
