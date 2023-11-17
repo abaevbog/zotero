@@ -253,6 +253,10 @@ var Zotero_QuickFormat = new function () {
 				_showCitation(null);
 				_resize();
 			}
+			// Create and focus input in the end onload
+			let input = _createInputField();
+			qfe.appendChild(input);
+			input.focus();
 		}
 		catch (e) {
 			Zotero.logError(e);
@@ -294,6 +298,12 @@ var Zotero_QuickFormat = new function () {
 			if (referencePanel.hidden) {
 				referencePanel.hidden = false;
 				_resizeReferencePanel();
+			}
+		});
+		// Delete empty input on blur
+		newInput.addEventListener("blur", (_) => {
+			if (inputEmpty(newInput)) {
+				newInput.remove();
 			}
 		});
 		return newInput;
@@ -1263,6 +1273,14 @@ var Zotero_QuickFormat = new function () {
 		return document.querySelector(".zotero-bubble-input");
 	}
 
+	// Determine if the input has anything that is not just whitepsace
+	function inputEmpty(input) {
+		if (!input) {
+			return true;
+		}
+		return !/\S/.test(input.value);
+	}
+
 	function _sameZoteroItem(nodeOne, nodeTwo) {
 		if (!nodeOne || !nodeTwo) {
 			return false;
@@ -1332,6 +1350,12 @@ var Zotero_QuickFormat = new function () {
 		let clickX = event.clientX;
 		let clickY = event.clientY;
 		let { lastBubble, newline } = lastBubbleBeforePoint(clickX, clickY);
+		let existingInput = _getInput();
+		// Input would have been added where another input already exists
+		if (existingInput?.previousElementSibling == lastBubble) {
+			existingInput.focus();
+			return;
+		}
 		let newInput = _createInputField();
 		if (lastBubble !== null) {
 			lastBubble.after(newInput);
@@ -1356,18 +1380,14 @@ var Zotero_QuickFormat = new function () {
 		}
 		else if (["ArrowLeft", "ArrowRight"].includes(event.key)) {
 			locatorLocked = true;
-			// If input only has whitespaces, count it as empty
-			let inputEmpty = !/\S/.test(this.value);
+			// On arrow left from the beginning of the input, move to previous bubble
 			if (event.key === "ArrowLeft" && this.selectionStart === 0) {
-				if (moveFocusBack(this) && inputEmpty) {
-					this.remove();
-				}
+				moveFocusBack(this);
 				event.preventDefault();
 			}
+			// On arrow right from the end of the input, move to next bubble
 			else if (event.key === "ArrowRight" && this.selectionStart === this.value.length) {
-				if (moveFocusForward(this) && inputEmpty) {
-					this.remove();
-				}
+				moveFocusForward(this);
 				event.preventDefault();
 			}
 		}
@@ -1392,7 +1412,7 @@ var Zotero_QuickFormat = new function () {
 			event.preventDefault();
 			let inputExists = _getInput();
 			let newInput;
-			if (!inputExists || !inputExists.value.length) {
+			if (!inputExists || inputEmpty(inputExists)) {
 				newInput = _createInputField();
 			}
 			
@@ -1437,6 +1457,10 @@ var Zotero_QuickFormat = new function () {
 		if(qfGuidance) qfGuidance.hide();
 		
 		var keyCode = event.keyCode;
+		let focusedInput = _getInput();
+		if (focusedInput != document.activeElement) {
+			focusedInput = null;
+		}
 		if (event.key == ' ') {
 			// Space on toolbarbutton opens the popup
 			if (event.target.tagName == "toolbarbutton") {
@@ -1454,6 +1478,20 @@ var Zotero_QuickFormat = new function () {
 			});
 			referenceBox.dispatchEvent(e);
 			event.preventDefault();
+		}
+		// On Home from the beginning of the input, create and focus input in the beginning
+		else if (event.key === "Home"
+			&& (!focusedInput || (focusedInput.selectionStart === 0 && focusedInput.previousElementSibling))) {
+			let input = _createInputField();
+			qfe.prepend(input);
+			input.focus();
+		}
+		// On End from the beginning of the input, create and focus input in the end
+		else if (event.key === "End"
+			&& (!focusedInput || (focusedInput.selectionStart === focusedInput.value.length && focusedInput.nextElementSibling))) {
+			let input = _createInputField();
+			qfe.appendChild(input);
+			input.focus();
 		}
 		else if (keyCode == event.DOM_VK_TAB) {
 			// Shift-Tab from the input field tries to focus on zotero icon dropdown
@@ -1726,10 +1764,15 @@ var Zotero_QuickFormat = new function () {
 			// Enter anywhere else closes the dialog
 			else if (event.key === "Enter") {
 				document.getElementById("citation-properties").hidePopup();
-				_refocusQfe();
 				event.stopPropagation();
 				event.preventDefault();
 			}
+		}
+		// Arrow up closes the popup
+		if (event.key === "ArrowUp" && !(event.ctrlKey || event.altKey || event.metaKey)) {
+			document.getElementById("citation-properties").hidePopup();
+			event.stopPropagation();
+			event.preventDefault();
 		}
 	};
 	
