@@ -1378,12 +1378,12 @@ var Zotero_QuickFormat = new function () {
 
 	var onInputPress = function (event) {
 		if (accepted) return;
-		if (event.charCode === 59 /* ; */ || event.key === "Enter") {
+		if ((event.charCode === 59 /* ; */ || event.key === "Enter") && referencePanel.state === "open") {
 			event.preventDefault();
 			event.stopPropagation();
 			Zotero_QuickFormat._bubbleizeSelected();
 		}
-		else if (["ArrowLeft", "ArrowRight"].includes(event.key)) {
+		else if (["ArrowLeft", "ArrowRight"].includes(event.key) && !event.shiftKey) {
 			locatorLocked = true;
 			// On arrow left from the beginning of the input, move to previous bubble
 			if (event.key === "ArrowLeft" && this.selectionStart === 0) {
@@ -1413,7 +1413,7 @@ var Zotero_QuickFormat = new function () {
 			_showCitationProperties(this);
 			event.preventDefault();
 		}
-		else if (["ArrowLeft", "ArrowRight"].includes(event.key)) {
+		else if (["ArrowLeft", "ArrowRight"].includes(event.key) && !event.shiftKey) {
 			event.preventDefault();
 			let inputExists = _getInput();
 			let newInput;
@@ -1439,6 +1439,37 @@ var Zotero_QuickFormat = new function () {
 					moveFocusForward(this);
 				}
 			}
+		}
+		else if (["ArrowLeft", "ArrowRight"].includes(event.key) && event.shiftKey) {
+			// On Shift-Left/Right swap focused bubble with it's neighbor
+			event.preventDefault();
+			let findNextBubble = () => {
+				let node = event.target;
+				do {
+					node = event.key == "ArrowLeft" ? node.previousElementSibling : node.nextElementSibling;
+				} while (node && !(node.classList.contains("bubble") || node.classList.contains("zotero-bubble-input")));
+				return node;
+			};
+			let nextBubble = findNextBubble();
+			if (nextBubble) {
+				// If we ran into a line break on the way, delete it
+				if (nextBubble.previousElementSibling?.tagName == "br") {
+					nextBubble.previousElementSibling.remove();
+				}
+				if (event.key == "ArrowLeft") {
+					nextBubble.before(this);
+				}
+				else {
+					nextBubble.after(this);
+				}
+				// Do not "Keep Sources Sorted"
+				if (io.sortable && keepSorted?.hasAttribute("checked")) {
+					keepSorted.removeAttribute("checked");
+				}
+				_previewAndSort();
+			}
+			
+			this.focus();
 		}
 		else if (["Backspace", "Delete"].includes(event.key)) {
 			event.preventDefault();
