@@ -52,18 +52,21 @@
 		<deck class="citation-dialog deck" selectedIndex="0" flex="1">
 			<hbox class="citation-dialog search" flex="1" align="start">
 				<hbox flex="1">
-					<toolbarbutton id="zotero-icon" type="menu" tabindex="0" disabled="true" aria-disabled="true">
-						<menupopup>
-							<menuitem id="keep-sorted" label="&zotero.citation.keepSorted.label;"
-									  oncommand="Zotero_QuickFormat.onKeepSortedCommand()" type="checkbox"
-									  hidden="true"/>
-							<menuitem id="show-editor" label="&zotero.integration.showEditor.label;"
-									  oncommand="Zotero_QuickFormat.onShowEditorCommand()" type="checkbox"
-									  hidden="true"/>
-							<menuitem id="classic-view" label="&zotero.integration.classicView.label;"
-									  oncommand="Zotero_QuickFormat.onClassicViewCommand()"/>
-						</menupopup>
-					</toolbarbutton>
+					<vbox flex="1" align="center" style="display: flex;align-items: center">
+						<toolbarbutton id="zotero-icon" type="menu" tabindex="0" disabled="true">
+							<menupopup>
+								<menuitem id="keep-sorted" label="&zotero.citation.keepSorted.label;"
+										oncommand="Zotero_QuickFormat.onKeepSortedCommand()" type="checkbox"
+										hidden="true"/>
+								<menuitem id="show-editor" label="&zotero.integration.showEditor.label;"
+										oncommand="Zotero_QuickFormat.onShowEditorCommand()" type="checkbox"
+										hidden="true"/>
+								<menuitem id="classic-view" label="&zotero.integration.classicView.label;"
+										oncommand="Zotero_QuickFormat.onClassicViewCommand()"/>
+							</menupopup>
+						</toolbarbutton>
+					</vbox>
+
 
 					<html:div flex="1" spellcheck="false" class="citation-dialog editor" role="application"></html:div>
 							

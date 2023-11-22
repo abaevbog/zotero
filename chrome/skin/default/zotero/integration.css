@@ -191,7 +191,7 @@
 	outline: none;
 	line-height: 2em;
 	cursor: text;
-	width: 730px;
+	width: 720px;
 	height: 28px;
 }
 
@@ -248,6 +248,31 @@ richlistitem[selected="true"] {
 	list-style-image: url("chrome://zotero/skin/zotero-new-z-16px.png");
 	padding: 0;
 	margin: 0;
+}
+
+/* Add cursor and hover/active effects to make the Z icon act like a button */
+#zotero-icon:not([disabled]) {
+	border: solid #ccc 1px;
+	padding: 5px;
+	border-radius: 5px;
+	cursor: pointer;
+}
+
+#zotero-icon:not([disabled]):hover,
+#zotero-icon:not([disabled]):focus {
+	background: #f2f2f2;
+}
+
+#zotero-icon:not([disabled]):active {
+	background: #e6e6e6;
+}
+
+#zotero-icon:not([disabled])::before {
+	background: url("searchbar-dropmarker@2x.png") no-repeat center / contain;
+	display: inline-block;
+	content: "";
+	width: 5px;
+	height: 8px;
 }
 
 #zotero-icon .toolbarbutton-text {
