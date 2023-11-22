@@ -105,11 +105,12 @@ var Zotero_QuickFormat = new function () {
 					event.stopPropagation();
 					event.target.closest("richlistitem").click();
 				}
-				// Shift-tab will move focus back to the input field
-				else if (event.key === "Tab" && event.shiftKey) {
+				// Tab will move focus back to the input field
+				else if (event.key === "Tab") {
 					event.preventDefault();
 					event.stopPropagation();
-					document.querySelector(".zotero-bubble-input").focus();
+					let input = _getInput();
+					input?.focus();
 				}
 				// Can keep typing from the reference box
 				else if (event.key.length === 1 || event.key === 'Backspace') {
@@ -1352,7 +1353,7 @@ var Zotero_QuickFormat = new function () {
 		let { lastBubble, newline } = lastBubbleBeforePoint(clickX, clickY);
 		let existingInput = _getInput();
 		// Input would have been added where another input already exists
-		if (existingInput?.previousElementSibling == lastBubble) {
+		if (existingInput && existingInput.previousElementSibling == lastBubble) {
 			existingInput.focus();
 			return;
 		}
@@ -1480,17 +1481,31 @@ var Zotero_QuickFormat = new function () {
 			event.preventDefault();
 		}
 		// On Home from the beginning of the input, create and focus input in the beginning
+		// If there is an input in the beginning already, just focus it
 		else if (event.key === "Home"
 			&& (!focusedInput || (focusedInput.selectionStart === 0 && focusedInput.previousElementSibling))) {
-			let input = _createInputField();
-			qfe.prepend(input);
+			let input;
+			if (qfe.firstChild?.classList.contains("zotero-bubble-input")) {
+				input = qfe.firstChild;
+			}
+			else {
+				input = _createInputField();
+				qfe.prepend(input);
+			}
 			input.focus();
 		}
-		// On End from the beginning of the input, create and focus input in the end
+		// On End from the beginning of the input, create and focus input in the end.
+		// If there is an input in the end already, just focus it
 		else if (event.key === "End"
 			&& (!focusedInput || (focusedInput.selectionStart === focusedInput.value.length && focusedInput.nextElementSibling))) {
-			let input = _createInputField();
-			qfe.appendChild(input);
+			let input;
+			if (qfe.childNodes[qfe.childNodes.length - 1]?.classList.contains("zotero-bubble-input")) {
+				input = qfe.childNodes[qfe.childNodes.length - 1];
+			}
+			else {
+				input = _createInputField();
+				qfe.appendChild(input);
+			}
 			input.focus();
 		}
 		else if (keyCode == event.DOM_VK_TAB) {
@@ -1503,10 +1518,10 @@ var Zotero_QuickFormat = new function () {
 					return;
 				}
 			}
-			// Otherwise, Tab places focus on the very first bubble
-			let firstBubble = document.querySelector(".bubble");
-			if (firstBubble) {
-				firstBubble.focus();
+			// Tab places focus on the existing input or creates a new one in the end
+			let input = _getInput();
+			if (input) {
+				input.focus();
 			}
 			else {
 				let newInput = _createInputField();
