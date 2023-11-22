@@ -193,7 +193,13 @@ var Zotero_QuickFormat = new function () {
 			let resizeObserver = new MutationObserver(function (mutationsList) {
 				for (let mutation of mutationsList) {
 					if (mutation.type === 'childList') {
-						_resize();
+						// Due to very odd mozilla behavior, calls to resize the window when
+						// dragging is happening make the next drag events after resize
+						// act strange (dragging doesn't happen, though dragstart fires but dragend doesn't)
+						// Resizing after delay in onDrop seems to not cause this issue
+						if (!dragPlaceholder) {
+							_resize();
+						}
 					}
 				}
 			});
@@ -252,7 +258,6 @@ var Zotero_QuickFormat = new function () {
 			if (io.citation.citationItems.length) {
 				await resizePromise;
 				_showCitation(null);
-				_resize();
 			}
 			// Create and focus input in the end onload
 			let input = _createInputField();
@@ -887,7 +892,6 @@ var Zotero_QuickFormat = new function () {
 	 */
 	function _clearEntryList() {
 		while(referenceBox.hasChildNodes()) referenceBox.removeChild(referenceBox.firstChild);
-		_resize();
 		_resizeReferencePanel();
 	}
 	
@@ -1549,12 +1553,14 @@ var Zotero_QuickFormat = new function () {
 		});
 		let index = _getBubbleIndex(this);
 		event.dataTransfer.setData("zotero/citation_bubble", index);
+		dragPlaceholder.setAttribute("original-index", index);
+		event.dataTransfer.effectAllowed = "move";
 		event.stopPropagation();
 	}
 
 	function _onBubbleDragOver(event) {
 		event.preventDefault();
-		let bubbleIndex = event.dataTransfer.getData("zotero/citation_bubble");
+		let bubbleIndex = dragPlaceholder.getAttribute("original-index");
 		let bubble = event.target;
 		if (bubble.classList?.contains("editor")) {
 			let { lastBubble, _ } = lastBubbleBeforePoint(event.clientX, event.clientY);
@@ -1629,11 +1635,17 @@ var Zotero_QuickFormat = new function () {
 	var _onBubbleDrop = Zotero.Promise.coroutine(function* (event) {
 		event.preventDefault();
 		event.stopPropagation();
-		let oldPosition = parseInt(event.dataTransfer.getData("zotero/citation_bubble"));
+		let oldPosition = parseInt(dragPlaceholder.getAttribute("original-index"));
 		let bubble = document.getElementById("dragged-bubble");
 		if (isNaN(oldPosition) || !bubble) return;
 
 		dragPlaceholder.after(bubble);
+
+		// Manual call to resize after delay to avoid strange mozilla behaviors that affect
+		// subsequent drag events when resizing happens around the same time as drag events
+		setTimeout(() => {
+			_resize();
+		}, 50);
 
 		// If moved out of order, turn off "Keep Sources Sorted"
 		if(io.sortable && keepSorted && keepSorted.hasAttribute("checked") && oldPosition !== -1 &&
@@ -1644,17 +1656,6 @@ var Zotero_QuickFormat = new function () {
 		onBubbleDragEnd();
 
 		yield _previewAndSort();
-		let bubbles = document.querySelectorAll(".bubble");
-		let lastBubbleRect = bubbles[bubbles.length - 1].getBoundingClientRect();
-		let editorRect = qfe.getBoundingClientRect();
-		// During reordering, a bubble can be moved to a new lower row
-		// so we need to expand the search field to see it.
-		// Calling _resize causes a glitch that prevents the next drag event from
-		// properly executing, so this sets the new height manually
-		if (lastBubbleRect.bottom > editorRect.bottom) {
-			let qfsHeight = qfs.getBoundingClientRect().height;
-			qfs.height = `${qfsHeight + 27}px`;
-		}
 	});
 	
 	/**
