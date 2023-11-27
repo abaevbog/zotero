@@ -4902,8 +4902,12 @@ Zotero.Item.prototype._eraseData = Zotero.Promise.coroutine(function* (env) {
 Zotero.Item.prototype.isCollection = function() {
 	return false;
 }
-
-
+Zotero.Item.prototype.isSearch = function () {
+	return false;
+}
+Zotero.Item.prototype.isItem = function() {
+	return true;
+}
 /**
  * Populate the object's data from an API JSON data object
  *

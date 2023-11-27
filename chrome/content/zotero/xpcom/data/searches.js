@@ -120,6 +120,10 @@ Zotero.Searches = function() {
 		return Zotero.Utilities.Internal.getNextName(name, names, true);
 	};
 	
+	this.emptyTrash = async function (libraryID) {
+		let deleted = await Zotero.Searches.getDeleted(libraryID, true);
+		await Zotero.Searches.erase(deleted);
+	}
 	
 	this._loadConditions = Zotero.Promise.coroutine(function* (libraryID, ids, idSQL) {
 		var sql = "SELECT savedSearchID, searchConditionID, condition, operator, value, required "

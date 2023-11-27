@@ -1749,7 +1749,18 @@ var ZoteroPane = new function()
 			if (selectedItems.length == 1) {
 				var item = selectedItems[0];
 				
-				if (item.isNote()) {
+				if (item.isCollection()) {
+					// If a collection is selected, it must be in the trash.
+					var subcollectionsCount = item.getDescendents(false, 'collection', true).length;
+					
+					this.setItemPaneMessage(`Deleted collection with ${subcollectionsCount} subcollections.`);
+				}
+				else if (item.isSearch()) {
+					var searchResultCount = (yield item.search()).length;
+					var conditions = Object.keys(item.getConditions()).length;
+					this.setItemPaneMessage(`Deleted search with ${conditions} condition(s) and ${searchResultCount} match(es)`);
+				}
+				else if (item.isNote()) {
 					ZoteroItemPane.onNoteSelected(item, this.collectionsView.editable);
 				}
 				
@@ -1996,7 +2007,7 @@ var ZoteroPane = new function()
 	this.updateQuickCopyCommands = function (selectedItems) {
 		let canCopy = false;
 		// If all items are notes/attachments and at least one note is not empty
-		if (selectedItems.every(item => item.isNote() || item.isAttachment())) {
+		if (selectedItems.every(item => !item.isCollection() && (item.isNote() || item.isAttachment()))) {
 			if (selectedItems.some(item => item.note)) {
 				canCopy = true;
 			}
@@ -2005,7 +2016,7 @@ var ZoteroPane = new function()
 			let format = Zotero.QuickCopy.getFormatFromURL(Zotero.QuickCopy.lastActiveURL);
 			format = Zotero.QuickCopy.unserializeSetting(format);
 			if (format.mode == 'bibliography') {
-				canCopy = selectedItems.some(item => item.isRegularItem());
+				canCopy = selectedItems.some(item => !item.isCollection() && item.isRegularItem());
 			}
 			else {
 				canCopy = true;
@@ -2420,13 +2431,12 @@ var ZoteroPane = new function()
 	 * @return {Promise}
 	 */
 	this.restoreSelectedItems = async function () {
-		let items = this.getSelectedItems();
-		if (!items.length) {
+		let selectedIDs = this.getSelectedItems(true);
+		if (!selectedIDs.length) {
 			return;
 		}
 
-		let selectedIDs = new Set(items.map(item => item.id));
-		let isSelected = itemOrID => (itemOrID.id ? selectedIDs.has(itemOrID.id) : selectedIDs.has(itemOrID));
+		let isSelected = itemOrID => (itemOrID.treeViewID ? selectedIDs.includes(itemOrID.treeViewID) : selectedIDs.includes(itemOrID));
 
 		await Zotero.DB.executeTransaction(async () => {
 			for (let row = 0; row < this.itemsView.rowCount; row++) {
@@ -2437,17 +2447,26 @@ var ZoteroPane = new function()
 
 				let parent = this.itemsView.getRow(row).ref;
 				let children = [];
-				if (!parent.isNote()) children.push(...parent.getNotes(true));
-				if (!parent.isAttachment()) children.push(...parent.getAttachments(true));
-
+				let subcollections = [];
+				if (parent.isCollection()) {
+					// If the restored item is a collection, restore its subcollections too
+					if (isSelected(parent)) {
+						subcollections = parent.getDescendents(false, 'collection', true).map(col => col.id);
+					}
+				}
+				else {
+					if (!parent.isNote()) children.push(...parent.getNotes(true));
+					if (!parent.isAttachment()) children.push(...parent.getAttachments(true));
+				}
 				if (isSelected(parent)) {
 					if (parent.deleted) {
 						parent.deleted = false;
-						await parent.save();
+						await parent.save({ skipSelect: true, restore: true });
 					}
 
 					let noneSelected = !children.some(isSelected);
-					for (let child of Zotero.Items.get(children)) {
+					let allChildren = Zotero.Items.get(children).concat(Zotero.Collections.get(subcollections));
+					for (let child of allChildren) {
 						if ((noneSelected || isSelected(child)) && child.deleted) {
 							child.deleted = false;
 							await child.save();
@@ -2485,6 +2504,8 @@ var ZoteroPane = new function()
 		if (result) {
 			Zotero.showZoteroPaneProgressMeter(null, true);
 			try {
+				yield Zotero.Collections.emptyTrash(libraryID);
+				yield Zotero.Searches.emptyTrash(libraryID);
 				let deleted = yield Zotero.Items.emptyTrash(
 					libraryID,
 					{
@@ -3777,7 +3798,7 @@ var ZoteroPane = new function()
 				this.updateAttachmentButtonMenu(popup);
 				
 				// Block certain actions on files if no access
-				if (item.isFileAttachment() && !collectionTreeRow.filesEditable) {
+				if (item.isCollection() || item.isFileAttachment() && !collectionTreeRow.filesEditable) {
 					[m.moveToTrash, m.createParent, m.renameAttachments]
 						.forEach(function (x) {
 							disable.add(x);
@@ -3882,6 +3903,14 @@ var ZoteroPane = new function()
 		}
 		else {
 			menu.childNodes[m.showInLibrary].setAttribute('label', Zotero.getString('general.showInLibrary'));
+		}
+		// For collections and search, only keep restore/delete options
+		if (items.some(item => item.isCollection() || item.isSearch())) {
+			for (let option of options) {
+				if (!['restoreToLibrary', 'deleteFromLibrary'].includes(option)) {
+					show.delete(m[option]);
+				}
+			}
 		}
 		
 		// Set labels, plural if necessary

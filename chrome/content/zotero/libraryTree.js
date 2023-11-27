@@ -184,7 +184,7 @@ var LibraryTree = class LibraryTree extends React.Component {
 		var rowMap = {};
 		for (var i = 0; i < this.rowCount; i++) {
 			let row = this.getRow(i);
-			let id = row.id;
+			let id = ['item', 'collection', 'search'].includes(row.type) ? row.ref.treeViewID : row.id;
 			if (rowMap[id] !== undefined) {
 				Zotero.debug(`WARNING: _refreshRowMap(): ${this.type} row ${rowMap[id]} already found for item ${id} at ${i}`, 2);
 				Zotero.debug(new Error().stack, 2);

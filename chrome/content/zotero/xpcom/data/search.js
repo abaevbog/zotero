@@ -112,6 +112,42 @@ Zotero.defineProperty(Zotero.Search.prototype, 'treeViewImage', {
 	}
 });
 
+// Some properties to make it easier for a search to "pretend"
+// to be an item for itemTree
+var properties = {
+	isCollection: false,
+	isAnnotation: false,
+	isNote: false,
+	numNotes: 0,
+	isAttachment: false,
+	numAttachments: false,
+	getColoredTags: false,
+	isRegularItem: false, // Should be false to prevent items dropped into deleted searches
+	isSearch: true,
+	getNotes: [],
+	getAttachments: [],
+	isFileAttachment: false,
+	isTopLevelItem: false,
+	isItem: false
+};
+
+for (let [name, returnValue] of Object.entries(properties)) {
+	Zotero.Search.prototype[name] = () => returnValue;
+}
+
+Zotero.Search.prototype.getField = function (field, _) {
+	return this['_' + field] || "";
+}
+Zotero.Search.prototype.getDisplayTitle = function () {
+	return this.name;
+}
+Zotero.Search.prototype.getBestAttachment = Zotero.Promise.coroutine(function* () {
+	return false;
+})
+Zotero.Search.prototype.getBestAttachments = Zotero.Promise.coroutine(function* () {
+	return false;
+})
+
 Zotero.Search.prototype.loadFromRow = function (row) {
 	var primaryFields = this._ObjectsClass.primaryFields;
 	for (let i=0; i<primaryFields.length; i++) {

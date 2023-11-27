@@ -154,6 +154,11 @@ Zotero.Collections = function() {
 		});
 		
 	}
+
+	this.emptyTrash = async function (libraryID) {
+		let deleted = await Zotero.Collections.getDeleted(libraryID, true);
+		await Zotero.Collections.erase(deleted);
+	};
 	
 	
 	this._loadChildCollections = Zotero.Promise.coroutine(function* (libraryID, ids, idSQL) {
