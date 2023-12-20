@@ -193,6 +193,7 @@
 	cursor: text;
 	width: 720px;
 	height: 28px;
+	font-size: 13px;
 }
 
 .citation-dialog.spinner {
@@ -201,8 +202,6 @@
 }
 
 .citation-dialog.item {
-	font-size: 12px;
-	font: -moz-field;
 	-moz-user-focus: normal;
 	padding: 3px 5px 3px 10px;
 }
@@ -253,13 +252,14 @@ richlistitem[selected="true"] {
 /* Add cursor and hover/active effects to make the Z icon act like a button */
 #zotero-icon:not([disabled]) {
 	border: solid #ccc 1px;
-	padding: 5px;
+	padding: 5px 7px 5px 5px;
 	border-radius: 5px;
 	cursor: pointer;
 }
 
 #zotero-icon:not([disabled]):hover,
-#zotero-icon:not([disabled]):focus {
+#zotero-icon:not([disabled]):focus,
+#zotero-icon[open="true"]:not([disabled]) {
 	background: #f2f2f2;
 }
 
