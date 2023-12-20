@@ -1713,6 +1713,8 @@ var Zotero_QuickFormat = new function () {
 			isPaste = true;
 			let input = _getInput();
 			input.value = str.replace(/[\r\n]/g, " ").trim();
+			input.style.width = input.scrollWidth + 'px';
+			_resetSearchTimer();
 		}
 	}
 	
