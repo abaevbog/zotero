@@ -191,14 +191,14 @@
 	outline: none;
 	line-height: 2em;
 	cursor: text;
-	width: 720px;
+	width: 710px;
 	height: 28px;
 	font-size: 13px;
 }
 
 .citation-dialog.spinner {
-	margin-top: 2px;
-	margin-right: 8px;
+	display: flex;
+	align-items: center;
 }
 
 .citation-dialog.item {
