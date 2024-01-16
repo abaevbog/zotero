@@ -905,7 +905,7 @@ var Zotero_QuickFormat = new function () {
 	 * Converts the selected item to a bubble
 	 */
 	this._bubbleizeSelected = Zotero.Promise.coroutine(function* () {
-		if(!referenceBox.hasChildNodes() || !referenceBox.selectedItem || !_getInput()) return false;
+		if(!referenceBox.hasChildNodes() || !referenceBox.selectedItem || !(_lastFocusedInput || _getInput())) return false;
 		var citationItem = {"id":referenceBox.selectedItem.getAttribute("zotero-item")};
 		if (typeof citationItem.id === "string" && citationItem.id.indexOf("/") !== -1) {
 			var item = Zotero.Cite.getItem(citationItem.id);
@@ -957,7 +957,7 @@ var Zotero_QuickFormat = new function () {
 		// the bubble list for sorting, so we do some additional
 		// handling to maintain the correct locator node in
 		// _showCitation()
-		let input = _getInput();
+		let input = _getInput() || _lastFocusedInput;
 		locatorNode = _insertBubble(citationItem, input);
 		input.remove();
 		isPaste = false;
