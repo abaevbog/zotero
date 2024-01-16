@@ -43,6 +43,7 @@ var Zotero_QuickFormat = new function () {
 	var locatorLocked = true;
 	var locatorNode = null;
 	var _searchPromise;
+	var _lastFocusedInput = null;
 	
 	const SEARCH_TIMEOUT = 250;
 	const SHOWN_REFERENCES = 7;
@@ -109,21 +110,19 @@ var Zotero_QuickFormat = new function () {
 				else if (event.key === "Tab") {
 					event.preventDefault();
 					event.stopPropagation();
-					let input = _getInput();
-					input?.focus();
+					_lastFocusedInput.focus();
 				}
 				// Can keep typing from the reference box
 				else if (event.key.length === 1 || event.key === 'Backspace') {
 					event.preventDefault();
-					let input = _getInput();
 					if (event.key === 'Backspace') {
-						input.value = input.value.slice(0, -1);
+						_lastFocusedInput.value = _lastFocusedInput.value.slice(0, -1);
 					}
 					else {
-						input.value += event.key;
+						_lastFocusedInput.value += event.key;
 					}
-					input.dispatchEvent(new Event('input', { bubbles: true }));
-					input.focus();
+					_lastFocusedInput.dispatchEvent(new Event('input', { bubbles: true }));
+					_lastFocusedInput.focus();
 				}
 			});
 			if (Zotero.isWin) {
@@ -274,18 +273,7 @@ var Zotero_QuickFormat = new function () {
 		qfe.focus();
 	}
 
-
-	function _clearOpenedInput() {
-		let input = document.querySelector(".zotero-bubble-input");
-		if (input) {
-			input.remove();
-			document.querySelector("br")?.remove();
-			_updateItemList({ citedItems: [] });
-		}
-	}
-
 	function _createInputField() {
-		_clearOpenedInput();
 		let newInput = MozXULElement.parseXULToFragment(`
 			<html:input class="zotero-bubble-input" aria-description="&zotero.citation.input;"></html:input>
 		`, ['chrome://zotero/locale/zotero.dtd']);
@@ -299,8 +287,17 @@ var Zotero_QuickFormat = new function () {
 		newInput.addEventListener("paste", _onPaste, false);
 		newInput.addEventListener("focus", (_) => {
 			newInput.setAttribute("keep-focus", true);
-			// If the reference panel was hidden due to click on a bubble,
-			// it will be reopened when the input is focused
+
+			// Refresh search results when a non-empty input when focused
+			// Clear result list if an empty input is focused to prevent
+			// results of the previous input from sticking around for a moment after focus change
+			if (!inputEmpty(newInput)) {
+				_resetSearchTimer();
+			}
+			else {
+				_updateItemList({ citedItems: [] });
+			}
+
 			if (referencePanel.hidden) {
 				referencePanel.hidden = false;
 				_resizeReferencePanel();
@@ -311,18 +308,24 @@ var Zotero_QuickFormat = new function () {
 			if (inputEmpty(newInput)) {
 				newInput.remove();
 			}
+			else {
+				_lastFocusedInput = newInput;
+			}
+			// If focus leaves input, hide the reference panel.
+			setTimeout(() => {
+				if (referencePanel.contains(document.activeElement)) {
+					return;
+				}
+				let focusedInput = _getInput();
+				if (!focusedInput) {
+					referencePanel.hidden = true;
+					_resizeReferencePanel();
+				}
+			});
 		});
 		return newInput;
 	}
 	
-	/**
-	 * Gets text within the currently selected node
-	 * @param {Boolean} [clear] If true, also remove these nodes
-	 */
-	function _getEditorContent(clear) {
-		let node = document.querySelector(".zotero-bubble-input");
-		return node ? node.value.trim() : false;
-	}
 
 	/**
 	 * Updates currentLocator based on a string
@@ -1274,8 +1277,19 @@ var Zotero_QuickFormat = new function () {
 		return false;
 	}
 
+	/**
+	 * Gets text within the currently selected node
+	 */
+	function _getEditorContent() {
+		let node = _getInput();
+		return node ? node.value.trim() : false;
+	}
+
 	function _getInput() {
-		return document.querySelector(".zotero-bubble-input");
+		if (isInput(document.activeElement)) {
+			return document.activeElement;
+		}
+		return false;
 	}
 
 	// Determine if the input has anything that is not just whitepsace
@@ -1284,6 +1298,11 @@ var Zotero_QuickFormat = new function () {
 			return true;
 		}
 		return !/\S/.test(input.value);
+	}
+
+	function isInput(node) {
+		if (!node) return false;
+		return node.classList.contains("zotero-bubble-input");
 	}
 
 	function _sameZoteroItem(nodeOne, nodeTwo) {
@@ -1355,10 +1374,10 @@ var Zotero_QuickFormat = new function () {
 		let clickX = event.clientX;
 		let clickY = event.clientY;
 		let { lastBubble, newline } = lastBubbleBeforePoint(clickX, clickY);
-		let existingInput = _getInput();
-		// Input would have been added where another input already exists
-		if (existingInput && existingInput.previousElementSibling == lastBubble) {
-			existingInput.focus();
+		// If click happened right before another input, focus that input
+		// instead of adding another one
+		if (isInput(lastBubble?.nextElementSibling)) {
+			lastBubble.nextElementSibling.focus();
 			return;
 		}
 		let newInput = _createInputField();
@@ -1415,28 +1434,24 @@ var Zotero_QuickFormat = new function () {
 		}
 		else if (["ArrowLeft", "ArrowRight"].includes(event.key) && !event.shiftKey) {
 			event.preventDefault();
-			let inputExists = _getInput();
-			let newInput;
-			if (!inputExists || inputEmpty(inputExists)) {
-				newInput = _createInputField();
-			}
+			let newInput = _createInputField();
 			
 			if (["ArrowLeft"].includes(event.key)) {
-				if (newInput) {
+				if (isInput(this.previousElementSibling)) {
+					moveFocusBack(this);
+				}
+				else {
 					this.before(newInput);
 					newInput.focus();
 				}
-				else {
-					moveFocusBack(this);
-				}
 			}
 			else if (["ArrowRight"].includes(event.key)) {
-				if (newInput) {
-					this.after(newInput);
-					newInput.focus();
+				if (isInput(this.nextElementSibling)) {
+					moveFocusForward(this);
 				}
 				else {
-					moveFocusForward(this);
+					this.after(newInput);
+					newInput.focus();
 				}
 			}
 		}
@@ -1494,9 +1509,6 @@ var Zotero_QuickFormat = new function () {
 		
 		var keyCode = event.keyCode;
 		let focusedInput = _getInput();
-		if (focusedInput != document.activeElement) {
-			focusedInput = null;
-		}
 		if (event.key == ' ') {
 			// Space on toolbarbutton opens the popup
 			if (event.target.tagName == "toolbarbutton") {
@@ -1520,7 +1532,7 @@ var Zotero_QuickFormat = new function () {
 		else if (event.key === "Home"
 			&& (!focusedInput || (focusedInput.selectionStart === 0 && focusedInput.previousElementSibling))) {
 			let input;
-			if (qfe.firstChild?.classList.contains("zotero-bubble-input")) {
+			if (isInput(qfe.firstChild)) {
 				input = qfe.firstChild;
 			}
 			else {
@@ -1534,7 +1546,7 @@ var Zotero_QuickFormat = new function () {
 		else if (event.key === "End"
 			&& (!focusedInput || (focusedInput.selectionStart === focusedInput.value.length && focusedInput.nextElementSibling))) {
 			let input;
-			if (qfe.childNodes[qfe.childNodes.length - 1]?.classList.contains("zotero-bubble-input")) {
+			if (isInput(qfe.childNodes[qfe.childNodes.length - 1])) {
 				input = qfe.childNodes[qfe.childNodes.length - 1];
 			}
 			else {
@@ -1554,9 +1566,8 @@ var Zotero_QuickFormat = new function () {
 				}
 			}
 			// Tab places focus on the existing input or creates a new one in the end
-			let input = _getInput();
-			if (input) {
-				input.focus();
+			if (_lastFocusedInput) {
+				_lastFocusedInput.focus();
 			}
 			else {
 				let newInput = _createInputField();
@@ -1714,9 +1725,8 @@ var Zotero_QuickFormat = new function () {
 		var str = Zotero.Utilities.Internal.getClipboard("text/unicode");
 		if (str) {
 			isPaste = true;
-			let input = _getInput();
-			input.value = str.replace(/[\r\n]/g, " ").trim();
-			input.style.width = input.scrollWidth + 'px';
+			this.value = str.replace(/[\r\n]/g, " ").trim();
+			this.style.width = this.scrollWidth + 'px';
 			_resetSearchTimer();
 		}
 	}
@@ -1762,7 +1772,7 @@ var Zotero_QuickFormat = new function () {
 	};
 	
 	/**
-	 * Handle closing citation properties panel. Focus an opened input if any.
+	 * Handle closing citation properties panel. Focus last opened input if possible.
 	 * Otherwise, return focus to the bubble.
 	 */
 	this.onCitationPropertiesClosed = function(event) {
@@ -1771,9 +1781,8 @@ var Zotero_QuickFormat = new function () {
 		}
 		panelRefersToBubble.removeAttribute("selected");
 		Zotero_QuickFormat.onCitationPropertiesChanged();
-		let input = _getInput();
-		if (input) {
-			input.focus();
+		if (_lastFocusedInput) {
+			_lastFocusedInput.focus();
 		}
 		else {
 			panelRefersToBubble.focus();
