@@ -36,7 +36,7 @@ var Zotero_QuickFormat = new function () {
 	
 	var initialized, io, qfs, qfe, qfb, qfGuidance,
 		keepSorted, showEditor, referencePanel, referenceBox, referenceHeight = 0,
-		separatorHeight = 0, currentLocator, currentLocatorLabel, currentSearchTime, dragPlaceholder,
+		separatorHeight = 0, currentLocator, currentLocatorLabel, currentSearchTime, bubbleDragged,
 		panel, panelPrefix, panelSuffix, panelSuppressAuthor, panelLocatorLabel, panelLocator,
 		panelLibraryLink, panelInfo, panelRefersToBubble, panelFrameHeight = 0, accepted = false,
 		isPaste = false, lastEnter, lastEscape, throttleEscape = false, throttleEnter = false;
@@ -197,7 +197,7 @@ var Zotero_QuickFormat = new function () {
 						// dragging is happening make the next drag events after resize
 						// act strange (dragging doesn't happen, though dragstart fires but dragend doesn't)
 						// Resizing after delay in onDrop seems to not cause this issue
-						if (!dragPlaceholder) {
+						if (!bubbleDragged) {
 							_resize();
 						}
 					}
@@ -1508,7 +1508,6 @@ var Zotero_QuickFormat = new function () {
 				moveFocusForward(this);
 			}
 			this.parentNode.removeChild(this);
-			_resize();
 		}
 	};
 
@@ -1603,23 +1602,22 @@ var Zotero_QuickFormat = new function () {
 	 * Adds a dummy element to make dragging work
 	 */
 	function _onBubbleDrag(event) {
-		dragPlaceholder = this.cloneNode(true);
-		dragPlaceholder.setAttribute("id", "dragged-placeholder");
+		bubbleDragged = true;
 		this.style.cursor = "grabbing";
 		setTimeout(() => {
 			this.setAttribute("id", "dragged-bubble");
-			this.style.display = "none";
 		});
 		let index = _getBubbleIndex(this);
 		event.dataTransfer.setData("zotero/citation_bubble", index);
-		dragPlaceholder.setAttribute("original-index", index);
+		this.setAttribute("original-index", index);
 		event.dataTransfer.effectAllowed = "move";
 		event.stopPropagation();
 	}
 
 	function _onBubbleDragOver(event) {
 		event.preventDefault();
-		let bubbleIndex = dragPlaceholder.getAttribute("original-index");
+		let placeholder = document.querySelector("#dragged-bubble");
+		let bubbleIndex = placeholder.getAttribute("original-index");
 		let bubble = event.target;
 		if (bubble.classList?.contains("editor")) {
 			let { lastBubble, _ } = lastBubbleBeforePoint(event.clientX, event.clientY);
@@ -1631,14 +1629,13 @@ var Zotero_QuickFormat = new function () {
 		if (isNaN(parseInt(bubbleIndex)) || !bubble.classList?.contains("bubble")) {
 			return false;
 		}
-		if (bubble.getAttribute("id") == "dragged-placeholder") {
+		if (bubble.getAttribute("id") == "dragged-bubble") {
 			return true;
 		}
 
-		let placeholder = dragPlaceholder;
 		let bubbleRect = bubble.getBoundingClientRect();
 		let midpoint = (bubbleRect.right + bubbleRect.left) / 2;
-		if (event.clientX > midpoint && bubble.nextElementSibling?.id !== "dragged-placeholder") {
+		if (event.clientX > midpoint && bubble.nextElementSibling?.id !== "dragged-bubble") {
 			if (bubble.nextElementSibling) {
 				qfe.insertBefore(placeholder, bubble.nextElementSibling);
 			}
@@ -1649,7 +1646,7 @@ var Zotero_QuickFormat = new function () {
 				linebreak.remove();
 			}
 		}
-		else if (event.clientX < midpoint && bubble.previousElementSibling?.id !== "dragged-placeholder") {
+		else if (event.clientX < midpoint && bubble.previousElementSibling?.id !== "dragged-bubble") {
 			let previousBubbleRect = bubble.previousElementSibling?.getBoundingClientRect();
 			if (previousBubbleRect?.top && previousBubbleRect.top !== bubbleRect.top) {
 				let linebreak = document.querySelector("br");
@@ -1664,9 +1661,7 @@ var Zotero_QuickFormat = new function () {
 	}
 
 	function onBubbleDragEnd(_) {
-		if (dragPlaceholder) {
-			dragPlaceholder.remove();
-		}
+		bubbleDragged = false;
 		let bubble = document.getElementById("dragged-bubble");
 		if (bubble) {
 			bubble.style = "";
@@ -1697,11 +1692,10 @@ var Zotero_QuickFormat = new function () {
 	var _onBubbleDrop = Zotero.Promise.coroutine(function* (event) {
 		event.preventDefault();
 		event.stopPropagation();
-		let oldPosition = parseInt(dragPlaceholder.getAttribute("original-index"));
+		let draggedBubble = document.getElementById("dragged-bubble");
+		let oldPosition = parseInt(draggedBubble.getAttribute("original-index"));
 		let bubble = document.getElementById("dragged-bubble");
 		if (isNaN(oldPosition) || !bubble) return;
-
-		dragPlaceholder.after(bubble);
 
 		// Manual call to resize after delay to avoid strange mozilla behaviors that affect
 		// subsequent drag events when resizing happens around the same time as drag events
