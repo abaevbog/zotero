@@ -279,6 +279,8 @@ var Zotero_QuickFormat = new function () {
 		`, ['chrome://zotero/locale/zotero.dtd']);
 		newInput = document.importNode(newInput.querySelector("input"));
 		newInput.addEventListener("input", (_) => {
+			// Resize window to make it taller in case if the input moves to the next line
+			_resize();
 			_resetSearchTimer();
 			// Expand the input field if needed
 			newInput.style.width = newInput.scrollWidth + 'px';
@@ -1727,6 +1729,10 @@ var Zotero_QuickFormat = new function () {
 			isPaste = true;
 			this.value = str.replace(/[\r\n]/g, " ").trim();
 			this.style.width = this.scrollWidth + 'px';
+			// Move curor to the end
+			this.setSelectionRange(str.length, str.length);
+			// Resize window to make it taller in case if the input moves to the next line
+			_resize();
 			_resetSearchTimer();
 		}
 	}
