@@ -1617,6 +1617,9 @@ var Zotero_QuickFormat = new function () {
 			else {
 				qfe.appendChild(placeholder);
 			}
+			for (let linebreak of document.querySelectorAll("br")) {
+				linebreak.remove();
+			}
 		}
 		else if (event.clientX < midpoint && bubble.previousElementSibling?.id !== "dragged-placeholder") {
 			let previousBubbleRect = bubble.previousElementSibling?.getBoundingClientRect();
