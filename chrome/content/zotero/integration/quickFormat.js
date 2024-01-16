@@ -282,8 +282,9 @@ var Zotero_QuickFormat = new function () {
 			// Resize window to make it taller in case if the input moves to the next line
 			_resize();
 			_resetSearchTimer();
-			// Expand the input field if needed
-			newInput.style.width = newInput.scrollWidth + 'px';
+			// Expand/shrink the input field to match the width of content
+			let width = widthOfContent(newInput);
+			newInput.style.width = width + 'px';
 		});
 		newInput.addEventListener("keypress", onInputPress);
 		newInput.addEventListener("paste", _onPaste, false);
@@ -1294,6 +1295,16 @@ var Zotero_QuickFormat = new function () {
 		return false;
 	}
 
+	function widthOfContent(input) {
+		let span = document.createElement("span");
+		span.classList = "zotero-bubble-input";
+		span.innerText = input.value;
+		qfe.appendChild(span);
+		let spanWidth = span.getBoundingClientRect().width;
+		span.remove();
+		return spanWidth;
+	}
+
 	// Determine if the input has anything that is not just whitepsace
 	function inputEmpty(input) {
 		if (!input) {
@@ -1728,7 +1739,8 @@ var Zotero_QuickFormat = new function () {
 		if (str) {
 			isPaste = true;
 			this.value = str.replace(/[\r\n]/g, " ").trim();
-			this.style.width = this.scrollWidth + 'px';
+			let width = widthOfContent(this);
+			this.style.width = width + 'px';
 			// Move curor to the end
 			this.setSelectionRange(str.length, str.length);
 			// Resize window to make it taller in case if the input moves to the next line
