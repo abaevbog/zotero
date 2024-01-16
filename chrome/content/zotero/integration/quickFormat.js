@@ -47,6 +47,7 @@ var Zotero_QuickFormat = new function () {
 	
 	const SEARCH_TIMEOUT = 250;
 	const SHOWN_REFERENCES = 7;
+	const WINDOW_WIDTH = 800;
 	// Only one Enter/Escape keypress within this time window is processed to prevent
 	// accidental double clicks from closing the dialog
 	const MILISECONDS_BETWEEN_KEYPRESSES = 1000;
@@ -309,7 +310,11 @@ var Zotero_QuickFormat = new function () {
 		// Delete empty input on blur
 		newInput.addEventListener("blur", (_) => {
 			if (inputEmpty(newInput)) {
-				newInput.remove();
+				// Removing the input right before drag-drop reordering starts, will interrupt the
+				// drag event. To avoid it, wait for a second to delete empty input during drag-drop.
+				setTimeout(() => {
+					newInput.remove();
+				}, 500);
 			}
 			else {
 				_lastFocusedInput = newInput;
@@ -884,8 +889,8 @@ var Zotero_QuickFormat = new function () {
 			bubble.setAttribute("aria-label", str);
 		}
 		bubble.textContent = str;
-		bubble.addEventListener("click", _onBubbleClick, false);
-		bubble.addEventListener("dragstart", _onBubbleDrag, false);
+		bubble.addEventListener("click", _onBubbleClick);
+		bubble.addEventListener("dragstart", _onBubbleDrag);
 		bubble.addEventListener("dragend", onBubbleDragEnd);
 		bubble.addEventListener("keypress", onBubblePress);
 		bubble.dataset.citationItem = JSON.stringify(citationItem);
@@ -977,11 +982,9 @@ var Zotero_QuickFormat = new function () {
 	}
 
 	function _resize() {
-		let currentHeight = parseInt(qfe.style.height);
-		if (!currentHeight || qfe.scrollHeight > currentHeight || currentHeight > qfe.scrollHeight + 20) {
-			qfe.style.height = `${qfe.scrollHeight + (Zotero.isMac ? 6 : 4)}px`;
-			window.sizeToContent();
-		}
+		let box = document.querySelector(".citation-dialog.entry");
+		let contentHeight = box.getBoundingClientRect().height;
+		window.resizeTo(WINDOW_WIDTH, contentHeight);
 		if (Zotero.isMac && Zotero.platformMajorVersion >= 60) {
 			document.children[0].setAttribute('drawintitlebar', 'false');
 			document.children[0].setAttribute('drawintitlebar', 'true');
@@ -1505,6 +1508,7 @@ var Zotero_QuickFormat = new function () {
 				moveFocusForward(this);
 			}
 			this.parentNode.removeChild(this);
+			_resize();
 		}
 	};
 
