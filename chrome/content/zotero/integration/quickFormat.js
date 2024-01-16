@@ -92,13 +92,6 @@ var Zotero_QuickFormat = new function () {
 			qfbHeight = qfb.scrollHeight;
 			referencePanel = document.querySelector(".citation-dialog.reference-panel");
 			referenceBox = document.querySelector(".citation-dialog.reference-list");
-			// Explicitly set the focused reference as the selected item. Screenreaders may focus
-			// on the richlistitem, announce it but not actually select it.
-			referenceBox.addEventListener('focus', (_) => {
-				if (!_sameZoteroItem(document.activeElement, referenceBox.selectedItem)) {
-					referenceBox.selectedItem = document.activeElement;
-				}
-			}, true);
 			// Navigation within the reference panel
 			referenceBox.addEventListener("keypress", (event) => {
 				// Enter or ; selects the reference
@@ -124,6 +117,9 @@ var Zotero_QuickFormat = new function () {
 					}
 					_lastFocusedInput.dispatchEvent(new Event('input', { bubbles: true }));
 					_lastFocusedInput.focus();
+				}
+				else if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+					handleItemSelection(event);
 				}
 			});
 			if (Zotero.isWin) {
@@ -1409,6 +1405,26 @@ var Zotero_QuickFormat = new function () {
 		}
 		newInput.focus();
 	}
+
+	// Essentially a rewrite of default richlistbox  arrow navigation
+	// so that it works with voiceover on CMD-ArrowUp/Down
+	var handleItemSelection = (event) => {
+		event.preventDefault();
+		event.stopPropagation();
+		let selected = referenceBox.selectedItem;
+		let selectNext = (node) => {
+			return event.key == "ArrowDown" ? node.nextElementSibling : node.previousElementSibling;
+		};
+		do {
+			selected = selectNext(selected);
+			referenceBox.ensureElementIsVisible(selected);
+		}
+		while (selected && selected.disabled);
+		if (selected) {
+			referenceBox.selectedItem = selected;
+			selected.focus();
+		}
+	};
 	
 
 	var onInputPress = function (event) {
@@ -1438,6 +1454,9 @@ var Zotero_QuickFormat = new function () {
 		}
 		else if (["ArrowDown", "ArrowUp"].includes(event.key) && referencePanel.state === "open") {
 			this.removeAttribute("keep-focus");
+			// Arrow up/down from wherever will navigate the references panel if that's opened
+			locatorLocked = true;
+			handleItemSelection(event);
 		}
 	};
 
@@ -1530,18 +1549,6 @@ var Zotero_QuickFormat = new function () {
 			if (event.target.tagName == "toolbarbutton") {
 				event.target.firstChild.openPopup();
 			}
-		}
-		else if (["ArrowDown", "ArrowUp"].includes(event.key) && referencePanel.state === "open") {
-			// Arrow up/down from wherever will navigate the references panel if that's opened
-			locatorLocked = true;
-			var e = new KeyboardEvent('keypress', {
-				key: event.key,
-				code: event.code,
-				keyCode: event.keyCode,
-				bubbles: true
-			});
-			referenceBox.dispatchEvent(e);
-			event.preventDefault();
 		}
 		// On Home from the beginning of the input, create and focus input in the beginning
 		// If there is an input in the beginning already, just focus it
