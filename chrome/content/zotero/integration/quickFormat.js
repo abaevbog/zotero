@@ -44,7 +44,8 @@ var Zotero_QuickFormat = new function () {
 	var locatorNode = null;
 	var _searchPromise;
 	var _lastFocusedInput = null;
-	
+	var _secondToLastFocusedInput = null;
+
 	const SEARCH_TIMEOUT = 250;
 	const SHOWN_REFERENCES = 7;
 	const WINDOW_WIDTH = 800;
@@ -313,6 +314,7 @@ var Zotero_QuickFormat = new function () {
 				}, 500);
 			}
 			else {
+				_secondToLastFocusedInput = _lastFocusedInput;
 				_lastFocusedInput = newInput;
 			}
 			// If focus leaves input, hide the reference panel.
@@ -960,12 +962,31 @@ var Zotero_QuickFormat = new function () {
 		// _showCitation()
 		let input = _getInput() || _lastFocusedInput;
 		locatorNode = _insertBubble(citationItem, input);
-		input.remove();
 		isPaste = false;
 		_clearEntryList();
 		yield _previewAndSort();
 		_refocusQfe();
-		locatorNode.focus();
+		
+		// Focused input will become a bubble. Focus the input active before that
+		if (_getInput() && qfe.contains(_lastFocusedInput)) {
+			_lastFocusedInput.focus();
+		}
+		// Last focused input will become a bubble. Focus the second-to-last active input
+		else if (_secondToLastFocusedInput && qfe.contains(_secondToLastFocusedInput)) {
+			_secondToLastFocusedInput.focus();
+		}
+		input.remove();
+
+		// As a fallback, try to focus the first remaining input or the newly created bubble
+		if (!qfe.contains(document.activeElement)) {
+			let remainingInput = qfe.querySelector(".zotero-bubble-input");
+			if (remainingInput) {
+				remainingInput.focus();
+			}
+			else {
+				locatorNode.focus();
+			}
+		}
 		return true;
 	});
 	
