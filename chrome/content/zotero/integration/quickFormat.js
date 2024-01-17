@@ -308,7 +308,8 @@ var Zotero_QuickFormat = new function () {
 		newInput.addEventListener("blur", (_) => {
 			if (inputEmpty(newInput)) {
 				// Removing the input right before drag-drop reordering starts, will interrupt the
-				// drag event. To avoid it, wait for a second to delete empty input during drag-drop.
+				// drag event. To avoid it, hide the input immediately and delete it after delay.
+				newInput.style.display = "none";
 				setTimeout(() => {
 					newInput.remove();
 				}, 500);
