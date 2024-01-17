@@ -1640,6 +1640,12 @@ var Zotero_QuickFormat = new function () {
 	function _onBubbleDrag(event) {
 		bubbleDragged = true;
 		this.style.cursor = "grabbing";
+		// Sometimes due to odd mozilla drag-drop behavior, the dragend event may not fire
+		// so the element will get stuck with the id. Clean it up on next dragstart if it happens.
+		let lastDragged = document.querySelector("#dragged-bubble");
+		if (lastDragged) {
+			lastDragged.removeAttribute("id");
+		}
 		setTimeout(() => {
 			this.setAttribute("id", "dragged-bubble");
 		});
@@ -1652,8 +1658,8 @@ var Zotero_QuickFormat = new function () {
 
 	function _onBubbleDragOver(event) {
 		event.preventDefault();
-		let placeholder = document.querySelector("#dragged-bubble");
-		let bubbleIndex = placeholder.getAttribute("original-index");
+		let draggedBubble = document.querySelector("#dragged-bubble");
+		let bubbleIndex = draggedBubble.getAttribute("original-index");
 		let bubble = event.target;
 		if (bubble.classList?.contains("editor")) {
 			let { lastBubble, _ } = lastBubbleBeforePoint(event.clientX, event.clientY);
@@ -1673,25 +1679,14 @@ var Zotero_QuickFormat = new function () {
 		let midpoint = (bubbleRect.right + bubbleRect.left) / 2;
 		if (event.clientX > midpoint && bubble.nextElementSibling?.id !== "dragged-bubble") {
 			if (bubble.nextElementSibling) {
-				qfe.insertBefore(placeholder, bubble.nextElementSibling);
+				qfe.insertBefore(draggedBubble, bubble.nextElementSibling);
 			}
 			else {
-				qfe.appendChild(placeholder);
-			}
-			for (let linebreak of document.querySelectorAll("br")) {
-				linebreak.remove();
+				qfe.appendChild(draggedBubble);
 			}
 		}
 		else if (event.clientX < midpoint && bubble.previousElementSibling?.id !== "dragged-bubble") {
-			let previousBubbleRect = bubble.previousElementSibling?.getBoundingClientRect();
-			if (previousBubbleRect?.top && previousBubbleRect.top !== bubbleRect.top) {
-				let linebreak = document.querySelector("br");
-				if (!linebreak) {
-					linebreak = document.createElement("br");
-				}
-				qfe.insertBefore(linebreak, bubble);
-			}
-			qfe.insertBefore(placeholder, bubble);
+			qfe.insertBefore(draggedBubble, bubble);
 		}
 		return false;
 	}
@@ -1702,10 +1697,13 @@ var Zotero_QuickFormat = new function () {
 		if (bubble) {
 			bubble.style = "";
 			bubble.removeAttribute("id");
+			bubble.removeAttribute("original-index");
 		}
-		for (let linebreak of document.querySelectorAll("br")) {
-			linebreak.remove();
-		}
+		// Manual call to resize after delay to avoid strange mozilla behaviors that affect
+		// subsequent drag events when resizing happens around the same time as drag events
+		setTimeout(() => {
+			_resize();
+		}, 50);
 	}
 
 	/**
@@ -1732,12 +1730,6 @@ var Zotero_QuickFormat = new function () {
 		let oldPosition = parseInt(draggedBubble.getAttribute("original-index"));
 		let bubble = document.getElementById("dragged-bubble");
 		if (isNaN(oldPosition) || !bubble) return;
-
-		// Manual call to resize after delay to avoid strange mozilla behaviors that affect
-		// subsequent drag events when resizing happens around the same time as drag events
-		setTimeout(() => {
-			_resize();
-		}, 50);
 
 		// If moved out of order, turn off "Keep Sources Sorted"
 		if(io.sortable && keepSorted && keepSorted.hasAttribute("checked") && oldPosition !== -1 &&
