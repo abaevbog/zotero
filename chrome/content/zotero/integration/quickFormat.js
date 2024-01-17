@@ -1480,6 +1480,12 @@ var Zotero_QuickFormat = new function () {
 			locatorLocked = true;
 			handleItemSelection(event);
 		}
+		else if (event.key == "Tab" && !event.shiftKey) {
+			// Tab from the input will focus the selected item in the references list
+			event.preventDefault();
+			event.stopPropagation();
+			referenceBox.selectedItem.focus();
+		}
 	};
 
 	var onBubblePress = function(event) {
