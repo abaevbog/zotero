@@ -1015,6 +1015,9 @@ var Zotero_QuickFormat = new function () {
 	function _resize() {
 		let box = document.querySelector(".citation-dialog.entry");
 		let contentHeight = box.getBoundingClientRect().height;
+		if (Zotero.isLinux) {
+			contentHeight += 10;
+		}
 		window.resizeTo(WINDOW_WIDTH, contentHeight);
 		if (Zotero.isMac && Zotero.platformMajorVersion >= 60) {
 			document.children[0].setAttribute('drawintitlebar', 'false');
