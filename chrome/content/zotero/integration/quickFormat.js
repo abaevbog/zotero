@@ -1462,8 +1462,8 @@ var Zotero_QuickFormat = new function () {
 
 	var onBubblePress = function(event) {
 		if (accepted) return;
-		if (event.key == " ") {
-			// On space, open new citation properties panel
+		if (event.key == "ArrowDown") {
+			// On arrow down, open new citation properties panel
 			_showCitationProperties(this);
 			event.preventDefault();
 		}
@@ -1527,6 +1527,13 @@ var Zotero_QuickFormat = new function () {
 				moveFocusForward(this);
 			}
 			this.parentNode.removeChild(this);
+		}
+		else if (event.key.length === 1 && _lastFocusedInput) {
+			event.preventDefault();
+			// Typing when you are focused on the bubble will re-focus the last input
+			_lastFocusedInput.value += event.key;
+			_lastFocusedInput.dispatchEvent(new Event('input', { bubbles: true }));
+			_lastFocusedInput.focus();
 		}
 	};
 
