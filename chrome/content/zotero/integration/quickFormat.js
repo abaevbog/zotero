@@ -271,6 +271,17 @@ var Zotero_QuickFormat = new function () {
 		qfe.focus();
 	}
 
+	// If this input field was counted as one of previously focused,
+	// it will be cleared. Call before removing the field
+	function clearLastFocused(input) {
+		if (input == _lastFocusedInput) {
+			_lastFocusedInput = null;
+		}
+		if (input == _secondToLastFocusedInput) {
+			_secondToLastFocusedInput = null;
+		}
+	}
+
 	function _createInputField() {
 		let newInput = MozXULElement.parseXULToFragment(`
 			<html:input class="zotero-bubble-input" aria-description="&zotero.citation.input;"></html:input>
@@ -310,6 +321,7 @@ var Zotero_QuickFormat = new function () {
 				// Removing the input right before drag-drop reordering starts, will interrupt the
 				// drag event. To avoid it, hide the input immediately and delete it after delay.
 				newInput.style.display = "none";
+				clearLastFocused(newInput);
 				setTimeout(() => {
 					newInput.remove();
 				}, 500);
@@ -323,7 +335,7 @@ var Zotero_QuickFormat = new function () {
 				if (referencePanel.contains(document.activeElement)) {
 					return;
 				}
-				let focusedInput = _getInput();
+				let focusedInput = _getCurrentInput();
 				if (!focusedInput) {
 					referencePanel.hidden = true;
 					_resizeReferencePanel();
@@ -390,7 +402,7 @@ var Zotero_QuickFormat = new function () {
 			if(m) {
 				if(m.index === 0) {
 					// add to previous cite
-					let node = _getInput();
+					let node = _getCurrentInput();
 					var prevNode = locatorLocked ? node.previousElementSibling : locatorNode;
 					let citationItem = JSON.parse(prevNode && prevNode.dataset.citationItem || "null");
 					if (citationItem) {
@@ -909,7 +921,7 @@ var Zotero_QuickFormat = new function () {
 	 * Converts the selected item to a bubble
 	 */
 	this._bubbleizeSelected = Zotero.Promise.coroutine(function* () {
-		if(!referenceBox.hasChildNodes() || !referenceBox.selectedItem || !(_lastFocusedInput || _getInput())) return false;
+		if(!referenceBox.hasChildNodes() || !referenceBox.selectedItem || !(_lastFocusedInput || _getCurrentInput())) return false;
 		var citationItem = {"id":referenceBox.selectedItem.getAttribute("zotero-item")};
 		if (typeof citationItem.id === "string" && citationItem.id.indexOf("/") !== -1) {
 			var item = Zotero.Cite.getItem(citationItem.id);
@@ -961,7 +973,7 @@ var Zotero_QuickFormat = new function () {
 		// the bubble list for sorting, so we do some additional
 		// handling to maintain the correct locator node in
 		// _showCitation()
-		let input = _getInput() || _lastFocusedInput;
+		let input = _getCurrentInput() || _lastFocusedInput;
 		locatorNode = _insertBubble(citationItem, input);
 		isPaste = false;
 		_clearEntryList();
@@ -969,13 +981,14 @@ var Zotero_QuickFormat = new function () {
 		_refocusQfe();
 		
 		// Focused input will become a bubble. Focus the input active before that
-		if (_getInput() && qfe.contains(_lastFocusedInput)) {
+		if (_getCurrentInput() && qfe.contains(_lastFocusedInput)) {
 			_lastFocusedInput.focus();
 		}
 		// Last focused input will become a bubble. Focus the second-to-last active input
 		else if (_secondToLastFocusedInput && qfe.contains(_secondToLastFocusedInput)) {
 			_secondToLastFocusedInput.focus();
 		}
+		clearLastFocused(input);
 		input.remove();
 
 		// As a fallback, try to focus the first remaining input or the newly created bubble
@@ -1305,11 +1318,11 @@ var Zotero_QuickFormat = new function () {
 	 * Gets text within the currently selected node
 	 */
 	function _getEditorContent() {
-		let node = _getInput();
+		let node = _getCurrentInput();
 		return node ? node.value.trim() : false;
 	}
 
-	function _getInput() {
+	function _getCurrentInput() {
 		if (isInput(document.activeElement)) {
 			return document.activeElement;
 		}
@@ -1578,7 +1591,7 @@ var Zotero_QuickFormat = new function () {
 		if(qfGuidance) qfGuidance.hide();
 		
 		var keyCode = event.keyCode;
-		let focusedInput = _getInput();
+		let focusedInput = _getCurrentInput();
 		if (event.key == ' ') {
 			// Space on toolbarbutton opens the popup
 			if (event.target.tagName == "toolbarbutton") {
