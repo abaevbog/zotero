@@ -126,8 +126,8 @@
 	white-space: pre;
 }
 
-#dragged-bubble {
-	opacity: 0.3;
+#dragg-placeholder {
+	opacity: 0.6;
 }
 
 .citation-dialog.bubble {

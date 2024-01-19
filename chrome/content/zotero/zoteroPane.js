@@ -542,6 +542,17 @@ var ZoteroPane = new function()
 		catch (e) {
 			Zotero.logError(e);
 		}
+
+		// let i = 0;
+		// let n = document.getElementById("test");
+		// var temp = () => {
+		// 	n.innerHTML = "This is a test " + i;
+		// 	i += 1;
+		// 	setTimeout(() => {
+		// 		temp();
+		// 	}, 2000);
+		// };
+		// temp();
 	}
 	
 	

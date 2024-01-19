@@ -88,9 +88,10 @@ var Zotero_QuickFormat = new function () {
 			qfe = document.querySelector(".citation-dialog.editor");
 			qfb.addEventListener("click", _onQuickSearchClick, false);
 			qfb.addEventListener("keypress", _onQuickSearchKeyPress, false);
-			qfe.addEventListener("dragover", _onBubbleDragOver);
-			qfe.addEventListener("drop", _onBubbleDrop, false);
-			qfbHeight = qfb.scrollHeight;
+			qfb.addEventListener("mouseup", _onMouseUp);
+			qfb.addEventListener("mousemove", _onBubbleMove);
+			qfe.addEventListener("mouseover", _onBubbleDragOver);
+			// qfe.addEventListener("drop", _onBubbleDrop, false);
 			referencePanel = document.querySelector(".citation-dialog.reference-panel");
 			referenceBox = document.querySelector(".citation-dialog.reference-list");
 			// Navigation within the reference panel
@@ -891,7 +892,7 @@ var Zotero_QuickFormat = new function () {
 		var str = _buildBubbleString(citationItem);
 		
 		let bubble = MozXULElement.parseXULToFragment(`
-			<html:div class="citation-dialog bubble" draggable="true" role="button" tabindex="0" aria-description="&zotero.citation.bubble;"></html:div>
+			<html:div class="citation-dialog bubble" role="button" tabindex="0" aria-description="&zotero.citation.bubble;"></html:div>
 		`, ['chrome://zotero/locale/zotero.dtd']);
 		bubble = document.importNode(bubble.querySelector("div"));
 		// VoiceOver works better without it
@@ -900,8 +901,7 @@ var Zotero_QuickFormat = new function () {
 		}
 		bubble.textContent = str;
 		bubble.addEventListener("click", _onBubbleClick);
-		bubble.addEventListener("dragstart", _onBubbleDrag);
-		bubble.addEventListener("dragend", onBubbleDragEnd);
+		bubble.addEventListener("mousedown", _onBubbleDrag);
 		bubble.addEventListener("keypress", onBubblePress);
 		bubble.dataset.citationItem = JSON.stringify(citationItem);
 		qfe.insertBefore(bubble, (nextNode ? nextNode : null));
@@ -1017,7 +1017,9 @@ var Zotero_QuickFormat = new function () {
 		if (Zotero.isLinux) {
 			contentHeight += 10;
 		}
-		window.resizeTo(WINDOW_WIDTH, contentHeight);
+		if (contentHeight > window.innerHeight || window.innerHeight - contentHeight > 10) {
+			window.resizeTo(WINDOW_WIDTH, contentHeight);
+		}
 		if (Zotero.isMac && Zotero.platformMajorVersion >= 60) {
 			document.children[0].setAttribute('drawintitlebar', 'false');
 			document.children[0].setAttribute('drawintitlebar', 'true');
@@ -1655,64 +1657,93 @@ var Zotero_QuickFormat = new function () {
 		}
 	});
 	
+	let offsetX = 0;
+	let offsetY = 0;
+	
 	/**
 	 * Adds a dummy element to make dragging work
 	 */
 	function _onBubbleDrag(event) {
-		bubbleDragged = true;
-		this.style.cursor = "grabbing";
-		// Sometimes due to odd mozilla drag-drop behavior, the dragend event may not fire
-		// so the element will get stuck with the id. Clean it up on next dragstart if it happens.
-		let lastDragged = document.querySelector("#dragged-bubble");
-		if (lastDragged) {
-			lastDragged.removeAttribute("id");
-		}
-		setTimeout(() => {
-			this.setAttribute("id", "dragged-bubble");
-		});
+		bubbleDragged = event.target;
+		let placeholder = event.target.cloneNode(true);
+		placeholder.setAttribute("id", "drag-placeholder");
+		event.target.setAttribute("id", "dragged-bubble");
 		let index = _getBubbleIndex(this);
-		event.dataTransfer.setData("zotero/citation_bubble", index);
-		this.setAttribute("original-index", index);
-		event.dataTransfer.effectAllowed = "move";
-		event.stopPropagation();
+		bubbleDragged.setAttribute("original-index", index);
+		placeholder.setAttribute("original-index", index);
+		offsetX = event.clientX - this.getBoundingClientRect().left;
+		offsetY = event.clientY - this.getBoundingClientRect().top;
+		event.target.after(placeholder);
+		this.style.cursor = "grabbing";
+		this.style.position = 'absolute';
+		this.style.zIndex = 1000;
+		console.log("Bubble drag ", bubbleDragged);
+	}
+
+	function _onBubbleMove(e) {
+		if (bubbleDragged) {
+			bubbleDragged.style.left = e.clientX - offsetX + 'px';
+			bubbleDragged.style.top = e.clientY - offsetY + 'px';
+		}
 	}
 
 	function _onBubbleDragOver(event) {
+		if (!bubbleDragged) return;
+
 		event.preventDefault();
-		let draggedBubble = document.querySelector("#dragged-bubble");
-		let bubbleIndex = draggedBubble.getAttribute("original-index");
+		let draggedBubble = document.querySelector("#drag-placeholder");
+		let bubbleIndex = bubbleDragged.getAttribute("original-index");
 		let bubble = event.target;
 		if (bubble.classList?.contains("editor")) {
 			let { lastBubble, _ } = lastBubbleBeforePoint(event.clientX, event.clientY);
 			if (!lastBubble) {
-				return false;
+				return;
 			}
 			bubble = lastBubble;
 		}
 		if (isNaN(parseInt(bubbleIndex)) || !bubble.classList?.contains("bubble")) {
-			return false;
+			return;
 		}
 		if (bubble.getAttribute("id") == "dragged-bubble") {
-			return true;
+			return;
 		}
 
 		let bubbleRect = bubble.getBoundingClientRect();
 		let midpoint = (bubbleRect.right + bubbleRect.left) / 2;
-		if (event.clientX > midpoint && bubble.nextElementSibling?.id !== "dragged-bubble") {
+		if (event.clientX > midpoint && bubble.nextElementSibling?.id !== "drag-placeholder") {
 			if (bubble.nextElementSibling) {
 				qfe.insertBefore(draggedBubble, bubble.nextElementSibling);
+				_resize();
 			}
 			else {
 				qfe.appendChild(draggedBubble);
+				_resize();
 			}
 		}
-		else if (event.clientX < midpoint && bubble.previousElementSibling?.id !== "dragged-bubble") {
+		else if (event.clientX < midpoint && bubble.previousElementSibling?.id !== "drag-placeholder") {
 			qfe.insertBefore(draggedBubble, bubble);
+			_resize();
 		}
-		return false;
 	}
 
+	function _onMouseUp(e) {
+		console.log("Mouse up!", e);
+		console.log(bubbleDragged);
+		if (bubbleDragged) {
+			// Check if the dropzone is under the mouse
+			let placeholder = document.getElementById("drag-placeholder");
+			if (placeholder) {
+				console.log("DONE!");
+				placeholder.removeAttribute("id");
+			}
+
+			bubbleDragged.remove();
+			bubbleDragged = null;
+			e.stopPropagation();
+		}
+	}
 	function onBubbleDragEnd(_) {
+		return;
 		bubbleDragged = false;
 		let bubble = document.getElementById("dragged-bubble");
 		if (bubble) {
