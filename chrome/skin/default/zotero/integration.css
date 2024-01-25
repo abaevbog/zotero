@@ -153,6 +153,7 @@
 	overflow: hidden;
 	outline: none;
 	line-height: 2em;
+	background-color: white;
 }
 
 .citation-dialog.spinner {
@@ -181,7 +182,7 @@
 }
 
 richlistitem[selected="true"] {
-	background: Highlight;
+	background: Highlight !important;
 	color: HighlightText;
 }
 
