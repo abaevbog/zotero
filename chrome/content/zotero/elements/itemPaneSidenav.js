@@ -101,7 +101,8 @@
 			<html:div class="pin-wrapper highlight-notes-active">
 				<toolbarbutton
 					data-l10n-id="sidenav-notes"
-					data-pane="context-notes"/>
+					data-pane="context-notes"
+					tabindex="0"/>
 			</html:div>
 			
 			<html:div class="divider"/>
@@ -109,7 +110,8 @@
 			<html:div class="pin-wrapper">
 				<toolbarbutton
 					tooltiptext="&zotero.toolbar.openURL.label;"
-					data-action="locate"/>
+					data-action="locate"
+					tabindex="0"/>
 			</html:div>
 			
 			<popupset>
@@ -479,6 +481,45 @@
 						locateMenu.openPopup(toolbarbutton, 'after_start', 0, 0, false, false);
 					});
 				}
+			}
+
+			// Keyboard navigation for focusable buttons
+			for (let toolbarbutton of this.querySelectorAll('toolbarbutton[tabindex="0"]')) {
+				toolbarbutton.addEventListener("keypress", (event) => {
+					// ArrowUp/ArrowDown to navigate between buttons
+					if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+						let moveInDirection = (node) => {
+							if (event.key == "ArrowDown") {
+								return node.nextElementSibling;
+							}
+							return node.previousElementSibling;
+						};
+						// Find the next focusable and visible button
+						let nextWrapper = moveInDirection(toolbarbutton.parentElement);
+						while (nextWrapper && (nextWrapper.hidden || !nextWrapper.querySelector("toolbarbutton[tabindex='0']"))) {
+							nextWrapper = moveInDirection(nextWrapper);
+						}
+						// If found, focus it
+						if (nextWrapper) {
+							nextWrapper.querySelector("toolbarbutton[tabindex='0']").focus();
+						}
+						// Otherwise, keep focus at the current button
+						// (Something tries to move it away even if event is stopped)
+						else {
+							toolbarbutton.focus();
+						}
+						event.preventDefault();
+						event.stopPropagation();
+					}
+					// Arrow towards the item/contextPane will refocus its scrollable araea
+					if ((Zotero.rtl && event.key == "ArrowRight") || event.key == "ArrowLeft") {
+						this.container.focus();
+					}
+					// Otherwise, right/left arrows keep focus on the button
+					else if (["ArrowRight", "ArrowLeft"].includes(event.key)) {
+						toolbarbutton.focus();
+					}
+				});
 			}
 			
 			this.querySelector('.zotero-menuitem-pin').addEventListener('command', () => {

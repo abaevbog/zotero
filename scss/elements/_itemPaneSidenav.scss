@@ -112,6 +112,9 @@ item-pane-sidenav {
 		&[data-action="locate"] {
 			@include svgicon-menu("go-to", "universal", "20");
 		}
+
+		--radius-focus-border: 5px;
+		@include focus-ring;
 	}
 	
 	&.stacked toolbarbutton[data-pane="toggle-collapse"] {

@@ -186,12 +186,25 @@ var ZoteroItemPane = new function() {
 			stopEvent();
 			return;
 		}
-		// Tab from the scrollable area focuses the pinned pane if it exists
-		if (event.target.classList.contains("zotero-view-item") && event.key == "Tab" && !event.shiftKey && sidenav.pinnedPane) {
-			let pane = sidenav.getPane(sidenav.pinnedPane);
-			pane.firstChild._head.focus();
-			stopEvent();
-			return;
+
+		if (event.target.classList.contains("zotero-view-item")) {
+			// Tab from the scrollable area focuses the pinned pane if it exists
+			if (event.key == "Tab" && !event.shiftKey && sidenav.pinnedPane) {
+				let pane = sidenav.getPane(sidenav.pinnedPane);
+				pane.firstChild._head.focus();
+				stopEvent();
+				return;
+			}
+			// Arrow click towards the sidenav will focus the first focusable button
+			if ((Zotero.rtl && event.key == "ArrowLeft") || event.key == "ArrowRight") {
+				let focusable = [...sidenav.querySelectorAll("toolbarbutton[tabindex='0']")];
+				let visible = focusable.filter(btn => !btn.parentElement.hidden);
+				if (visible.length > 0) {
+					visible[0].focus();
+				}
+				stopEvent();
+				return;
+			}
 		}
 		// Tab tavigation between entries and buttons within library, related and notes boxes
 		if (event.key == "Tab" && event.target.closest(".box")) {

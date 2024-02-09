@@ -1021,7 +1021,10 @@ var ZoteroPane = new function()
 			if (event.target.querySelector("menupopup")) {
 				event.target.open = true;
 			}
-			else {
+			else if (!event.target.open) {
+				// If button opens a menu, do nothing once the menu is opened.
+				// Otherwise, this will try to click on the button instead of selecting an option
+				// from the menu (e.g. locate button)
 				event.target.click();
 			}
 			event.preventDefault();
