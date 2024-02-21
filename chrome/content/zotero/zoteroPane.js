@@ -884,7 +884,10 @@ var ZoteroPane = new function()
 				if (!document.activeElement.classList.contains('reader')) {
 					let reader = Zotero.Reader.getByTabID(Zotero_Tabs.selectedID);
 					if (reader) {
-						reader.focus();
+						// Give time for editable-text to restore the input value
+						setTimeout(() => {
+							reader.focus();
+						});
 						// Keep propagating if current focus is on input or textarea
 						// The Escape event needs to be handled by itemBox, tagBox, etc. to undo edits.
 						if (!["input", "textarea"].includes(document.activeElement.tagName)) {
