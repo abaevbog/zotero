@@ -536,6 +536,7 @@ class VirtualizedTable extends React.Component {
 	_onKeyDown = (e) => {
 		if (this.props.onKeyDown && this.props.onKeyDown(e) === false) return;
 
+		if (!Zotero.isMac && ['PageUp', 'PageDown'].includes(e.key) && e.ctrlKey) return;
 		this._preventKeyboardScrolling(e);
 
 		if (e.altKey) return;
