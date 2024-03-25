@@ -41,19 +41,19 @@ var Zotero_Tooltip = new function () {
 	 * Start tracking the mouse and show a tooltip after it stops
 	 */
 	this.start = function (tooltipText) {
-		window.addEventListener('mousemove', handleMouseMove);
-		text = tooltipText;
+		// window.addEventListener('mousemove', handleMouseMove);
+		// text = tooltipText;
 	};
 	
 	/**
 	 * Stop tracking the mouse and hide the tooltip if it's showing
 	 */
 	this.stop = function () {
-		window.removeEventListener('mousemove', handleMouseMove);
-		clearTimeout(timeoutID);
+		// window.removeEventListener('mousemove', handleMouseMove);
+		// clearTimeout(timeoutID);
 		// Mozilla hides the tooltip as soon as the mouse leaves the element, which is also different
 		// from macOS behavior
-		hidePopup();
+		// hidePopup();
 	};
 	
 	function handleMouseMove(event) {

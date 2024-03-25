@@ -229,7 +229,7 @@ const TabBar = forwardRef(function (props, ref) {
 		// Fix `title` not working for HTML-in-XUL. Using `mousemove` ensures we restart the tooltip
 		// after just a small movement even when the active tab has changed under the cursor, which
 		// matches behavior in Firefox.
-		window.Zotero_Tooltip.start(title);
+		// window.Zotero_Tooltip.start(title);
 	}
 	
 	function handleTabBarMouseOut() {
@@ -289,7 +289,7 @@ const TabBar = forwardRef(function (props, ref) {
 				tabIndex="-1"
 			>
 				{icon}
-				<div className="tab-name">{title}</div>
+				<div className="tab-name" title={title}>{title}</div>
 				<div
 					className="tab-close"
 					onClick={(event) => handleTabClose(event, id)}

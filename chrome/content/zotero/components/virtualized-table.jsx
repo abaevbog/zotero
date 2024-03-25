@@ -1021,7 +1021,7 @@ class VirtualizedTable extends React.Component {
 		this._updateWidth();
 		this.props.treeboxRef && this.props.treeboxRef(this._jsWindow);
 	
-		this._setXulTooltip();
+		//this._setXulTooltip();
 
 		window.addEventListener("resize", () => {
 			this._debouncedRerender();
