@@ -142,11 +142,6 @@ var Zotero_QuickFormat = new function () {
 					dialog.setAttribute("square", "true");
 				}
 			}
-			// With fx60 and drawintitlebar=true Firefox calculates the minHeight
-			// as titlebar+maincontent, so we have hack around that here.
-			else if (Zotero.isMac) {
-				dialog.style.marginBottom = "-28px";
-			}
 			
 			keepSorted = document.getElementById("keep-sorted");
 			showEditor = document.getElementById("show-editor");
@@ -200,11 +195,6 @@ var Zotero_QuickFormat = new function () {
 						document.getElementById('locator').focus();
 					}
 				});
-			}
-			
-			// Don't need to set noautohide dynamically on these platforms, so do it now
-			if(Zotero.isMac || Zotero.isWin) {
-				referencePanel.setAttribute("noautohide", true);
 			}
 
 			// Resize whenever a bubble/input is added or removed of their attributes change
@@ -354,7 +344,7 @@ var Zotero_QuickFormat = new function () {
 				}
 				let focusedInput = _getCurrentInput();
 				if (!focusedInput) {
-					referencePanel.hidePopup();
+					_hideReferencePanel();
 				}
 			});
 			// If there was a br added before input so that it doesn't appear on the previous line,
@@ -521,8 +511,7 @@ var Zotero_QuickFormat = new function () {
 				io.getItems().then(function(citedItems) {
 					// Don't do anything if panel is already closed
 					if(isAsync &&
-							((referencePanel.state !== "open" && referencePanel.state !== "showing")
-							|| lastSearchTime !== currentSearchTime)) return;
+							(referencePanel.hidden || lastSearchTime !== currentSearchTime)) return;
 					
 					completed = true;
 					
@@ -1111,9 +1100,8 @@ var Zotero_QuickFormat = new function () {
 	 * Converts the selected item to a bubble
 	 */
 	this._bubbleizeSelected = Zotero.Promise.coroutine(function* () {
-		const panelShowing = referencePanel.state === "open" || referencePanel.state === "showing";
 		let inputExists = _lastFocusedInput || _getCurrentInput()
-		if(!panelShowing || !referenceBox.hasChildNodes() || !referenceBox.selectedItem || _searchPromise?.isPending()) return false;
+		if(referencePanel.hidden || !referenceBox.hasChildNodes() || !referenceBox.selectedItem || _searchPromise?.isPending()) return false;
 
 		if(!referenceBox.hasChildNodes() || !referenceBox.selectedItem || !inputExists) return false;
 		var citationItem = {"id":referenceBox.selectedItem.getAttribute("zotero-item")};
@@ -1125,7 +1113,7 @@ var Zotero_QuickFormat = new function () {
 		else if (Zotero.Retractions.isRetracted({ id: parseInt(citationItem.id) })) {
 			citationItem.id = parseInt(citationItem.id);
 			if (Zotero.Retractions.shouldShowCitationWarning(citationItem)) {
-				referencePanel.hidden = true;
+				_hideReferencePanel();
 				var ps = Services.prompt;
 				var buttonFlags = ps.BUTTON_POS_0 * ps.BUTTON_TITLE_IS_STRING
 					+ ps.BUTTON_POS_1 * ps.BUTTON_TITLE_CANCEL
@@ -1140,7 +1128,7 @@ var Zotero_QuickFormat = new function () {
 					null,
 					Zotero.getString('pane.items.showItemInLibrary'),
 					Zotero.getString('retraction.citationWarning.dontWarn'), checkbox);
-				referencePanel.hidden = false;
+				_openReferencePanel();
 				if (result > 0) {
 					if (result == 2) {
 						Zotero_QuickFormat.showInLibrary(parseInt(citationItem.id));
@@ -1196,10 +1184,13 @@ var Zotero_QuickFormat = new function () {
 		}
 	}
 	function _resizeWindow() {
-		let box = document.querySelector(".citation-dialog.entry");
+		let box = document.querySelector(".citation-dialog.wrapper");
 		let contentHeight = box.getBoundingClientRect().height;
 		if (Zotero.isLinux) {
 			contentHeight += 10;
+		}
+		else if (Zotero.isMac) {
+			contentHeight += 28;
 		}
 		if (Math.abs(contentHeight - window.innerHeight) < 5) {
 			// Do not do anything if the difference is just a few pixels
@@ -1208,17 +1199,6 @@ var Zotero_QuickFormat = new function () {
 		// Resized so that outerHeight=contentHeight
 		let outerHeightAdjustment = Math.max(window.outerHeight - window.innerHeight, 0);
 		window.resizeTo(WINDOW_WIDTH, contentHeight + outerHeightAdjustment);
-		if (Zotero.isWin) {
-			// On windows, if the editor height changes, the panel will remain where it was.
-			// Check if the panel is not next to the dialog, and if so - close and reopen it
-			// to position references panel properly
-			let dialogBottom = dialog.getBoundingClientRect().bottom;
-			let panelTop = referencePanel.getBoundingClientRect().top;
-			if (Math.abs(dialogBottom - panelTop) > 5) {
-				referencePanel.hidePopup();
-				_openReferencePanel();
-			}
-		}
 		if (Zotero.isMac && Zotero.platformMajorVersion >= 60) {
 			document.children[0].setAttribute('drawintitlebar', 'false');
 			document.children[0].setAttribute('drawintitlebar', 'true');
@@ -1241,26 +1221,16 @@ var Zotero_QuickFormat = new function () {
 		// References should be shown whenever there are matching items
 		let showReferencePanel = visibleNodes.length > 0;
 		if (!showReferencePanel) {
-			referencePanel.hidePopup();
+			_hideReferencePanel();
 			return;
 		}
 		_openReferencePanel();
-		if (!panelFrameHeight) {
-			panelFrameHeight = referencePanel.getBoundingClientRect().height - referencePanel.clientHeight;
-			var computedStyle = window.getComputedStyle(referenceBox, null);
-			for (var attr of ["border-top-width", "border-bottom-width"]) {
-				var val = computedStyle.getPropertyValue(attr);
-				if (val) {
-					var m = pixelRe.exec(val);
-					if (m) panelFrameHeight += parseInt(m[1], 10);
-				}
-			}
-		}
 		// Find the height needed to display SHOWN_REFERENCES items
 		let height = visibleNodes.reduce((prev, cur) => {
 			return prev + cur.scrollHeight + 1;
 		}, 0);
-		referencePanel.sizeTo(window.outerWidth - 30, height + panelFrameHeight);
+		referencePanel.style.height = `${height}px`;
+		_resizeWindow();
 	}
 
 	/**
@@ -1286,21 +1256,23 @@ var Zotero_QuickFormat = new function () {
 	 * Opens the reference panel
 	 */
 	function _openReferencePanel() {
-		var panelShowing = referencePanel.state === "open" || referencePanel.state === "showing";
-		
-		if (!panelShowing && !Zotero.isMac && !Zotero.isWin) {
-			// noautohide and noautofocus are incompatible on Linux
-			// https://bugzilla.mozilla.org/show_bug.cgi?id=545265
-			referencePanel.setAttribute("noautohide", "false");
-			
-			// reinstate noautohide after the window is shown
-			referencePanel.addEventListener("popupshowing", function() {
-				referencePanel.removeEventListener("popupshowing", arguments.callee, false);
-				referencePanel.setAttribute("noautohide", "true");
-			}, false);
+		referencePanel.hidden = false;
+		// With fx60 and drawintitlebar=true Firefox calculates the minHeight
+		// as titlebar+maincontent, so we have hack around that here.
+		if (Zotero.isMac) {
+			referencePanel.style.marginBottom = "-28px";
+			dialog.style.marginBottom = "0";
 		}
+		_resizeWindow();
+	}
 
-		referencePanel.openPopup(dialog, "after_start", 15, 0, false, false, null);
+	function _hideReferencePanel() {
+		referencePanel.hidden = true;
+		if (Zotero.isMac) {
+			referencePanel.style.marginBottom = "0";
+			dialog.style.marginBottom = "-28px";
+		}
+		_resizeWindow();
 	}
 	
 	/**
@@ -1426,7 +1398,7 @@ var Zotero_QuickFormat = new function () {
 		target.setAttribute("selected", "true");
 		itemPopover.openPopup(target, "after_start",
 			target.clientWidth/2, 0, false, false, null);
-		referencePanel.hidePopup();
+		_hideReferencePanel();
 	}
 	
 	/**
@@ -1743,7 +1715,7 @@ var Zotero_QuickFormat = new function () {
 			// Rerun search to update opened documents section if needed
 			_resetSearchTimer();
 		}
-		else if (["ArrowDown", "ArrowUp"].includes(event.key) && referencePanel.state === "open") {
+		else if (["ArrowDown", "ArrowUp"].includes(event.key) && !referencePanel.hidden) {
 			// ArrowUp when item is selected does nothing
 			if (referenceBox.selectedIndex < 1 && event.key == "ArrowUp") {
 				return;
@@ -1757,7 +1729,7 @@ var Zotero_QuickFormat = new function () {
 				handleItemSelection(event);
 			}
 		}
-		else if (event.key == "Tab" && !event.shiftKey && referencePanel.state === "open") {
+		else if (event.key == "Tab" && !event.shiftKey && !referencePanel.hidden) {
 			// Tab from the input will focus the selected item in the references list
 			event.preventDefault();
 			event.stopPropagation();
