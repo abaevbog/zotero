@@ -1209,14 +1209,15 @@ var Zotero_QuickFormat = new function () {
 		let outerHeightAdjustment = Math.max(window.outerHeight - window.innerHeight, 0);
 		window.resizeTo(WINDOW_WIDTH, contentHeight + outerHeightAdjustment);
 		if (Zotero.isWin) {
-			// On windows, if the editor height changes, the panel will remain where it was.
-			// Check if the panel is not next to the dialog, and if so - close and reopen it
-			// to position references panel properly
-			let dialogBottom = dialog.getBoundingClientRect().bottom;
-			let panelTop = referencePanel.getBoundingClientRect().top;
-			if (Math.abs(dialogBottom - panelTop) > 5) {
-				referencePanel.hidePopup();
-				_openReferencePanel();
+			// Dynamically add/remove margins depending on editors height
+			let dialogHeight = dialog.getBoundingClientRect().height;
+			if (dialogHeight > 60) {
+				// multiline editor
+				referencePanel.style.marginTop = "-5px";
+			}
+			else {
+				// single line
+				referencePanel.style.marginTop = "-30px";
 			}
 		}
 		if (Zotero.isMac && Zotero.platformMajorVersion >= 60) {
@@ -1300,7 +1301,8 @@ var Zotero_QuickFormat = new function () {
 			}, false);
 		}
 
-		referencePanel.openPopup(dialog, "after_start", 15, 0, false, false, null);
+		referencePanel.openPopup(document.documentElement, "after_start", 15,
+			dialog.clientHeight-window.clientHeight, false, false, null);
 	}
 	
 	/**
