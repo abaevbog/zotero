@@ -70,8 +70,16 @@ var Zotero_QuickFormat = new function () {
 			// Only hide chrome on Windows or Mac
 			if(Zotero.isMac) {
 				document.documentElement.setAttribute("drawintitlebar", true);
-			} else if(Zotero.isWin) {
-				document.documentElement.setAttribute("hidechrome", true);
+			}
+			
+			if (Zotero.isMac) {
+				document.documentElement.setAttribute('chromemargin', '0,-1,-1,-1');
+			}
+			else {
+				// '0,2,2,2' or increasing the top margin causes breakage
+				// '0,25,25,25' so far works the best, though the very top of the
+				// dialog doesn't initiate dragging
+				document.documentElement.setAttribute('chromemargin', '0,25,25,25');
 			}
 
 			// Include a different key combo in message on Mac
@@ -79,8 +87,6 @@ var Zotero_QuickFormat = new function () {
 				var qf = document.querySelector('.citation-dialog.guidance');
 				qf && qf.setAttribute('about', qf.getAttribute('about') + "Mac");
 			}
-			
-			new WindowDraggingElement(document.querySelector("window.citation-dialog"), window);
 			
 			dialog = document.querySelector(".citation-dialog.entry");
 			editor = document.querySelector(".citation-dialog.editor");
