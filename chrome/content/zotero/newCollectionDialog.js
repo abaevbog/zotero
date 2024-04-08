@@ -26,7 +26,7 @@
 var Zotero_New_Collection_Dialog = {
 	_handleLoad() {
 		let io = window.arguments[0];
-		
+
 		document.querySelector('#name').value = io.name;
 		document.addEventListener('dialogaccept', () => this._handleAccept());
 		
@@ -36,11 +36,12 @@ var Zotero_New_Collection_Dialog = {
 	},
 
 	_handleAccept() {
-		window.arguments[0].dataOut = {
+		let result = {
 			name: document.querySelector('#name').value,
 			libraryID: this._libraryID,
 			parentCollectionID: this._parentCollectionID
 		};
+		window.arguments[0].onAccept(result);
 	},
 
 	_updateMenu() {

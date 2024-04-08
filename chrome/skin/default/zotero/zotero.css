@@ -218,6 +218,21 @@ zoterosearch .menulist-icon {
 	grid-template-columns: max-content 1fr;
 }
 
+#dialogBackground {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 100vw;
+	height: 100vh;
+	background: rgba(0,0,0,.3);
+	display: flex;
+	justify-content: center;
+	align-content: center;
+}
+
+#dialogBackground[hidden="true"] {
+	display: none;
+}
 
 /* BEGIN 2X BLOCK -- DO NOT EDIT MANUALLY -- USE 2XIZE */
 @media (min-resolution: 1.25dppx) {

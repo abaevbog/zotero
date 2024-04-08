@@ -1461,24 +1461,26 @@ var ZoteroPane = new function()
 			prefix,
 			collections.map(c => c.name).filter(n => n.startsWith(prefix))
 		);
-		
-		var io = { name, libraryID, parentCollectionID };
+		let onAccept = (dataOut) => {
+			document.getElementById("dialogBackground").hidden = true;
+			if (!dataOut) {
+				return null;
+			}
+			
+			if (!dataOut.name) {
+				dataOut.name = name;
+			}
+			
+			var collection = new Zotero.Collection();
+			collection.libraryID = dataOut.libraryID;
+			collection.name = dataOut.name;
+			collection.parentID = dataOut.parentCollectionID;
+			return collection.saveTx();
+		};
+		var io = { name, libraryID, parentCollectionID, onAccept };
 		window.openDialog("chrome://zotero/content/newCollectionDialog.xhtml",
-			"_blank", "chrome,modal,centerscreen,resizable=no", io);
-		var dataOut = io.dataOut;
-		if (!dataOut) {
-			return null;
-		}
-		
-		if (!dataOut.name) {
-			dataOut.name = name;
-		}
-		
-		var collection = new Zotero.Collection();
-		collection.libraryID = dataOut.libraryID;
-		collection.name = dataOut.name;
-		collection.parentID = dataOut.parentCollectionID;
-		return collection.saveTx();
+			"_blank", "chrome,alwaysRaised,centerscreen,resizable=no", io);
+		document.getElementById("dialogBackground").hidden = false;
 	};
 	
 	this.importFeedsFromOPML = async function (event) {
