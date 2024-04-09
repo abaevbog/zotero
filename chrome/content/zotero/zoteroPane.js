@@ -1461,22 +1461,47 @@ var ZoteroPane = new function()
 		);
 		
 		var io = { name, libraryID, parentCollectionID };
-		window.openDialog("chrome://zotero/content/newCollectionDialog.xhtml",
-			"_blank", "chrome,modal,centerscreen,resizable=no", io);
-		var dataOut = io.dataOut;
-		if (!dataOut) {
-			return null;
-		}
-		
-		if (!dataOut.name) {
-			dataOut.name = name;
-		}
-		
-		var collection = new Zotero.Collection();
-		collection.libraryID = dataOut.libraryID;
-		collection.name = dataOut.name;
-		collection.parentID = dataOut.parentCollectionID;
-		return collection.saveTx();
+		// window.openDialog("chrome://zotero/content/newCollectionDialog.xhtml",
+		// 	null, "chrome,modal,centerscreen,titlebar,dialog=yes", io);
+		let dialogWrapper = document.getElementById("window-modal-dialog");
+		// Hardcoded style setting for now
+		dialogWrapper.style = "border: none";
+		let browser = dialogWrapper.querySelector("browser");
+
+		// Load the desired window
+		browser.setAttribute("src", "chrome://zotero/content/newCollectionDialog.xhtml");
+		// Wait for window to load
+		browser.addEventListener('DOMContentLoaded', e => {
+			// Directly pass io object and load the dialog
+			browser.contentDocument.defaultView.Zotero_New_Collection_Dialog._handleLoad(io);
+			// Run the collection creation if accepted
+			browser.contentDocument.documentElement.addEventListener('dialogaccept', (e) => {
+				// Fetch the selection from the dialog
+				var dataOut = browser.contentDocument.defaultView.Zotero_New_Collection_Dialog.dataOut;
+				
+				// Remaining of collection creation logic from earlier
+				if (!dataOut) {
+					return null;
+				}
+				
+				if (!dataOut.name) {
+					dataOut.name = name;
+				}
+				
+				var collection = new Zotero.Collection();
+				collection.libraryID = dataOut.libraryID;
+				collection.name = dataOut.name;
+				collection.parentID = dataOut.parentCollectionID;
+				collection.saveTx();
+				// In the end, close the dialog wrapper
+				dialogWrapper.close();
+			});
+			browser.contentDocument.documentElement.addEventListener('dialogcancel', (e) => {
+				// Just close the dialog wrapper
+				dialogWrapper.close();
+			});
+		});
+		dialogWrapper.showModal();
 	};
 	
 	this.importFeedsFromOPML = async function (event) {

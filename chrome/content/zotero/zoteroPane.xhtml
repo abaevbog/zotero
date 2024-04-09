@@ -1307,4 +1307,14 @@
 			nomaxresults="true"
 		/>
 	</popupset>
+	<html:dialog id="window-modal-dialog" style="visibility: hidden; height: 0; width: 0">
+	<vbox id="window-modal-dialog-template">
+	  <vbox class="dialogTemplate dialogOverlay" topmost="true">
+		<hbox class="dialogBox">
+		  <browser class="dialogFrame" style="width:500px;height:500px;" autoscroll="false" disablehistory="true"/>
+		</hbox>
+	  </vbox>
+	</vbox>
+	</html:dialog>
+
 </window>

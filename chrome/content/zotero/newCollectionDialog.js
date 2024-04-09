@@ -24,9 +24,7 @@
 */
 
 var Zotero_New_Collection_Dialog = {
-	_handleLoad() {
-		let io = window.arguments[0];
-		
+	_handleLoad(io) {
 		document.querySelector('#name').value = io.name;
 		document.addEventListener('dialogaccept', () => this._handleAccept());
 		
@@ -36,7 +34,7 @@ var Zotero_New_Collection_Dialog = {
 	},
 
 	_handleAccept() {
-		window.arguments[0].dataOut = {
+		this.dataOut = {
 			name: document.querySelector('#name').value,
 			libraryID: this._libraryID,
 			parentCollectionID: this._parentCollectionID
