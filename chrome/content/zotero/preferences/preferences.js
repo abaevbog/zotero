@@ -326,6 +326,7 @@ var Zotero_Preferences = {
 		};
 		pane.loadPromise = rest();
 		await pane.loadPromise;
+		this.a11yEnableWin10JAWSAnnouncement(pane.container);
 	},
 
 	/**
@@ -859,5 +860,88 @@ ${str}
 	openURL: function (url) {
 		Zotero.warn("Zotero_Preferences.openURL() is deprecated -- use Zotero.launchURL()");
 		Zotero.launchURL(url);
+	},
+
+	// JAWS specifically on windows 10 does not announce headers and descriptions. As a workaround,
+	// announce aria-labels or aria-descriptions via aria-live alert region.
+	a11yEnableWin10JAWSAnnouncement: async (pane) => {
+		let os = await Zotero.getOSVersion();
+		// This only applies to windows 10
+		if (!os.includes("Windows 10")) return;
+
+		// Fetch aria-labels and aria-descriptions for groupboxes and replace them with attributes that
+		// screen readers won't announce. Otherwise, NVDA (which has not issues) would announce
+		// labels twice.
+		for (let group of [...pane.querySelectorAll("groupbox")]) {
+			for (let attr of ["aria-label", "aria-labelledby", "aria-description", "aria-describedby"]) {
+				let val = group.getAttribute(attr);
+				if (!val) continue;
+				group.setAttribute(attr + "-live", val);
+				group.removeAttribute(attr);
+			}
+			// Hide headers and group labels otherwise NVDA will have them announced twice as well
+			for (let node of [...group.querySelectorAll("h1,h2")]) {
+				node.setAttribute("aria-hidden", true);
+			}
+			group.querySelector("#color-scheme-label")?.setAttribute("aria-hidden", true);
+		}
+
+		// When focus enters the group, construct the message by manually putting together
+		// aria-labels and descriptions and use role="alert" component to have JAWS announce it.
+		pane.addEventListener("focusin", (event) => {
+			let containersSelectors = [
+				"groupbox",
+				".main-section"
+			];
+			let containerSelector = containersSelectors.join(",");
+			let target = event.target;
+			let containers = [];
+			// Find all the containing groupboxes and sections
+			while (target.parentNode.closest(containerSelector)) {
+				target = target.parentNode.closest(containerSelector);
+				containers.push(target);
+			}
+			// Make sure "Export" header is included
+			if (target.id == "zotero-prefpane-export-groupbox") {
+				containers.push(target.closest(".pane-container"));
+			}
+			containers.reverse();
+			let message = "";
+
+			// Fetch the best candidate for the label and description of the container
+			for (let container of containers) {
+				if (container.getAttribute("aria-label-live")) {
+					message += `${container.getAttribute("aria-label-live")}. `;
+				}
+				else if (container.getAttribute("aria-labelledby-live")) {
+					let id = container.getAttribute("aria-labelledby-live");
+					message += `${document.getElementById(id)?.textContent || ""}. `;
+				}
+				else if (container.querySelector("h1,h2")) {
+					// If there is not explicit label, use nearest header
+					message += `${container.querySelector("h1,h2").textContent}. `;
+				}
+	
+				if (container.getAttribute("aria-description-live")) {
+					message += `\n${container.getAttribute("aria-description-live")}\n`;
+				}
+				else if (container.getAttribute("aria-describedby-live")) {
+					for (let id of container.getAttribute("aria-describedby-live").split(" ")) {
+						message += `\n${document.getElementById(id)?.textContent || ""}\n`;
+					}
+				}
+				else if (container.querySelector("description")?.closest(containerSelector) == container) {
+					message += `\n${container.querySelector("description").textContent || ""}\n`;
+				}
+			}
+
+			if (event.target.id == "fulltext-stats-grid") {
+				message += [...event.target.childNodes].map(node => node.value).join(" ");
+			}
+			if (document.getElementById("a11yAnnouncement").innerHTML == message) return;
+
+			// Announce it via alert
+			document.getElementById("a11yAnnouncement").innerHTML = message;
+		});
 	}
 };

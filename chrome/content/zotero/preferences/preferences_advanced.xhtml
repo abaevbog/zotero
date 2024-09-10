@@ -70,7 +70,7 @@
 		</groupbox>
 	</vbox>
 	
-	<vbox class="main-section" role="group" aria-label="&zotero.preferences.advanced.filesAndFolders;">
+	<vbox id="zotero-prefpane-advanced-files-and-folders" class="main-section" role="group" aria-label="&zotero.preferences.advanced.filesAndFolders;">
 		<html:h1>&zotero.preferences.advanced.filesAndFolders;</html:h1>
 
 		<groupbox aria-label="&zotero.preferences.attachmentBaseDir.caption;" aria-description="&zotero.preferences.attachmentBaseDir.message;">
@@ -264,10 +264,10 @@
 			</hbox>
 		</groupbox>
 		
-		<groupbox id="fulltext-stats" tabindex="0" aria-label="&zotero.preferences.search.indexStats;" aria-describedby="fulltext-stats-grid">
+		<groupbox id="fulltext-stats" aria-label="&zotero.preferences.search.indexStats;" aria-describedby="fulltext-stats-grid">
 			<label><html:h2>&zotero.preferences.search.indexStats;</html:h2></label>
 			
-			<vbox class="form-grid" id="fulltext-stats-grid">
+			<vbox class="form-grid" id="fulltext-stats-grid" tabindex="0">
 				<label value="&zotero.preferences.search.indexStats.indexed;"/>
 				<label id="fulltext-stats-indexed"/>
 	
