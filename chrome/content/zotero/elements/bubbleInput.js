@@ -34,7 +34,6 @@
 
 		init() {
 			this._body = this.querySelector('.bubble-input.body');
-			this._body.addEventListener('keydown', this._onBodyKeydown.bind(this), { capture: true });
 			this._body.addEventListener('click', this._onBodyClick.bind(this));
 			this._body.addEventListener('dragenter', event => event.preventDefault());
 			this._body.addEventListener('dragover', (event) => {
@@ -66,6 +65,10 @@
 					this._dragOver.before(this._dragBubble);
 				}
 				this._dragOver?.classList.remove('drop-after', 'drop-before');
+
+				// Tell citationDialog.js where the bubble moved
+				let newIndex = [...this._body.querySelectorAll(".bubble")].findIndex(node => node == this._dragBubble);
+				this.propOnBubbleMove(this._dragBubble, newIndex);
 
 				// // Find old position in list
 				// var oldPosition = this._getBubbleIndex(this._dragBubble);
@@ -108,17 +111,24 @@
 			// If click happened right before another input, focus that input
 			// instead of adding another one. There may be a br node on the way, so we have to check
 			// more than just the next node.
-			if (lastBubble) {
-				let nextNode = lastBubble.nextElementSibling;
-				while (nextNode && !nextNode.classList.contains("bubble")) {
-					if (this._isInput(nextNode)) {
-						nextNode.focus();
-						return;
-					}
-					nextNode = nextNode.nextElementSibling;
+			let nextNode = lastBubble ? lastBubble.nextElementSibling : this._body.firstChild;
+			while (nextNode && !nextNode.classList.contains("bubble")) {
+				if (this._isInput(nextNode)) {
+					nextNode.focus();
+					return;
 				}
+				nextNode = nextNode.nextElementSibling;
 			}
+			
 			let newInput = this._createInputElem();
+			let currentInput = this.getCurrentInput() || this._lastFocusedInput;
+			// If there is a current input, delete it here.
+			// It can be handled by the "blur" event handler but it happens
+			// after a small delay which causes bubbles to shift back and forth
+			if (currentInput && this._isInputEmpty(currentInput)) {
+				this._clearLastFocused(currentInput);
+				currentInput.remove();
+			}
 			if (lastBubble !== null) {
 				lastBubble.after(newInput);
 				if (startOfTheLine) {
@@ -131,33 +141,88 @@
 			}
 			newInput.focus();
 		}
-		
-		_onBodyKeydown(event) {
-			const focused = document.activeElement;
-			if (this._isInput(focused) && event.key == "Enter") {
-				this.convertInputToBubble();
+
+		_onBubblePress(event) {
+			let bubble = event.target;
+			// if (accepted) return;
+			if (event.key == "ArrowDown" || event.key == " ") {
+				// On arrow down or whitespace, open new citation properties panel
+				//_showItemPopover(this);
+				event.preventDefault();
 			}
 			else if (["ArrowLeft", "ArrowRight"].includes(event.key) && !event.shiftKey) {
-				// On arrow left from the beginning of the input, move to previous bubble
-				if (event.key === "ArrowLeft" && (!this._isInput(focused) || focused.selectionStart === 0)) {
-					this._moveFocusBack(focused);
-					event.preventDefault();
+				event.preventDefault();
+				let newInput = this._createInputElem();
+				
+				if (event.key === Zotero.arrowPreviousKey) {
+					if (this._isInput(bubble.previousElementSibling)) {
+						this._moveFocusBack(bubble);
+					}
+					else {
+						bubble.before(newInput);
+						newInput.focus();
+					}
 				}
-				// On arrow right from the end of the input, move to next bubble
-				else if (event.key === "ArrowRight" && (!this._isInput(focused) || focused.selectionStart === focused.value.length)) {
-					this._moveFocusForward(focused);
-					event.preventDefault();
+				else if (event.key === Zotero.arrowNextKey) {
+					if (this._isInput(this.nextElementSibling)) {
+						this._moveFocusForward(bubble);
+					}
+					else {
+						bubble.after(newInput);
+						newInput.focus();
+					}
 				}
 			}
-			else if (this._isInput(focused) && ["Backspace", "Delete"].includes(event.key)
-				&& (focused.selectionStart + focused.selectionEnd) === 0) {
+			else if (["ArrowLeft", "ArrowRight"].includes(event.key) && event.shiftKey) {
+				// On Shift-Left/Right swap focused bubble with it's neighbor
 				event.preventDefault();
-				// Backspace/Delete from the beginning of an input will delete the previous bubble.
-				// If there are two inputs next to each other as a result, they are merged
-				if (this.previousElementSibling) {
-					this.previousElementSibling.remove();
-					this._combineNeighboringInputs();
+				let findNextBubble = () => {
+					let node = event.target;
+					do {
+						node = event.key == Zotero.arrowPreviousKey ? node.previousElementSibling : node.nextElementSibling;
+					} while (node && !(node.classList.contains("bubble") || node.classList.contains("zotero-bubble-input")));
+					return node;
+				};
+				let nextBubble = findNextBubble();
+				if (nextBubble) {
+					let nextBubbleIndex = [...this._body.querySelectorAll(".bubble")].findIndex(bubble => bubble == nextBubble);
+					if (event.key === Zotero.arrowPreviousKey) {
+						nextBubble.before(bubble);
+					}
+					else {
+						nextBubble.after(bubble);
+					}
+					this.propOnBubbleMove(bubble, nextBubbleIndex);
+					// Do not "Keep Sources Sorted"
+					// if (io.sortable && keepSorted?.hasAttribute("checked")) {
+					// 	keepSorted.removeAttribute("checked");
+					// }
+					// _previewAndSort();
 				}
+				
+				bubble.focus();
+			}
+			else if (["Backspace", "Delete"].includes(event.key)) {
+				event.preventDefault();
+				if (!this._moveFocusBack(bubble)) {
+					this._moveFocusForward(bubble);
+				}
+				this._deleteBubble(bubble);
+				// Removed item bubble may belong to opened documents section. Reference panel
+				// needs to be reset so that it appears among other items.
+				// _clearEntryList();
+				this._combineNeighboringInputs();
+				// If all bubbles are removed, add and focus an input
+				if (this.getAllBubbles().length == 0) {
+					this._refocusInput();
+				}
+			}
+			else if (this._isKeypressPrintable(event) && event.key !== " ") {
+				event.preventDefault();
+				let input = this._refocusInput();
+				// Typing when you are focused on the bubble will re-focus the last input
+				input.value += event.key;
+				input.dispatchEvent(new Event('input', { bubbles: true }));
 			}
 		}
 		
@@ -165,8 +230,13 @@
 			const input = this.getLastInput();
 			text = text || input.value;
 			const bubble = this._createBubble(text);
-			input.before(bubble);
-			input.value = "";
+			if (input) {
+				input.before(bubble);
+				input.value = "";
+			}
+			else {
+				this._body.append(bubble);
+			}
 			return bubble;
 		}
 		
@@ -182,7 +252,7 @@
 			if (!Zotero.isMac) {
 				bubble.setAttribute("aria-label", str);
 			}
-			// bubble.addEventListener("click", _onBubbleClick);
+			bubble.addEventListener("click", () => this.propOpenItemDetails(bubble));
 			bubble.addEventListener("dragstart", (event) => {
 				this._dragBubble = event.currentTarget;
 				event.dataTransfer.setData("text/plain", '<span id="zotero-drag"/>');
@@ -194,7 +264,7 @@
 				bubble.classList.add('drop-before');
 			});
 			// bubble.addEventListener("dragend", onBubbleDragEnd);
-			// bubble.addEventListener("keypress", onBubblePress);
+			bubble.addEventListener("keypress", this._onBubblePress.bind(this));
 			// bubble.addEventListener("mousedown", (_) => {
 			// 	_bubbleMouseDown = true;
 			// });
@@ -210,16 +280,26 @@
 			let cross = document.createElement("div");
 			cross.className = "cross";
 			cross.addEventListener("click", () => {
-				bubble.remove();
+				this._deleteBubble(bubble);
 			});
 			cross.addEventListener("keydown", (e) => {
 				if (e.target === cross && e.key === "Enter") {
-					bubble.remove();
+					this._deleteBubble(bubble);
 				}
 			});
 			bubble.append(cross);
 			
 			return bubble;
+		}
+
+		// Delete the bubble and clear locator node if it pointed at this bubble
+		_deleteBubble(bubble) {
+			// if (bubble == locatorNode) {
+			// 	locatorNode = null;
+			// }
+			// tell citationDialog.js the bubble was deleted
+			this.propOnBubbleDelete(bubble);
+			bubble.remove();
 		}
 		
 		_isInput(node) {
@@ -258,6 +338,11 @@
 			return this._body.childElementCount == 1 && this._isInput(this._body.firstChild);
 		}
 
+		getAllBubbles() {
+			return [...this._body.querySelectorAll(".bubble")];
+		}
+		
+
 		// If this input field was counted as previously focused,
 		// it will be cleared. Call before removing the field
 		_clearLastFocused(input) {
@@ -280,6 +365,7 @@
 			let input = document.createElement('input');
 			input.setAttribute("aria-describedby", "input-description");
 			input.addEventListener("input", (_) => {
+				this._rerunSearch();
 				// _resetSearchTimer();
 				// Expand/shrink the input field to match the width of content
 				let width = this._getContentWidth(input);
@@ -296,9 +382,9 @@
 				// 	return;
 				// }
 				// // Otherwise, run the search if the input is non-empty.
-				// if (!isInputEmpty(input)) {
-				// 	_resetSearchTimer();
-				// }
+				if (!this._isInputEmpty(input)) {
+					this._rerunSearch();
+				}
 				// else {
 				// 	_updateItemList({ citedItems: [] });
 				// }
@@ -337,6 +423,31 @@
 			});
 			return input;
 		}
+
+		_rerunSearch() {
+			let input = this.getCurrentInput();
+			// ask citationDialog.js to rerun search
+			this.propSearch(input.value);
+		}
+		
+		// Return the focus to the input.
+		// If tryLastFocused=true, try to focus on the last active input first.
+		// Then, try to focus the last input from the editor.
+		// If there are no inputs, append one to the end and focus that.
+		_refocusInput(tryLastFocused = true) {
+			let input = tryLastFocused ? this._lastFocusedInput : null;
+			if (!input) {
+				let allInputs = this._body.querySelectorAll(".zotero-bubble-input");
+				if (allInputs.length > 0) {
+					input = allInputs[allInputs.length - 1];
+				}
+			}
+			if (!input) {
+				input = this._appendInput();
+			}
+			input.focus();
+			return input;
+		}
 		
 		_onInputKeypress(input, event) {
 			if (event.target === input && event.key == "Enter") {
@@ -359,8 +470,8 @@
 				event.preventDefault();
 				// Backspace/Delete from the beginning of an input will delete the previous bubble.
 				// If there are two inputs next to each other as a result, they are merged
-				if (this.previousElementSibling) {
-					this.previousElementSibling.remove();
+				if (input.previousElementSibling) {
+					this._deleteBubble(input.previousElementSibling);
 					this._combineNeighboringInputs();
 				}
 			}
@@ -455,6 +566,28 @@
 				lastBubble = bubbles[lastBubble];
 			}
 			return { lastBubble: lastBubble, startOfTheLine: startOfTheLine };
+		}
+
+		// Determine if keypress event is on a printable character.
+		/* eslint-disable array-element-newline */
+		_isKeypressPrintable(event) {
+			if (event.ctrlKey || event.metaKey || event.altKey) return false;
+			// If it's a single character, for latin locales it has to be printable
+			if (event.key.length === 1) {
+				return true;
+			}
+			// Otherwise, check against a list of common control keys
+			let nonPrintableKeys = [
+				'Enter', 'Escape', 'Backspace', 'Tab',
+				'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+				'Home', 'End', 'PageUp', 'PageDown',
+				'Delete', 'Insert',
+				'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
+				'Control', 'Meta', 'Alt', 'Shift', 'CapsLock'
+			];
+			/* eslint-enable array-element-newline */
+		
+			return !nonPrintableKeys.includes(event.key);
 		}
 	}
 

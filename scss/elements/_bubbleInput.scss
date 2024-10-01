@@ -14,12 +14,15 @@ bubble-input {
 		min-height: 28px;
 		font-size: 13px;
 		background: white;
-		color: black;
 		width: 100%;
-		padding-inline: 6px;
+		padding-inline-end: 6px;
 		
 		span {
 			white-space: pre;
+		}
+
+		& > :first-child {
+			margin-left: 0 !important;
 		}
 	}
 	
@@ -31,7 +34,6 @@ bubble-input {
 		height: 15px;
 		/* Keep the background and text color unchanged in dark mode */
 		background-color: transparent !important;
-		color: black;
 		//background-image: none !important;
 		padding: 0;
 		margin-inline: -1px;
@@ -39,31 +41,26 @@ bubble-input {
 	
 	.bubble {
 		--margin-horizontal: 2px;
-		border-radius: 8px;
-		background-color: #dee7f8;
-		border-style: solid;
-		border-width: 1px;
-		border-color: #a8c0ec;
-		padding: 0 4px;
+		height: 22px;
+		border-radius: 5px;
+		background: white;
+		border: 1px solid var(--fill-quarternary);
+		padding: 0 8px;
 		margin: 0 var(--margin-horizontal);
 		display: flex;
 		flex-direction: row;
 		align-items: center;
 		white-space: nowrap;
 		line-height: normal;
-		color: #000;
 		-moz-user-select: none;
 		cursor: pointer;
-		height: 16px;
-		max-width: -moz-available;
-		position: relative;
 		
 		&:hover {
-			background-color: #bbcef1;
-			border-color: #6d95e0;
+			background-color: var(--fill-quarternary);
 			
 			.cross {
 				display: block;
+				z-index: 2;
 			}
 			
 			.text {
@@ -100,7 +97,7 @@ bubble-input {
 			display: none;
 			width: 16px;
 			height: 18px;
-			align-self: start;
+			align-self: center;
 		}
 	}
 }

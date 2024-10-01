@@ -1545,8 +1545,8 @@ Zotero.Integration.Session.prototype.cite = async function (field, addNote=false
 			'alwaysRaised,resizable', io);
 	}
 	else {
-		Zotero.Integration.displayDialog('chrome://zotero/content/integration/quickFormat.xhtml',
-			mode, io);
+		Zotero.Integration.displayDialog('chrome://zotero/content/integration/citationDialog.xhtml',
+			'chrome,centerscreen', io);
 	}
 
 	// -------------------
