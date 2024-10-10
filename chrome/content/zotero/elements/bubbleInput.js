@@ -38,63 +38,52 @@
 			this._body.addEventListener('dragenter', event => event.preventDefault());
 			this._body.addEventListener('dragover', (event) => {
 				event.preventDefault();
-				if (event.target === this._body) {
-					const { lastBubble: lastBeforeDrop } = this._getLastBubbleBeforePoint(event.clientX, event.clientY);
-					const lastBubble = this._body.querySelector('.bubble:last-of-type');
-					if (lastBubble !== lastBeforeDrop) return;
-					// Only drop to final position if dragging after all bubbles, not in-between
-					this._dragOver?.classList.remove('drop-after', 'drop-before');
-					this._dragOver = event.target;
-					lastBubble.classList.add('drop-after');
+
+				// Find the last bubble before current mouse position
+				let { lastBubble: lastBeforeDrop } = this._getLastBubbleBeforePoint(event.clientX, event.clientY);
+				// If no bubble, mouse may be at the very start of the input so use the first bubble
+				if (!lastBeforeDrop) {
+					lastBeforeDrop = this.getAllBubbles()[0];
 				}
-			});
-			this._body.addEventListener('dragleave', (event) => {
+				
 				this._dragOver?.classList.remove('drop-after', 'drop-before');
-				this._dragOver = null;
+				this._dragOver = lastBeforeDrop;
+
+				// Add indicator after or before the hovered bubble depending on mouse position
+				let bubbleRect = lastBeforeDrop.getBoundingClientRect();
+				let midpoint = (bubbleRect.right + bubbleRect.left) / 2;
+
+				if (event.clientX > midpoint) {
+					this._dragOver.classList.add('drop-after');
+				}
+				else {
+					this._dragOver.classList.add('drop-before');
+				}
 			});
 			this._body.addEventListener('drop', (event) => {
 				event.preventDefault();
 				event.stopPropagation();
-				if (!this._dragBubble || !this._dragOver && this._dragBubble != this._dragOver) return;
+				if (!this._dragBubble || !this._dragOver) return;
 				
-				this._dragBubble.remove();
-				if (this._dragOver === this._body) {
-					this._body.querySelector('.bubble:last-of-type').after(this._dragBubble);
+				if (this._dragOver.classList.contains("drop-after")) {
+					this._dragOver.after(this._dragBubble);
 				}
 				else {
 					this._dragOver.before(this._dragBubble);
 				}
-				this._dragOver?.classList.remove('drop-after', 'drop-before');
+				this._dragOver.classList.remove('drop-after', 'drop-before');
 
 				// Tell citationDialog.js where the bubble moved
 				let newIndex = [...this._body.querySelectorAll(".bubble")].findIndex(node => node == this._dragBubble);
 				this.propOnBubbleMove(this._dragBubble, newIndex);
-
-				// // Find old position in list
-				// var oldPosition = this._getBubbleIndex(this._dragBubble);
-				//
-				// // Move bubble
-				// var range = document.createRange();
-				// // Prevent dragging out of qfe
-				// if (event.target === qfe) {
-				// 	range.setStartAfter(qfe.childNodes[qfe.childNodes.length-1]);
-				// }
-				// else {
-				// 	range.setStartAfter(event.target);
-				// }
-				// dragging.parentNode.removeChild(dragging);
-				// var bubble = _insertBubble(JSON.parse(dragging.dataset.citationItem), range);
-				// this._dragBubble = null;
-				//
-				// // If moved out of order, turn off "Keep Sources Sorted"
-				// if(io.sortable && keepSorted && keepSorted.hasAttribute("checked") && oldPosition !== -1 &&
-				// 		oldPosition != _getBubbleIndex(bubble)) {
-				// 	keepSorted.removeAttribute("checked");
-				// }
-				//
-				// yield _previewAndSort();
-				// _moveCursorToEnd();
 			});
+
+			this._body.addEventListener('dragend', (event) => {
+				this._body.querySelector(".drop-after,.drop-before")?.classList.remove('drop-after', 'drop-before');
+				this._dragBubble = null;
+				this._dragOver = null;
+			});
+
 			this._appendInput();
 			
 			this._dragBubble = null;
@@ -258,20 +247,7 @@
 				event.dataTransfer.setData("text/plain", '<span id="zotero-drag"/>');
 				event.stopPropagation();
 			});
-			bubble.addEventListener("dragover", (event) => {
-				this._dragOver?.classList.remove('drop-after', 'drop-before');
-				this._dragOver = bubble;
-				bubble.classList.add('drop-before');
-			});
-			// bubble.addEventListener("dragend", onBubbleDragEnd);
 			bubble.addEventListener("keypress", this._onBubblePress.bind(this));
-			// bubble.addEventListener("mousedown", (_) => {
-			// 	_bubbleMouseDown = true;
-			// });
-			// bubble.addEventListener("mouseup", (_) => {
-			// 	_bubbleMouseDown = false;
-			// });
-			// bubble.dataset.citationItem = JSON.stringify(citationItem);
 			let text = document.createElement("span");
 			text.textContent = str;
 			text.className = "text";
@@ -366,7 +342,6 @@
 			input.setAttribute("aria-describedby", "input-description");
 			input.addEventListener("input", (_) => {
 				this._rerunSearch();
-				// _resetSearchTimer();
 				// Expand/shrink the input field to match the width of content
 				let width = this._getContentWidth(input);
 				input.style.width = width + 'px';
@@ -385,9 +360,6 @@
 				if (!this._isInputEmpty(input)) {
 					this._rerunSearch();
 				}
-				// else {
-				// 	_updateItemList({ citedItems: [] });
-				// }
 				this._lastFocusedInput = input;
 			});
 			// // Delete empty input on blur unless it's the last input
@@ -396,16 +368,6 @@
 				setTimeout(() => {
 					const inputFocused = this._isInput(document.activeElement);
 					if (this._isInputEmpty(input) && inputFocused) {
-						// // Resizing window right before drag-drop reordering starts, will interrupt the
-						// // drag event. To avoid it, hide the input immediately and delete it after delay.
-						// if (_bubbleMouseDown) {
-						// 	input.style.display = "none";
-						// 	setTimeout(() => {
-						// 		input.remove();
-						// 	}, 500);
-						// 	clearLastFocused(input);
-						// }
-						// else
 						if (document.activeElement !== input && !this.isEmpty()) {
 							// If no dragging, delete it if focus has moved elsewhere.
 							// If focus remained, the entire dialog lost focus, so do nothing
@@ -540,12 +502,15 @@
 			let bubbles = this._body.querySelectorAll('.bubble');
 			let lastBubble = null;
 			let startOfTheLine = false;
+			let isClickAfterBubble = (clickX, bubbleRect) => {
+				return Zotero.rtl ? clickX < bubbleRect.right : clickX > bubbleRect.left;
+			};
 			for (let i = 0; i < bubbles.length; i++) {
 				let rect = bubbles[i].getBoundingClientRect();
 				// If within the vertical range of a bubble
 				if (y >= rect.top && y <= rect.bottom) {
 					// If the click is to the right of a bubble, it becomes a candidate
-					if (x > rect.right) {
+					if (isClickAfterBubble(x, rect)) {
 						lastBubble = i;
 					}
 					// Otherwise, stop and return the last bubble we saw if any

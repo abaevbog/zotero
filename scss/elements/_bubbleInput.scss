@@ -54,6 +54,7 @@ bubble-input {
 		line-height: normal;
 		-moz-user-select: none;
 		cursor: pointer;
+		position: relative;
 		
 		&:hover {
 			background-color: var(--fill-quarternary);

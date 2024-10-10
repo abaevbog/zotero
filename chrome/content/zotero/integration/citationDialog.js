@@ -154,6 +154,9 @@ class Layout {
 	}
 
 	async includeItemsIntoCitation(items) {
+		if (!Array.isArray(items)) {
+			items = [items];
+		}
 		await Citation.addItems({ citationItems: items });
 		await SearchHanlder.refresh(SearchHanlder.lastSearchValue);
 		this.refreshItemsList();
@@ -213,6 +216,7 @@ class LibraryLayout extends Layout {
 			persistColumns: true,
 			columnPicker: true,
 			onSelectionChange: selection => {},
+			regularOnly: true,
 			onActivate: (event, items) => {
 				// debounec as this can fire more than once on the same double click
 				this._addItemsDebounced(items);
