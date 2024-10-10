@@ -48,7 +48,11 @@ function onDOMContentLoaded() {
 	// pass a few functions to bubble-input to call on user interactions
 	// that affect the general state that we keep track of here
 	_id("bubble-input").propSearch = text => currentLayout.search(text);
-	_id("bubble-input").propOnBubbleDelete = Citation.onBubbleNodeDeleted;
+	_id("bubble-input").propOnBubbleDelete = async (bubble) => {
+		Citation.onBubbleNodeDeleted(bubble);
+		await SearchHanlder.refresh(SearchHanlder.lastSearchValue);
+		currentLayout.refreshItemsList();
+	};
 	_id("bubble-input").propOnBubbleMove = Citation.onBubbleNodeMoved;
 	_id("bubble-input").propOpenItemDetails = Popups.openItemDetails;
 	_id("bubble-input").prophide = Popups.hide;
@@ -79,9 +83,29 @@ function accept() {
 	if (accepted || SearchHanlder.searching) return;
 	accepted = true;
 	try {
-		io.citation.citationItems = Citation.items;
-		// document.querySelector(".citation-dialog.deck").selectedIndex = 1;
-		io.accept(percent => console.log("Progress ", percent));
+		let result = [];
+		for (let item of Citation.items) {
+			delete item.dialogReferenceID;
+			if (item instanceof Zotero.Item) {
+				let ioResult = { id: item.cslItemID || item.id };
+				if (typeof ioResult.id === "string" && ioResult.id.indexOf("/") !== -1) {
+					let item = Zotero.Cite.getItem(ioResult.id);
+					ioResult.uris = item.cslURIs;
+					ioResult.itemData = item.cslItemData;
+				}
+				ioResult.label = item.label || null;
+				ioResult.locator = item.locator || null;
+				ioResult.prefix = item.prefix || null;
+				ioResult.suffix = item.suffix || null;
+				ioResult['suppress-author'] = item["suppress-author"] || null;
+				result.push(ioResult);
+			}
+			else {
+				result.push(item);
+			}
+		}
+		io.citation.citationItems = result;
+		io.accept((percent) => console.log("Percent ", percent));
 	}
 	catch (e) {
 		Zotero.debug(e);
@@ -128,6 +152,12 @@ class Layout {
 			SearchHanlder.searching = false;
 		});
 	}
+
+	async includeItemsIntoCitation(items) {
+		await Citation.addItems({ citationItems: items });
+		await SearchHanlder.refresh(SearchHanlder.lastSearchValue);
+		this.refreshItemsList();
+	}
 }
 
 class LibraryLayout extends Layout {
@@ -140,7 +170,7 @@ class LibraryLayout extends Layout {
 	// After the search is run, library layout updates the itemsView filter
 	async search(value) {
 		super.search(value);
-		this.itemsView.setFilter('search', value);
+		this.itemsView?.setFilter('search', value);
 	}
 
 	async refreshItemsList() {
@@ -148,7 +178,6 @@ class LibraryLayout extends Layout {
 		
 		for (let [key, group] of Object.entries(groups)) {
 			let section = _id(`${this.type}-${key}-items`);
-			console.log("Refresh items list ", `${this.type}-${key}-items`, group.length);
 			if (!section) continue;
 			section.hidden = !group.length;
 			let itemContainer = section.querySelector(".itemsContainer");
@@ -166,8 +195,8 @@ class LibraryLayout extends Layout {
 				title.textContent = item.getDisplayTitle();
 
 				itemNode.append(title, description);
-				itemNode.addEventListener("click", () => {
-					Citation.addItems({ items: [item] });
+				itemNode.addEventListener("click", async () => {
+					this.includeItemsIntoCitation(item);
 				});
 				items.push(itemNode);
 			}
@@ -185,7 +214,8 @@ class LibraryLayout extends Layout {
 			columnPicker: true,
 			onSelectionChange: selection => {},
 			onActivate: (event, items) => {
-				Citation.addItems({ items: items });
+				// debounec as this can fire more than once on the same double click
+				this._addItemsDebounced(items);
 			},
 			emptyMessage: Zotero.getString('pane.items.loading')
 		});
@@ -221,6 +251,10 @@ class LibraryLayout extends Layout {
 		
 		this.itemsView.clearItemsPaneMessage();
 	}
+
+	_addItemsDebounced = Zotero.Utilities.debounce(async (items) => {
+		this.includeItemsIntoCitation(items);
+	}, 100);
 }
 
 class ListLayout extends Layout {
@@ -233,7 +267,6 @@ class ListLayout extends Layout {
 		
 		for (let [key, group] of Object.entries(groups)) {
 			let section = _id(`${this.type}-${key}-items`);
-			console.log("Refresh items list ", `${this.type}-${key}-items`, group.length);
 			if (!section) continue;
 			section.hidden = !group.length;
 			let itemContainer = section.querySelector(".itemsContainer");
@@ -256,8 +289,8 @@ class ListLayout extends Layout {
 
 				itemInfo.append(title, description);
 				itemNode.append(icon, itemInfo);
-				itemNode.addEventListener("click", () => {
-					Citation.addItems({ items: [item] });
+				itemNode.addEventListener("click", async () => {
+					this.includeItemsIntoCitation(item);
 				});
 				items.push(itemNode);
 			}
@@ -273,8 +306,9 @@ class ListLayout extends Layout {
 var SearchHanlder = {
 	lastSearchValue: "",
 	results: {},
-	options: {},
 	searching: false,
+	nCitedItemsFromLibrary: {}, // number of cited items in each library
+	searchResultIDs: [],
 
 	refreshDebounced: Zotero.Utilities.debounce(async (str, callback) => {
 		await SearchHanlder.refresh(str);
@@ -282,23 +316,15 @@ var SearchHanlder = {
 	}, SEARCH_TIMEOUT),
 
 	async refresh(str = "") {
-		let searchResultIDs = await this._runSearch(str);
+		this.searchResultIDs = await this._runSearch(str);
 		this.lastSearchValue = str;
-		this.options = {
-			citedItems: false,
-			citedItemsMatchingSearch: false,
-			searchString: str,
-			searchResultIDs: searchResultIDs,
-			preserveSelection: false,
-			nCitedItemsFromLibrary: {},
-			citationItemIDs: new Set()
-		};
 
 		let [selectedItems, libraryItems] = await this._getMatchingLibraryItems();
+		this.nCitedItemsFromLibrary = this._getCitedItemsPerLibrary();
 		this.results = {
 			found: currentLayout.type == "list" ? libraryItems : [],
-			open: (await this._getMatchingReaderOpenItems()) || [],
-			cited: this._getMatchingCitedItems(),
+			open: await this._getMatchingReaderOpenItems(),
+			cited: await this._getMatchingCitedItems(),
 			selected: selectedItems,
 		};
 	},
@@ -312,30 +338,58 @@ var SearchHanlder = {
 		if (io.filterLibraryIDs) {
 			io.filterLibraryIDs.forEach(id => s.addCondition("libraryID", "is", id));
 		}
-		let searchResultIDs = await s.search();
-		return searchResultIDs;
+		let ids = await s.search();
+		return ids;
 	},
 
-	_getMatchingCitedItems() {
-		let { citedItems, citedItemsMatchingSearch, nCitedItemsFromLibrary } = this.options;
-		if (isCitingNotes || !citedItems) return [];
+	_getCitedItemsPerLibrary() {
+		let result = {};
+		if (isCitingNotes) return result;
 	
 		// We have cited items
-		for (let citedItem of citedItems) {
+		for (let citedItem of Citation.items) {
+			if (citedItem.cslItemID) continue;
 			// Tabulate number of items in document for each library
-			if (!citedItem.cslItemID) {
-				var libraryID = citedItem.libraryID;
-				if (libraryID in nCitedItemsFromLibrary) {
-					nCitedItemsFromLibrary[libraryID]++;
-				}
-				else {
-					nCitedItemsFromLibrary[libraryID] = 1;
-				}
+			var libraryID = citedItem.libraryID;
+			if (libraryID in this.nCitedItemsFromLibrary) {
+				result[libraryID]++;
+			}
+			else {
+				result[libraryID] = 1;
 			}
 		}
-		return citedItemsMatchingSearch;
+		return result;
 	},
 	
+	async _getMatchingCitedItems() {
+		// Fetch all cited items in the document, not just items currently in the dialog
+		let citedItems = await io.getItems();
+		// if "ibid" is typed, return all items
+		if (this.lastSearchValue.toLowerCase() === Zotero.getString("integration.ibid").toLowerCase()) {
+			return citedItems;
+		}
+		var splits = Zotero.Fulltext.semanticSplitter(this.lastSearchValue)
+		let result = [];
+		
+		for (let item of citedItems) {
+			let itemStr = item.getCreators()
+				.map(creator => creator.firstName + " " + creator.lastName)
+				.concat([item.getField("title"), item.getField("date", true, true).substr(0, 4)])
+				.join(" ");
+			
+			let wordsMatch = true;
+			for (let word of splits) {
+				if (itemStr.toLowerCase().indexOf(word) === -1) {
+					wordsMatch = false;
+				}
+			}
+			if (wordsMatch) {
+				result.push(item);
+			}
+		}
+		return result;
+	},
+
 	async  _getMatchingReaderOpenItems() {
 		if (isCitingNotes) return [];
 		let win = Zotero.getMainWindow();
@@ -360,10 +414,10 @@ var SearchHanlder = {
 			return Zotero.Cite.getItem(itemID);
 		});
 		let matchedItems = new Set(items);
-		if (this.options.searchString) {
+		if (this.lastSearchValue) {
 			Zotero.debug("QuickFormat: Searching open tabs");
 			matchedItems = new Set();
-			let splits = Zotero.Fulltext.semanticSplitter(this.options.searchString);
+			let splits = Zotero.Fulltext.semanticSplitter(this.lastSearchValue);
 			for (let item of items) {
 				// Generate a string to search for each item
 				let itemStr = item.getCreators()
@@ -379,38 +433,37 @@ var SearchHanlder = {
 			Zotero.debug("QuickFormat: Found matching open tabs");
 		}
 		// Filter out already cited items
-		return Array.from(matchedItems).filter(i => !this.options.citationItemIDs.has(i.cslItemID ? i.cslItemID : i.id));
+		let citedItemsIDs = new Set(Citation.items.map(item => item.cslItemID || item.id));
+		return Array.from(matchedItems).filter(i => !citedItemsIDs.has(i.cslItemID ? i.cslItemID : i.id));
 	},
 	
 	async  _getMatchingLibraryItems() {
-		let { searchString,
-			searchResultIDs, nCitedItemsFromLibrary } = this.options;
-
 		let win = Zotero.getMainWindow();
 		let selectedItems = [];
 		if (win.Zotero_Tabs.selectedType === "library") {
 			if (!isCitingNotes) {
 				selectedItems = Zotero.getActiveZoteroPane().getSelectedItems().filter(i => i.isRegularItem());
 				// Filter out already cited items
-				selectedItems = selectedItems.filter(i => !this.options.citationItemIDs.has(i.cslItemID ? i.cslItemID : i.id));
+				let citedItemsIDs = new Set(Citation.items.map(item => item.cslItemID || item.id));
+				selectedItems = selectedItems.filter(i => !citedItemsIDs.has(i.cslItemID ? i.cslItemID : i.id));
 			}
 			else {
 				selectedItems = Zotero.getActiveZoteroPane().getSelectedItems().filter(i => i.isNote());
 			}
 		}
-		if (!searchString) {
+		if (!this.lastSearchValue) {
 			return [selectedItems, []];
 		}
-		else if (!searchResultIDs.length) {
+		else if (!this.searchResultIDs.length) {
 			return [[], []];
 		}
 			
 		// Search results might be in an unloaded library, so get items asynchronously and load
 		// necessary data
-		var items = await Zotero.Items.getAsync(searchResultIDs);
+		var items = await Zotero.Items.getAsync(this.searchResultIDs);
 		await Zotero.Items.loadDataTypes(items);
 		
-		searchString = searchString.toLowerCase();
+		let searchString = this.lastSearchValue.toLowerCase();
 		let searchParts = Zotero.SearchConditions.parseSearchString(searchString);
 		var collation = Zotero.getLocaleCollation();
 		
@@ -434,6 +487,7 @@ var SearchHanlder = {
 			
 			var libA = a.libraryID, libB = b.libraryID;
 			if (libA !== libB) {
+				let { nCitedItemsFromLibrary } = SearchHanlder;
 				// Sort by number of cites for library
 				if (nCitedItemsFromLibrary[libA] && !nCitedItemsFromLibrary[libB]) {
 					return -1;
@@ -493,7 +547,7 @@ var SearchHanlder = {
 // is updated as bubbles are being updated, and it is used to set io.citationItems when dialog
 // is accepted.
 var Citation = {
-	keepSorted: true,
+	keepSorted: false,
 	items: [],
 
 	// Resorts the items in the citation and reorders bubbles to be in their proper spots
@@ -515,21 +569,7 @@ var Citation = {
 	},
 
 	// Include specified items into the citation
-	async addItems({ ids = [], items = [], citationItems = [] }) {
-		if (items) {
-			ids = ids.concat(items.map(item => item.id));
-		}
-		if (ids) {
-			citationItems = citationItems.concat(ids.map((id) => {
-				let citationItem = { id };
-				if (typeof id === "string" && id.indexOf("/") !== -1) {
-					let item = Zotero.Cite.getItem(id);
-					citationItem.uris = item.cslURIs;
-					citationItem.itemData = item.cslItemData;
-				}
-				return citationItem;
-			}));
-		}
+	async addItems({ citationItems = [] }) {
 		for (let item of citationItems) {
 			// Add a new ID to our citation item and set the same ID on the bubble
 			// so we have a reliable way to identify which bubble refers to which citationItem.
@@ -575,6 +615,19 @@ var Citation = {
 
 	findItemIDForBubble(bubble) {
 		return this.items.findIndex(item => item.dialogReferenceID === bubble.getAttribute("dialogReferenceID"));
+	},
+
+	// Shortcut to fetch Zotero.Item based on citationItem
+	citationItemToZoteroItem(citationItem) {
+		if (citationItem instanceof Zotero.Item) return citationItem;
+		if (io.customGetItem) {
+			let item = io.customGetItem(citationItem);
+			if (item) return item;
+		}
+		if (citationItem.id) {
+			return Zotero.Cite.getItem(citationItem.id);
+		}
+		return null;
 	}
 };
 
@@ -590,8 +643,7 @@ var Helpers = {
 	},
 
 	buildBubbleString(citationItem) {
-		var item = io.customGetItem && io.customGetItem(citationItem) || Zotero.Cite.getItem(citationItem.id);
-		// create text for bubble
+		let item = Citation.citationItemToZoteroItem(citationItem);
 		
 		// Creator
 		var title;
@@ -750,7 +802,7 @@ var Popups = {
 		}
 
 		let citationItem = Citation.findItemForBubble(bubble);
-		let item = Zotero.Cite.getItem(citationItem.id);
+		let item = Citation.citationItemToZoteroItem(citationItem);
 		// Add header and fill inputs with their values
 		let description = Helpers.buildItemDescription(item);
 		_id("itemDetails").querySelector(".description")?.remove();

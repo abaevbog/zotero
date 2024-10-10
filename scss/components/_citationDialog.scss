@@ -75,6 +75,8 @@
 
 			margin-left: 36px;
 			border-top: 1px solid var(--fill-quinary);
+			padding-top: 8px;
+			margin-inline-end: 10px;
 
 			.section {
 				min-width: 0;
@@ -93,7 +95,7 @@
 						width: 210px;
 						overflow: hidden;
 						white-space: nowrap;
-						margin: 10px;
+						margin: 4px 10px 10px 10px;
 						&:first-child {
 							margin-left: 0;
 						}
