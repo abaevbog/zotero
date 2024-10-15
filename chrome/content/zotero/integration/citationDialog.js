@@ -45,17 +45,24 @@ function onDOMContentLoaded() {
 	_id("mode-button").addEventListener("click", _toggleMode);
 	currentLayout.search("");
 
-	// pass a few functions to bubble-input to call on user interactions
-	// that affect the general state that we keep track of here
-	_id("bubble-input").propSearch = text => currentLayout.search(text);
-	_id("bubble-input").propOnBubbleDelete = async (bubble) => {
-		Citation.onBubbleNodeDeleted(bubble);
+	// Run search and refresh items that are being displayed.
+	// Can either happen immediately (e.g. on focus of an input)
+	// or after a debounce (e.g. when one types)
+	this.addEventListener("run-search", ({ detail }) => {
+		if (detail.debounce) {
+			currentLayout.searchDebounced(detail.query);
+		}
+		else {
+			currentLayout.search(detail.query);
+		}
+	});
+	this.addEventListener("bubble-deleted", async ({ detail }) => {
+		Citation.onBubbleNodeDeleted(detail.bubble);
 		await SearchHanlder.refresh(SearchHanlder.lastSearchValue);
 		currentLayout.refreshItemsList();
-	};
-	_id("bubble-input").propOnBubbleMove = Citation.onBubbleNodeMoved;
-	_id("bubble-input").propOpenItemDetails = Popups.openItemDetails;
-	_id("bubble-input").prophide = Popups.hide;
+	});
+	this.addEventListener("bubble-moved", ({ detail }) => Citation.onBubbleNodeMoved(detail.bubble, detail.index));
+	this.addEventListener("bubble-popup-show", ({ detail }) => Popups.openItemDetails(detail.bubble));
 
 	doc.addEventListener("keypress", handleTopLevelKeypress);
 
@@ -144,13 +151,20 @@ class Layout {
 
 	// Regardless of which layout we are in, we need to run the search and
 	// update itemsList.
-	async search(value) {
+	async searchDebounced(value) {
 		SearchHanlder.searching = true;
 		// This is called on each typed character, so refresh item list when typing stopped
 		SearchHanlder.refreshDebounced(value, () => {
 			this.refreshItemsList();
 			SearchHanlder.searching = false;
 		});
+	}
+
+	async search(value) {
+		SearchHanlder.searching = true;
+		await SearchHanlder.refresh(value);
+		this.refreshItemsList();
+		SearchHanlder.searching = false;
 	}
 
 	async includeItemsIntoCitation(items) {

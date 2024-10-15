@@ -75,7 +75,7 @@
 
 				// Tell citationDialog.js where the bubble moved
 				let newIndex = [...this._body.querySelectorAll(".bubble")].findIndex(node => node == this._dragBubble);
-				this.propOnBubbleMove(this._dragBubble, newIndex);
+				this._notifyDialog('bubble-moved', { bubble: this._dragBubble, index: newIndex });
 			});
 
 			this._body.addEventListener('dragend', (event) => {
@@ -181,7 +181,7 @@
 					else {
 						nextBubble.after(bubble);
 					}
-					this.propOnBubbleMove(bubble, nextBubbleIndex);
+					this._notifyDialog('bubble-moved', { bubble, index: nextBubbleIndex });
 					// Do not "Keep Sources Sorted"
 					// if (io.sortable && keepSorted?.hasAttribute("checked")) {
 					// 	keepSorted.removeAttribute("checked");
@@ -241,7 +241,7 @@
 			if (!Zotero.isMac) {
 				bubble.setAttribute("aria-label", str);
 			}
-			bubble.addEventListener("click", () => this.propOpenItemDetails(bubble));
+			bubble.addEventListener("click", () => this._notifyDialog("bubble-popup-show", { bubble }));
 			bubble.addEventListener("dragstart", (event) => {
 				this._dragBubble = event.currentTarget;
 				event.dataTransfer.setData("text/plain", '<span id="zotero-drag"/>');
@@ -273,8 +273,7 @@
 			// if (bubble == locatorNode) {
 			// 	locatorNode = null;
 			// }
-			// tell citationDialog.js the bubble was deleted
-			this.propOnBubbleDelete(bubble);
+			this._notifyDialog('bubble-deleted', { bubble });
 			bubble.remove();
 		}
 		
@@ -341,7 +340,7 @@
 			let input = document.createElement('input');
 			input.setAttribute("aria-describedby", "input-description");
 			input.addEventListener("input", (_) => {
-				this._rerunSearch();
+				this._notifyDialog("run-search", { query: input.value, debounce: true });
 				// Expand/shrink the input field to match the width of content
 				let width = this._getContentWidth(input);
 				input.style.width = width + 'px';
@@ -358,7 +357,7 @@
 				// }
 				// // Otherwise, run the search if the input is non-empty.
 				if (!this._isInputEmpty(input)) {
-					this._rerunSearch();
+					this._notifyDialog("run-search", { query: input.value, debounce: false });
 				}
 				this._lastFocusedInput = input;
 			});
@@ -389,7 +388,7 @@
 		_rerunSearch() {
 			let input = this.getCurrentInput();
 			// ask citationDialog.js to rerun search
-			this.propSearch(input.value);
+			this._notifyDialog("run-search", { query: input.value });
 		}
 		
 		// Return the focus to the input.
@@ -553,6 +552,14 @@
 			/* eslint-enable array-element-newline */
 		
 			return !nonPrintableKeys.includes(event.key);
+		}
+
+		_notifyDialog(eventType, data = {}) {
+			let event = new CustomEvent(eventType, {
+				bubbles: true,
+				detail: data
+			});
+			this.dispatchEvent(event);
 		}
 	}
 
