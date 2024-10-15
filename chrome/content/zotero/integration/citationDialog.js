@@ -63,6 +63,7 @@ function onDOMContentLoaded() {
 	});
 	this.addEventListener("bubble-moved", ({ detail }) => Citation.onBubbleNodeMoved(detail.bubble, detail.index));
 	this.addEventListener("bubble-popup-show", ({ detail }) => Popups.openItemDetails(detail.bubble));
+	this.addEventListener("locator-added", ({ detail }) => Citation.addLocator(detail.bubble, detail.label, detail.locator));
 
 	doc.addEventListener("keypress", handleTopLevelKeypress);
 
@@ -624,6 +625,13 @@ var Citation = {
 		let currentIndex = Citation.findItemIDForBubble(bubble);
 		let [obj] = Citation.items.splice(currentIndex, 1);
 		Citation.items.splice(index, 0, obj);
+	},
+
+	addLocator(bubble, label, locator) {
+		let item = this.findItemForBubble(bubble);
+		item.label = label;
+		item.locator = locator;
+		bubble.textContent = Helpers.buildBubbleString(item);
 	},
 
 	// Convenience functions to find which citation item in the array a given bubble refers to.

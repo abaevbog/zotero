@@ -136,7 +136,7 @@
 			// if (accepted) return;
 			if (event.key == "ArrowDown" || event.key == " ") {
 				// On arrow down or whitespace, open new citation properties panel
-				//_showItemPopover(this);
+				this._notifyDialog("bubble-popup-show", { bubble });
 				event.preventDefault();
 			}
 			else if (["ArrowLeft", "ArrowRight"].includes(event.key) && !event.shiftKey) {
@@ -340,10 +340,16 @@
 			let input = document.createElement('input');
 			input.setAttribute("aria-describedby", "input-description");
 			input.addEventListener("input", (_) => {
-				this._notifyDialog("run-search", { query: input.value, debounce: true });
 				// Expand/shrink the input field to match the width of content
 				let width = this._getContentWidth(input);
 				input.style.width = width + 'px';
+				// If just the locator was typed, do nothing
+				let locator = this._fetchLocator(input.value);
+				if (locator && locator.length == input.value.length) return;
+				// If more than 2 characters were typed, run the search
+				if (input.value.trim().length > 2) {
+					this._notifyDialog("run-search", { query: input.value, debounce: true });
+				}
 			});
 			// input.addEventListener("keypress", onInputPress);
 			input.addEventListener("keypress", e => this._onInputKeypress(input, e));
@@ -384,12 +390,6 @@
 			});
 			return input;
 		}
-
-		_rerunSearch() {
-			let input = this.getCurrentInput();
-			// ask citationDialog.js to rerun search
-			this._notifyDialog("run-search", { query: input.value });
-		}
 		
 		// Return the focus to the input.
 		// If tryLastFocused=true, try to focus on the last active input first.
@@ -412,7 +412,17 @@
 		
 		_onInputKeypress(input, event) {
 			if (event.target === input && event.key == "Enter") {
-				this.convertInputToBubble();
+				if (!input.value) return;
+				let locator = this._fetchLocator(input.value);
+				if (locator && locator.length == input.value.length) {
+					let previousBubble = input.previousElementSibling;
+					if (previousBubble) {
+						this._notifyDialog("locator-added", { bubble: previousBubble, label: locator.label, locator: locator.locator });
+						input.value = "";
+					}
+					return;
+				}
+				// this.convertInputToBubble();
 			}
 			else if (["ArrowLeft", "ArrowRight"].includes(event.key) && !event.shiftKey) {
 				// On arrow left from the beginning of the input, move to previous bubble
@@ -560,6 +570,19 @@
 				detail: data
 			});
 			this.dispatchEvent(event);
+		}
+
+		// Fetch locator from a string and return an object: { label: "", page: "", length: 0}
+		// to identify the locator and pass that info to the dialog
+		_fetchLocator(string) {
+			const numberRegex = /^[0-9\-–]+$/;
+			if (numberRegex.test(string)) return { label: "page", locator: string, length: string.length };
+			
+			const specifiedLocatorRegex = /^(?:,? *(p{1,2})(?:\. *| *)|:)([0-9\-–]+) *$/;
+			let locator = specifiedLocatorRegex.exec(string);
+			// Can be later expanded to include other locators, not just page
+			if (locator && locator.length) return { label: "page", locator: locator[2], length: locator[0].length };
+			return null;
 		}
 	}
 
