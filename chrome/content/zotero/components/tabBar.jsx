@@ -40,18 +40,22 @@ const Tab = memo((props) => {
 	const handleTabClick = useCallback(event => onTabClick(event, id), [onTabClick, id]);
 	const handleDragStart = useCallback(event => onDragStart(event, id, index), [onDragStart, id, index]);
 	const handleTabClose = useCallback(event => onTabClose(event, id), [onTabClose, id]);
-	
-	let titleText;
-	let titleHTML;
-	if (renderTitle) {
-		let parentElement = document.createElement('div');
-		titleText = Zotero.Utilities.Internal.renderItemTitle(title, parentElement);
-		titleHTML = parentElement.innerHTML;
-	}
-	else {
-		titleText = title;
-		titleHTML = null;
-	}
+	const ref = useRef(null);
+
+	useEffect(() => {
+		if (!ref.current) return;
+		let tabName = ref.current.querySelector(".tab-name");
+		if (isItemType) {
+			// Generate formatted name for the tab name
+			let tempWrapper = document.createElement('div');
+			let updatedTitle = Zotero.Utilities.Internal.renderItemTitle(title, tempWrapper);
+			tabName.replaceChildren(...tempWrapper.childNodes);
+			tabName.setAttribute("title", updatedTitle);
+		}
+		else {
+			tabName.textContent = title;
+		}
+	}, [title]);
 
 	return (
 		<div
@@ -66,14 +70,15 @@ const Tab = memo((props) => {
 			onDragStart={handleDragStart}
 			onDragEnd={onDragEnd}
 			tabIndex="-1"
+			ref={ref}
 		>
 			{ isItemType
 				? <CSSItemTypeIcon itemType={icon} className="tab-icon" />
 				: <CSSIcon name={icon} className="tab-icon" />
 			}
-			{titleHTML
-				? <div className="tab-name" title={titleText} dangerouslySetInnerHTML={{ __html: titleHTML }}/>
-				: <div className="tab-name" title={titleText}>{titleText}</div>}
+			<div className="tab-name" title={title}>
+				{ /** Child nodes are set in useEffect */ }
+			</div>
 			<div
 				className="tab-close"
 				onClick={handleTabClose}
