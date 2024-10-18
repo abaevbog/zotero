@@ -49,11 +49,17 @@ function onDOMContentLoaded() {
 	// Can either happen immediately (e.g. on focus of an input)
 	// or after a debounce (e.g. when one types)
 	this.addEventListener("run-search", ({ detail }) => {
+		let query = detail.query;
+		// If there is a locator typed, do nothing
+		let locator = Helpers.fetchLocator(query);
+		if (locator) {
+			query = query.replace(locator.fullLocatorString, "");
+		}
 		if (detail.debounce) {
-			currentLayout.searchDebounced(detail.query);
+			currentLayout.searchDebounced(query);
 		}
 		else {
-			currentLayout.search(detail.query);
+			currentLayout.search(query);
 		}
 	});
 	this.addEventListener("bubble-deleted", async ({ detail }) => {
@@ -63,7 +69,6 @@ function onDOMContentLoaded() {
 	});
 	this.addEventListener("bubble-moved", ({ detail }) => Citation.onBubbleNodeMoved(detail.bubble, detail.index));
 	this.addEventListener("bubble-popup-show", ({ detail }) => Popups.openItemDetails(detail.bubble));
-	this.addEventListener("locator-added", ({ detail }) => Citation.addLocator(detail.bubble, detail.label, detail.locator));
 
 	doc.addEventListener("keypress", handleTopLevelKeypress);
 
@@ -121,6 +126,17 @@ function accept() {
 }
 
 function handleTopLevelKeypress(event) {
+	// On Enter on an input, if only a new locator was typed, just add it to previous bubble.
+	// Otherwise, just click the first matching item to add it.
+	if (event.key == "Enter" && !event.shiftKey && event.target.tagName == "input") {
+		let locator = Helpers.fetchLocator(event.target.value);
+		let bubble = event.target.previousElementSibling;
+		if (locator && locator.onlyLocator && bubble) {
+			Citation.addLocator(bubble, locator.label, locator.locator);
+			return;
+		}
+		document.querySelector(".first-item").click();
+	}
 	// Shift-Enter will always accept the existing dialog's state
 	if (event.key == "Enter" && event.shiftKey) {
 		event.preventDefault();
@@ -172,9 +188,24 @@ class Layout {
 		if (!Array.isArray(items)) {
 			items = [items];
 		}
+		// If the last input has a locator, add it into the item
+		let input = _id("bubble-input").getLastInput();
+		let locator = Helpers.fetchLocator(input.value || "");
+		if (locator) {
+			for (let item of items) {
+				item.label = locator.label;
+				item.locator = locator.locator;
+			}
+		}
 		await Citation.addItems({ citationItems: items });
 		await SearchHanlder.refresh(SearchHanlder.lastSearchValue);
 		this.refreshItemsList();
+	}
+
+	// Mark the first matching item to be added to citation on Enter
+	markFirstItem() {
+		document.querySelector(".first-item")?.classList.remove("first-item");
+		_id(`${this.type}-layout`).querySelector(".item")?.classList.add("first-item");
 	}
 }
 
@@ -220,6 +251,7 @@ class LibraryLayout extends Layout {
 			}
 			itemContainer.replaceChildren(...items);
 		}
+		this.markFirstItem();
 	}
 	
 	async _initItemTree() {
@@ -316,6 +348,7 @@ class ListLayout extends Layout {
 			itemContainer.replaceChildren(...items);
 		}
 		_id("no-items-message").hidden = !!_id("list-layout").querySelector(".section:not([hidden])");
+		this.markFirstItem();
 	}
 }
 
@@ -794,6 +827,59 @@ var Helpers = {
 		addPeriodIfNeeded(descriptionWrapper);
 
 		return descriptionWrapper;
+	},
+
+	// Fetch locator from a string and return an object: { label: string, page: string, onlyLocator: bool}
+	// to identify the locator and pass that info to the dialog
+	fetchLocator(string) {
+		const numberRegex = /^[0-9\-–]+$/;
+		if (numberRegex.test(string)) {
+			return {
+				label: "page",
+				locator: string,
+				onlyLocator: true,
+				fullLocatorString: string
+			};
+		}
+		
+		// Check for different ways of typing the page locator
+		const pageRegex = /^(?:,? *(p{1,2})(?:\. *| *)|:)([0-9\-–]+) *$/;
+		let pageLocator = pageRegex.exec(string);
+		if (pageLocator && pageLocator.length) {
+			return {
+				label: "page",
+				locator: pageLocator[2],
+				onlyLocator: pageLocator[0].length == string.length,
+				fullLocatorString: pageLocator[0]
+			};
+		}
+		// Check for a generalized way of typing any other locator in full or short form
+		// Capture the first word (e.g. "act") followed by optional : or . with any number of whitespaces.
+		// Then, capture either any text surrounded with " or ' (e.g. book: "Book title")
+		// or just any word (e.g. l. 10)
+		const generalRegex = /(\w+)\s*[:.]?\s*(?:(['"])(.*?)\2|(\w+))$/;
+		let generalLocator = generalRegex.exec(string);
+		if (generalLocator?.length) {
+			let typedLocatorLabel = generalLocator[1].toLowerCase();
+			let existingLocators = Zotero.Cite.labels;
+			for (let existingLocator of existingLocators) {
+				let locatorLabel = Zotero.Cite.getLocatorString(existingLocator).toLowerCase();
+				// strip short locator labels of punctuation, so that e.g. for line locator, "l 10" is still counted as "l. 10"
+				let locatorLabelShort = Zotero.Cite.getLocatorString(existingLocator, "short").replace(/[.,;:{}()]/g, "").toLowerCase();
+				if (typedLocatorLabel == locatorLabel || typedLocatorLabel == locatorLabelShort) {
+					// fetch either text in quotes or the last word without quotes as locator value
+					let locatorValue = generalLocator[3] || generalLocator[4];
+					console.log(generalLocator);
+					return {
+						label: existingLocator,
+						locator: locatorValue,
+						onlyLocator: generalLocator[0].length == string.length,
+						fullLocatorString: generalLocator[0]
+					};
+				}
+			}
+		}
+		return null;
 	}
 };
 
