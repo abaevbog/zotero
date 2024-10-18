@@ -345,7 +345,7 @@
 				input.style.width = width + 'px';
 				// If just the locator was typed, do nothing
 				let locator = this._fetchLocator(input.value);
-				if (locator && locator.length == input.value.length) return;
+				if (locator?.onlyLocator) return;
 				// If more than 2 characters were typed, run the search
 				if (input.value.trim().length > 2) {
 					this._notifyDialog("run-search", { query: input.value, debounce: true });
@@ -414,7 +414,8 @@
 			if (event.target === input && event.key == "Enter") {
 				if (!input.value) return;
 				let locator = this._fetchLocator(input.value);
-				if (locator && locator.length == input.value.length) {
+				console.log(locator);
+				if (locator?.onlyLocator) {
 					let previousBubble = input.previousElementSibling;
 					if (previousBubble) {
 						this._notifyDialog("locator-added", { bubble: previousBubble, label: locator.label, locator: locator.locator });
@@ -572,16 +573,52 @@
 			this.dispatchEvent(event);
 		}
 
-		// Fetch locator from a string and return an object: { label: "", page: "", length: 0}
+		// Fetch locator from a string and return an object: { label: string, page: string, onlyLocator: bool}
 		// to identify the locator and pass that info to the dialog
 		_fetchLocator(string) {
 			const numberRegex = /^[0-9\-–]+$/;
-			if (numberRegex.test(string)) return { label: "page", locator: string, length: string.length };
+			if (numberRegex.test(string)) {
+				return {
+					label: "page",
+					locator: string,
+					onlyLocator: true
+				};
+			}
 			
-			const specifiedLocatorRegex = /^(?:,? *(p{1,2})(?:\. *| *)|:)([0-9\-–]+) *$/;
-			let locator = specifiedLocatorRegex.exec(string);
-			// Can be later expanded to include other locators, not just page
-			if (locator && locator.length) return { label: "page", locator: locator[2], length: locator[0].length };
+			// Check for different ways of typing the page locator
+			const pageRegex = /^(?:,? *(p{1,2})(?:\. *| *)|:)([0-9\-–]+) *$/;
+			let pageLocator = pageRegex.exec(string);
+			if (pageLocator && pageLocator.length) {
+				return {
+					label: "page",
+					locator: pageLocator[2],
+					onlyLocator: pageLocator[0].length == string.length
+				};
+			}
+			// Check for a generalized way of typing any other locator in full or short form
+			// Capture the first word (e.g. "act") followed by optional : or . with any number of whitespaces.
+			// Then, capture either any text surrounded with " or ' (e.g. book: "Book title")
+			// or just any word (e.g. l. 10)
+			const generalRegex = /^(\w+)\s*[:.]?\s*(?:(['"])(.*?)\2|(\w+))$/;
+			let generalLocator = generalRegex.exec(string);
+			if (generalLocator?.length) {
+				let typedLocatorLabel = generalLocator[1].toLowerCase();
+				let existingLocators = Zotero.Cite.labels;
+				for (let existingLocator of existingLocators) {
+					let locatorLabel = Zotero.Cite.getLocatorString(existingLocator).toLowerCase();
+					// strip short locator labels of punctuation, so that e.g. for line locator, "l 10" is still counted as "l. 10"
+					let locatorLabelShort = Zotero.Cite.getLocatorString(existingLocator, "short").replace(/[.,;:{}()]/g, "").toLowerCase();
+					if (typedLocatorLabel == locatorLabel || typedLocatorLabel == locatorLabelShort) {
+						// fetch either text in quotes or the last word without quotes as locator value
+						let locatorValue = generalLocator[3] || generalLocator[4];
+						return {
+							label: existingLocator,
+							locator: locatorValue,
+							onlyLocator: generalLocator[0].length == string.length
+						};
+					}
+				}
+			}
 			return null;
 		}
 	}
