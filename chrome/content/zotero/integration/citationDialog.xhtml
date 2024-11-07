@@ -51,68 +51,36 @@
 				<div id="z-icon-container">
 					<div id="z-icon"></div>
 				</div>
-				<xul:bubble-input id="bubble-input" class="flex" placeholder="Type to search, or add selected and open items"/>
-				<button id="mode-button" class="icon icon-css icon-citation-dialog-library" title="Mode"/>
-				<button id="settings-button" class="icon icon-css icon-citation-dialog-settings" title="Settings"/>
+				<xul:bubble-input id="bubble-input" class="flex" placeholder="Type to search, or add selected and open items" data-tabstop="1"/>
+				<image id="loading-spinner" class="zotero-spinner-16"/>
+				<button id="mode-button" class="icon icon-css icon-citation-dialog-library" title="Mode" data-tabstop="1" tabindex="-1"/>
+				<button id="settings-button" class="icon icon-css icon-citation-dialog-settings" title="Settings" data-tabstop="1" tabindex="-1"/>
 			</div>
 			<div id="notification" style="display: none;"></div>
 		</div>
 		
 		<div id="list-layout" class="layout">
 			<div class="divider"></div>
-			<div id="list-layout-wrapper" class="vbox">
-				<div id="list-selected-items" class="section">
-					<div class="header">Selected</div>
-					<div class="itemsContainer"></div>
-				</div>
-				<div id="list-open-items" class="section vbox">
-					<div class="header">Open</div>
-					<div class="itemsContainer"></div>
-				</div>
-				<div id="list-cited-items" class="section vbox">
-					<div class="header">Cited</div>
-					<div class="itemsContainer"></div>
-				</div>
-				<div id="list-found-items" class="section vbox">
-					<div class="header">Found</div>
-					<div class="itemsContainer"></div>
-				</div>
-			</div>
-			<div id="no-items-message" class="vbox" style="align-items: center;">
-				<h2>No items found</h2>
-			</div>
+			<div id="list-layout-wrapper" class="vbox search-items" data-tabstop="1" data-arrow-nav="vertical"></div>
 		</div>
 		
 		<div id="library-layout" class="layout">
-			<div id="library-other-items" class="hbox">
-				<div id="library-selected-items" class="section vbox">
-					<div class="header">Selected</div>
-					<div class="itemsContainer hbox"></div>
-				</div>
-				<div id="library-open-items" class="section vbox" >
-					<div class="header">Open</div>
-					<div class="itemsContainer hbox"></div>
-				</div>
-				<div id="library-cited-items" class="section vbox" >
-					<div class="header">Cited</div>
-					<div class="itemsContainer hbox"></div>
-				</div>
-			</div>
+			<div id="library-other-items" class="hbox search-items" data-tabstop="1" data-arrow-nav="horizontal"></div>
 			<div class="divider"></div>
 			<div id="library-trees" class="hbox">			
 				<div id="collections-tree-container" class="vbox virtualized-table-container">
-					<div id="zotero-collections-tree" />
+					<div id="zotero-collections-tree" data-tabstop="1"/>
 				</div>
 				<div id="item-tree-container" class="hbox virtualized-table-container">
-					<div id="zotero-items-tree" />
+					<div id="zotero-items-tree" data-tabstop="1"/>
 				</div>
 			</div>
 		</div>
 
 		<div id="popups">
 			<div class="overlay" hidden="true"></div>
-			<div id="itemDetails" class="popup">
-				<div class="vbox">
+			<xul:panel id="itemDetails" focus-target-id="locator">
+				<div class="vbox popup">
 					<div class="details-header hbox">
 						<span class="icon icon-css icon-item-type"></span>
 						<div class="vbox">
@@ -144,10 +112,10 @@
 						<button class="show">Show in Zotero</button>
 						<button class="done">Done</button>
 					</div>
-				</div>
-			</div>
-			<div id="settingsPopup" class="popup">
-				<div class="vbox">
+				</div>	
+			</xul:panel>
+			<xul:panel id="settingsPopup">
+				<div class="vbox popup">
 					<div class="title">Citation Settings</div>
 					<div class="hbox">
 						<input id="keepSorted" type="checkbox"/>
@@ -170,7 +138,7 @@
 						<label for="splitCitation">Split Citation</label>
 					</div>
 				</div>
-			</div>
+			</xul:panel>
 		</div>
 	</body>
 </html>

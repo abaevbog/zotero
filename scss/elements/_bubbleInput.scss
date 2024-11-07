@@ -20,10 +20,6 @@ bubble-input {
 		span {
 			white-space: pre;
 		}
-
-		& > :first-child {
-			margin-left: 0 !important;
-		}
 	}
 	
 	input {
@@ -54,8 +50,9 @@ bubble-input {
 		line-height: normal;
 		-moz-user-select: none;
 		cursor: pointer;
+		position: relative;
 		
-		&:hover {
+		&:hover:not(.showingDetails) {
 			background-color: var(--fill-quarternary);
 			
 			.cross {
@@ -69,6 +66,10 @@ bubble-input {
 				overflow: hidden;
 				text-overflow: ellipsis;
 			}
+		}
+		&.showingDetails {
+			background-color: var(--fill-quarternary);
+			z-index: 2;
 		}
 		
 		&.drop-before::before, &.drop-after::after {

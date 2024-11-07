@@ -36,10 +36,24 @@
 			}
 		}
 
+		#loading-spinner {
+			width: 28px;
+			height: 28px;
+			background-size: 60%;
+			background-repeat: no-repeat;
+			margin-inline: 6px;
+			display: inline-block;
+			visibility: hidden;
+			&[status="animate"] {
+				visibility: visible;
+			}
+		}
+
 		.icon {
 			border: none;
 			width: 28px;
 			height: 28px;
+			max-height: 28px;
 			padding: 0;
 			color: var(--fill-secondary);
 			background-size: 60% !important;
@@ -75,6 +89,8 @@
 
 			margin-left: 36px;
 			border-top: 1px solid var(--fill-quinary);
+			padding-top: 8px;
+			margin-inline-end: 10px;
 
 			.section {
 				min-width: 0;
@@ -86,6 +102,8 @@
 		
 				.itemsContainer {
 					overflow-x: scroll;
+					flex-direction: row;
+					display: flex;
 		
 					.item {
 						height: 42px;
@@ -93,7 +111,7 @@
 						width: 210px;
 						overflow: hidden;
 						white-space: nowrap;
-						margin: 10px;
+						margin: 4px 10px 10px 10px;
 						&:first-child {
 							margin-left: 0;
 						}
@@ -187,6 +205,13 @@
 	}
 
 	#popups {
+		panel {
+			padding: 0;
+			.popup {
+				padding: 15px;
+
+			}
+		}
 		.overlay {
 			position: absolute;
 			top: 0;
@@ -194,41 +219,31 @@
 			height: 100%;
 			background-color: rgba(0, 0, 0, 0.1);
 		}
-		.popup {
-			position: absolute;
-			z-index: 1000;
-			background-color: white;
-			border: 1px solid #ccc;
-			padding: 10px;
-			box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-			border-radius: 10px;
-			&:not([open]) {
-				left: -1000px !important;
-				top: -1000px !important;
-			}
-		}
 		#settingsPopup {
 			top: 35px;
 			right: 5px;
 		}
 		#itemDetails {
-			width: 400px;
-			.details-header {
-				.icon {
-					margin-inline-end: 5px;
-					margin-top: 2px;
-					flex-shrink: 0;
+			.popup {
+				width: 400px;
+
+				.details-header {
+					.icon {
+						margin-inline-end: 5px;
+						margin-top: 2px;
+						flex-shrink: 0;
+					}
 				}
-			}
-			.details {
-				display: grid;
-				align-items: center;
-				grid-template-columns: max-content 1fr;
-				.details-label {
-					margin-top: auto;
-					margin-bottom: auto;
-					width: min-content;
-					margin-inline-start: auto;
+				.details {
+					display: grid;
+					align-items: center;
+					grid-template-columns: max-content 1fr;
+					.details-label {
+						margin-top: auto;
+						margin-bottom: auto;
+						width: min-content;
+						margin-inline-start: auto;
+					}
 				}
 			}
 		}
@@ -241,5 +256,15 @@
 		span:not(:last-child):not([no-comma])::after {
 			content: ", ";
 		}
+		&.expand-selected {
+			width: min-content;
+			&:hover {
+				text-decoration: underline;
+			}
+		}
+	}
+
+	.first-item {
+		border: 1px dotted purple !important;
 	}
 }
