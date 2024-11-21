@@ -91,17 +91,14 @@
 			border-top: 1px solid var(--fill-quinary);
 			padding-top: 8px;
 			margin-inline-end: 10px;
+			overflow-x: scroll;
 
 			.section {
-				min-width: 0;
-				flex: 1;
-	
 				.header {
 					color: var(--fill-secondary);
 				}
 		
 				.itemsContainer {
-					overflow-x: scroll;
 					flex-direction: row;
 					display: flex;
 		
@@ -219,9 +216,16 @@
 			height: 100%;
 			background-color: rgba(0, 0, 0, 0.1);
 		}
-		#settingsPopup {
+		#settings-popup {
 			top: 35px;
 			right: 5px;
+			width: 200px;
+
+			.title {
+				font-size: 13px;
+				font-weight: 700;
+				padding-bottom: 8px;
+			}
 		}
 		#itemDetails {
 			.popup {
@@ -264,7 +268,7 @@
 		}
 	}
 
-	.first-item {
+	.pre-selected-item {
 		border: 1px dotted purple !important;
 	}
 }

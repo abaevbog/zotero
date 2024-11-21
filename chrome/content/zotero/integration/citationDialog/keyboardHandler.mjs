@@ -10,6 +10,41 @@ export class CitationDialogKeyboardHandler {
 		return this.doc.getElementById(id);
 	}
 
+	handleKeypress(event) {
+		let handled = this.handleTopLevelKeypress(event);
+		if (!handled) {
+			handled = this.handleFocusNavigation(event);
+		}
+	}
+
+	handleTopLevelKeypress(event) {
+		let handled = false;
+		// Shift-Enter will always accept the existing dialog's state
+		if (event.key == "Enter" && event.shiftKey) {
+			handled = true;
+			this.doc.dispatchEvent(new CustomEvent("dialog-accepted"));
+		}
+		else if (event.key == "Escape") {
+			handled = true;
+			this.doc.dispatchEvent(new CustomEvent("dialog-cancelled"));
+		}
+		// Unhandled Enter or Space triggers a click
+		else if ((event.key == "Enter" || event.key == " ")) {
+			let isButton = event.target.tagName == "button";
+			let isCheckbox = event.target.getAttribute("type") == "checkbox";
+			let inInput = event.target.tagName == "input";
+			if (!(isButton || isCheckbox || inInput)) {
+				event.target.click();
+				handled = true;
+			}
+		}
+		if (handled) {
+			event.preventDefault();
+			event.stopPropagation();
+		}
+		return handled;
+	}
+
 	handleFocusNavigation(event) {
 		let handled = false;
 		let noModifiers = !['ctrlKey', 'metaKey', 'shiftKey', 'altKey'].some(key => event[key]);
@@ -26,13 +61,13 @@ export class CitationDialogKeyboardHandler {
 		}
 		else if (event.key.includes("Arrow") && noModifiers) {
 			let arrowDirection = event.target.closest("[data-arrow-nav]")?.getAttribute("data-arrow-nav");
-			if (!arrowDirection) return;
+			if (!arrowDirection) return false;
 			if (arrowDirection == "horizontal") {
-				if (!(event.key === Zotero.arrowNextKey || event.key === Zotero.arrowPreviousKey)) return;
+				if (!(event.key === Zotero.arrowNextKey || event.key === Zotero.arrowPreviousKey)) return false;
 				handled = this.moveWithinGroup(event.key == Zotero.arrowNextKey);
 			}
 			if (arrowDirection == "vertical") {
-				if (!(event.key == "ArrowUp" || event.key === "ArrowDown")) return;
+				if (!(event.key == "ArrowUp" || event.key === "ArrowDown")) return false;
 				handled = this.moveWithinGroup(event.key === "ArrowDown");
 			}
 		}
@@ -40,6 +75,7 @@ export class CitationDialogKeyboardHandler {
 			event.stopPropagation();
 			event.preventDefault();
 		}
+		return handled;
 	}
 
 	tabToGroup(forward = true) {

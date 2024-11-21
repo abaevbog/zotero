@@ -7,9 +7,8 @@ var { Zotero } = ChromeUtils.importESModule("chrome://zotero/content/zotero.mjs"
 const SEARCH_TIMEOUT = 500;
 
 export class CitationDialogSearchHandler {
-	constructor({ isCitingNotes, getCitationItems, io }) {
+	constructor({ isCitingNotes, io }) {
 		this.isCitingNotes = isCitingNotes;
-		this.getCitationItems = getCitationItems;
 		this.io = io;
 
 		this.lastSearchValue = "";
@@ -36,16 +35,22 @@ export class CitationDialogSearchHandler {
 	// Selected, Opened, Cited go first, followed by found library item groups ordered
 	// by the number of results in each library.
 	// Items/notes in the libraries group are sorted by _createItemsSort/_createNotesSort comparators.
-	getOrderedSearchResultGroups() {
+	// Takes citedItems as a parameter to filter them out.
+	getOrderedSearchResultGroups(citedItems) {
+		let removeCitedItems = (items) => {
+			let citedItemsIDs = new Set(citedItems.map(item => item.cslItemID || item.id));
+			return items.filter(i => !citedItemsIDs.has(i.cslItemID ? i.cslItemID : i.id));
+		};
 		let result = [];
 		// selected/open/cited go first
 		for (let groupKey of ["selected", "open", "cited"]) {
-			if (this.results[groupKey].length) {
-				result.push({ key: groupKey, group: this.results[groupKey] });
+			let groupItems = removeCitedItems(this.results[groupKey]);
+			if (groupItems.length) {
+				result.push({ key: groupKey, group: groupItems });
 			}
 		}
 		// library items go after
-		let libraryItems = Object.values(this.results.found.reduce((acc, item) => {
+		let libraryItems = Object.values(removeCitedItems(this.results.found).reduce((acc, item) => {
 			if (!acc[item.libraryID]) {
 				acc[item.libraryID] = { key: item.libraryID, group: [], isLibrary: true };
 			}
@@ -170,22 +175,16 @@ export class CitationDialogSearchHandler {
 			}
 			Zotero.debug("QuickFormat: Found matching open tabs");
 		}
-		// Filter out already cited items
-		let citedItemsIDs = new Set(this.getCitationItems().map(item => item.cslItemID || item.id));
-		return Array.from(matchedItems).filter(i => !citedItemsIDs.has(i.cslItemID ? i.cslItemID : i.id));
+		return Array.from(matchedItems);
 	}
 
 	_getSelectedLibraryItems() {
 		let win = Zotero.getMainWindow();
 		if (win.Zotero_Tabs.selectedType !== "library") return [];
-		let selectedItems = Zotero.getActiveZoteroPane().getSelectedItems().filter(i => i.isRegularItem());
-		// Filter out already cited items
-		let citedItemsIDs = new Set(this.getCitationItems().map(item => item.cslItemID || item.id));
-		selectedItems = selectedItems.filter(i => !citedItemsIDs.has(i.cslItemID ? i.cslItemID : i.id));
-		return selectedItems;
+		return Zotero.getActiveZoteroPane().getSelectedItems().filter(i => i.isRegularItem());
 	}
 	
-	async  _getMatchingLibraryItems(skipSelected = true) {
+	async _getMatchingLibraryItems(skipSelected = true) {
 		if (this.isCitingNotes) {
 			throw new Error("Not available when citing notes");
 		}

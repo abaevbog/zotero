@@ -3876,7 +3876,7 @@ var ItemTreeRow = function(ref, level, isOpen)
 
 ItemTreeRow.prototype.getField = function(field, unformatted)
 {
-	if (this.ref.hasOwnProperty(field) && this.ref[field] != null){
+	if (field in this.ref && this.ref[field] !== null) {
 		return this.ref[field];
 	}
 	else if (!Zotero.ItemTreeManager.isCustomColumn(field)) {

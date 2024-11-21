@@ -2,9 +2,8 @@ var { Zotero } = ChromeUtils.importESModule("chrome://zotero/content/zotero.mjs"
 
 // General helper functions
 export class CitationDialogHelpers {
-	constructor({ doc, io }) {
+	constructor({ doc }) {
 		this.doc = doc;
-		this.io = io;
 	}
 
 	createNode(type, attributes, className) {
@@ -14,65 +13,6 @@ export class CitationDialogHelpers {
 		}
 		node.className = className;
 		return node;
-	}
-
-	// Shortcut to fetch Zotero.Item based on citationItem
-	citationItemToZoteroItem(citationItem) {
-		if (citationItem instanceof Zotero.Item) return citationItem;
-		if (this.io.customGetItem) {
-			let item = this.io.customGetItem(citationItem);
-			if (item) return item;
-		}
-		if (citationItem.id) {
-			return Zotero.Cite.getItem(citationItem.id);
-		}
-		return null;
-	}
-
-	buildBubbleString(citationItem) {
-		let item = this.citationItemToZoteroItem(citationItem);
-		
-		// Creator
-		var title;
-		var str = item.getField("firstCreator");
-		
-		// Title, if no creator (getDisplayTitle in order to get case, e-mail, statute which don't have a title field)
-		title = item.getDisplayTitle();
-		title = title.substr(0, 32) + (title.length > 32 ? "…" : "");
-		if (!str) {
-			str = Zotero.getString("punctuation.openingQMark") + title + Zotero.getString("punctuation.closingQMark");
-		}
-		
-		// Date
-		var date = item.getField("date", true, true);
-		if (date && (date = date.substr(0, 4)) !== "0000") {
-			str += ", " + parseInt(date);
-		}
-		
-		// Locator
-		if (citationItem.locator) {
-			// Try to fetch the short form of the locator label. E.g. "p." for "page"
-			// If there is no locator label, default to "page" for now
-			let label = (Zotero.Cite.getLocatorString(citationItem.label || 'page', 'short') || '').toLocaleLowerCase();
-			
-			str += `, ${label} ${citationItem.locator}`;
-		}
-		
-		// Prefix
-		if (citationItem.prefix && Zotero.CiteProc.CSL.ENDSWITH_ROMANESQUE_REGEXP) {
-			let prefix = citationItem.prefix.substr(0, 10) + (citationItem.prefix.length > 10 ? "…" : "");
-			str = prefix
-				+ (Zotero.CiteProc.CSL.ENDSWITH_ROMANESQUE_REGEXP.test(citationItem.prefix) ? " " : "")
-				+ str;
-		}
-		
-		// Suffix
-		if (citationItem.suffix && Zotero.CiteProc.CSL.STARTSWITH_ROMANESQUE_REGEXP) {
-			let suffix = citationItem.suffix.substr(0, 10) + (citationItem.suffix.length > 10 ? "…" : "");
-			str += (Zotero.CiteProc.CSL.STARTSWITH_ROMANESQUE_REGEXP.test(citationItem.suffix) ? " " : "") + suffix;
-		}
-		
-		return str;
 	}
 
 	buildItemDescription(item) {
