@@ -16,6 +16,7 @@ bubble-input {
 		// height is limited to 5.5. rows of bubbles
 		max-height: calc(5.5 * (var(--bubble-height) + (2* var(--bubble-vertical-margin)) + 2px));
 		overflow-y: scroll;
+		scrollbar-width: none;
 		// to get proper width by getContentWidth in bubbleInput.js
 		span {
 			white-space: pre;

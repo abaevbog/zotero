@@ -264,6 +264,9 @@ class LibraryLayout extends Layout {
 			fixedWidth: true,
 			showInColumnPicker: false,
 			renderer: (index, data, column) => {
+				let cell = Helpers.createNode("span", {}, `cell ${column.className}`);
+				let iconWrapper = Helpers.createNode("span", {}, `icon-action`);
+				cell.append(iconWrapper);
 				let icon;
 				if (data === true) {
 					icon = getCSSIcon('minus-circle');
@@ -276,8 +279,8 @@ class LibraryLayout extends Layout {
 					// (e.g. when citing notes, parent items are displayed but not included)
 					icon = getCSSIcon("");
 				}
-				icon.className += ` cell icon-action ${column.className}`;
-				return icon;
+				iconWrapper.append(icon);
+				return cell;
 			}
 		});
 		this.itemsView = await ItemTree.init(itemsTree, {
@@ -307,9 +310,13 @@ class LibraryLayout extends Layout {
 			}
 		});
 		// handle icon click to add/remove items
-		itemsTree.addEventListener("mousedown", event => this._handleItemsViewRowClick(event));
+		itemsTree.addEventListener("mousedown", event => this._handleItemsViewRowClick(event), true);
+		itemsTree.addEventListener("mouseup", event => this._handleItemsViewRowClick(event), true);
 		// when focus leaves the itemTree, remove fixed height from bubbleInput
 		itemsTree.addEventListener("focusout", event => this._handleFocusOut(event));
+		// manually handle hover effect on +/- icon, since css :hover applies to the entire row
+		itemsTree.addEventListener("mousemove", event => this._handleItemsViewMouseMove(event));
+		// itemsTree.addEventListener("mouseleave", event => this._handleFocusOut(event));
 		this._refreshItemsViewHighlightedRows();
 	}
 	
@@ -356,21 +363,54 @@ class LibraryLayout extends Layout {
 		this.itemsView.clearItemsPaneMessage();
 	}
 
-	// Handle click on a row in itemTree
+	// Handle mouseup and mousedown events on a row in itemTree to enable clicking on +/- button
+	// On mousedown, add .active effect to the +/- button
+	// On mouseup, add/remove the clicked item from the citation
+	// This specific handling is required, since :active effect fires on the row and not the child button
 	_handleItemsViewRowClick(event) {
-		// fix height on bubble input  to make sure that a change in height
-		// does not shift itemTree rows as one is clicking
-		_id("bubble-input").setHeightLock(true);
 		let row = event.target;
-		let { clientX } = event;
+		let { clientY, clientX } = event;
 		let plusMinusIcon = row.querySelector(".icon-action");
 		if (!plusMinusIcon) return;
 		let iconRect = plusMinusIcon.getBoundingClientRect();
 		// event.target is the actual row, so check if the click happened
 		// within the bounding box of the +/- icon and handle it same as a double click
-		if (clientX > iconRect.left && clientX < iconRect.right) {
-			let selectedItem = this.itemsView.getSelectedItems()[0];
-			IOManager.toggleAddedItem([selectedItem]);
+		let overIcon = clientX > iconRect.left && clientX < iconRect.right
+			&& clientY > iconRect.top && clientY < iconRect.bottom;
+		if (!overIcon) return;
+		if (event.type == "mouseup") {
+			// fix height on bubble input  to make sure that a change in height
+			// does not shift itemTree rows as one is clicking
+			_id("bubble-input").setHeightLock(true);
+			// fetch index from the row's id (e.g. item-tree-citationDialog-row-0)
+			let rowIndex = row.id.split("-")[4];
+			let clickedItem = this.itemsView.getRow(rowIndex).ref;
+			IOManager.toggleAddedItem([clickedItem]);
+			plusMinusIcon.classList.remove("active");
+		}
+		else if (event.type == "mousedown") {
+			plusMinusIcon.classList.add("active");
+		}
+		// stop propagation to not select the row
+		event.stopPropagation();
+	}
+
+	// Add .hover effect to +/- button when the mouse is above it
+	// This  handling is required, since :hover effect fires on the row and not the actual button
+	_handleItemsViewMouseMove(event) {
+		let { clientY, clientX, target } = event;
+		let plusMinusIcon = target.querySelector(".icon-action");
+		if (!target.classList.contains("row") || !plusMinusIcon) {
+			_id('zotero-items-tree').querySelector(".icon-action.hover")?.classList.remove("hover");
+			_id('zotero-items-tree').querySelector(".icon-action.active")?.classList.remove("active");
+			return;
+		}
+		let iconRect = plusMinusIcon.getBoundingClientRect();
+		let overIcon = clientX > iconRect.left && clientX < iconRect.right
+			&& clientY > iconRect.top && clientY < iconRect.bottom;
+		plusMinusIcon.classList.toggle("hover", overIcon);
+		if (!overIcon) {
+			plusMinusIcon.classList.remove("active");
 		}
 	}
 

@@ -53,6 +53,8 @@
 				width: 16px;
 				height: 16px;
 				pointer-events: all;
+				align-self: baseline;
+  				margin-top: 7px;
 			}
 		}
 
@@ -98,20 +100,30 @@
 	#library-layout {
 		#library-other-items {
 
-			margin-left: 36px;
+			margin-left: 26px;
 			border-top: 1px solid var(--fill-quinary);
 			padding-top: 8px;
 			margin-inline-end: 10px;
 			overflow-x: scroll;
 			scrollbar-width: none;
+			flex-shrink: 0; // make sure suggested items do not get shrunk when window is resized
 
 			--item-width: 210px;
 			--item-padding-horizontal: 4px;
-			--item-margin: 10px;
+			--item-margin: 4px;
 			--item-horizontal-size: calc(var(--item-width) + 2*var(--item-padding-horizontal) + 2px);
 
+			// faded edges of the scrollable area
+			mask-image: linear-gradient(to right, transparent 0px, black 20px, black calc(100% - 20px), transparent 100%);
+			// padding to offset the faded edge above, so it's not visible upon initial load
+			padding-left: 10px;
+
 			.section {
-				margin-inline-end: var(--item-margin);
+				margin-inline-end: 16px;
+				// hide vertical divider
+				.divider {
+					display: none;
+				}
 				.header {
 					color: var(--fill-secondary);
 				}
@@ -248,7 +260,7 @@
 			}
 		}
 		#library-trees {
-			min-height: 0;
+			min-height: 200px;
 			flex: 1;
 			-moz-window-dragging: no-drag;
 			-moz-user-select: none;
@@ -265,6 +277,36 @@
 			#item-tree-container {
 				min-height: 100%;
 				flex: 1; /* expand all the way to the right */
+
+				// the actual column with the +/- button
+				.isAddedToCitation {
+					// make sure the button is centered
+					display: flex;
+					justify-content: center;
+					padding: 0;
+
+					// the actual clickable button
+					.icon-action {
+						display: flex;
+						justify-content: center;
+						width: 20px;
+						height: 20px;
+						align-items: center;
+						border-radius: 6px;
+						.icon {
+							width: 16px;
+							height: 16px;
+						}
+						// class to handle hover and active effect, since :hover is applied to the entire row
+						&.hover {
+							background-color: var(--fill-quinary) !important;
+						}
+						&.active {
+							background: var(--fill-quarternary) !important;
+						}
+					}
+
+				}
 			}
 		}
 	}
@@ -276,8 +318,15 @@
 			margin: 0 8px 8px 8px;
 			height: 100%;
 			.section {
-				border-bottom: 1px solid var(--fill-quinary);
-	
+				// show dividers except for on the last section
+				.divider {
+					margin: 4px 16px;
+				}
+				&:last-child {
+					.divider {
+						display: none;
+					}
+				}
 				.header {
 					font-weight: 700;
 					font-size: 13px;
@@ -288,7 +337,6 @@
 				.item {
 					@include focus-ring;
 					padding: 4px 8px;
-					margin-inline-start: 8px;
 
 					border-radius: 5px;
 					color: var(--fill-primary);
@@ -297,17 +345,27 @@
 					&:hover {
 						background-color: var(--fill-quarternary);
 					}
+					&.selected {
+						background: var(--accent-blue30);
+					}
 
 					.icon {
 						margin-top: 1px;
 						margin-inline-end: 4px;
+						flex-shrink: 0;
 					}
-					.description {
-						// Needed to have empty item row description to still occupy height
-						white-space: pre;
-					}
-					&.selected {
-						background: var(--accent-blue30);
+
+					.info {
+						overflow: hidden;
+						.description {
+							// Needed to have empty item row description to still occupy height
+							white-space: pre;
+						}
+						.title {
+							overflow: hidden;
+							text-wrap: nowrap;
+							text-overflow: ellipsis;
+						}
 					}
 				}
 				&.expandable {
@@ -369,10 +427,10 @@
 			align-items: center;
 			#mode-button {
 				&[mode="library"] {
-					@include svgicon("dialog-search-library", "universal", "16");
+					@include svgicon("dialog-search-list", "universal", "16");
 				}
 				&[mode="list"] {
-					@include svgicon("dialog-search-list", "universal", "16");
+					@include svgicon("dialog-search-library", "universal", "16");
 				}
 				margin-inline-end: 8px;
 			}
