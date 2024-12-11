@@ -131,10 +131,11 @@ export class CitationDialogHelpers {
 		let section = this.createNode("div", { id }, "section");
 		let header = this.createNode("div", {}, "header");
 		let headerSpan = this.createNode("span", {}, "header-label");
+		let divider = this.createNode("div", {}, "divider");
 		headerSpan.innerText = headerText;
 		header.append(headerSpan);
 		let itemContainer = this.createNode("div", { role: "group", "aria-label": headerText }, "itemsContainer");
-		section.append(header, itemContainer);
+		section.append(header, itemContainer, divider);
 
 		if (isCollapsible) {
 			section.classList.add("expandable");

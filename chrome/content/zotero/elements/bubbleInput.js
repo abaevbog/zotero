@@ -306,6 +306,8 @@
 			let input = document.createElement('input');
 			// tabindex for keyboard handling
 			input.setAttribute("tabindex", 0);
+			// hide windows appearance from _input.scss
+			input.setAttribute("no-windows-native", true);
 			input.className = "input";
 			input.setAttribute("aria-describedby", "input-description");
 			input.addEventListener("input", (_) => {
