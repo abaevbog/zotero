@@ -1011,8 +1011,9 @@ var CitationDataManager = {
 			targetZoteroItem = this._citationItemToZoteroItem(targetZoteroItem);
 		}
 		for (let item of this.items) {
-			if (item.zoteroItem.getField("firstCreator") === targetZoteroItem.getField("firstCreator")) return true;
-			if (item.zoteroItem.getDisplayTitle() === targetZoteroItem.getDisplayTitle()) return true;
+			let sameCreator = item.zoteroItem.getField("firstCreator") === targetZoteroItem.getField("firstCreator");
+			let sameTitle = item.zoteroItem.getDisplayTitle() === targetZoteroItem.getDisplayTitle();
+			if (sameCreator && sameTitle) return true;
 		}
 		return false;
 	},
