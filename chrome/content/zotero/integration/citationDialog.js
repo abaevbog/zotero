@@ -76,7 +76,15 @@ function accept() {
 	if (accepted || SearchHandler.searching) return;
 	accepted = true;
 	CitationDataManager.updateCitationObject(true);
-	io.accept((percent) => console.log("Percent ", percent));
+	_id("library-layout").hidden = true;
+	_id("list-layout").hidden = true;
+	_id("bubble-input").hidden = true;
+	_id("progress").hidden = false;
+	document.documentElement.style.removeProperty("min-height");
+	window.sizeToContent();
+	io.accept((percent) => {
+		_id("progress").value = Math.round(percent);
+	});
 }
 
 function cancel() {
