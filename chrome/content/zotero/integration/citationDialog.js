@@ -259,9 +259,9 @@ class LibraryLayout extends Layout {
 			doc.documentElement.style.height = `${this.lastHeight}px`;
 			window.sizeToContent();
 		}
-		// Only resize window if it's height would be increased
+		// Only resize window if it's height must be increased
 		// (meaning, if it was stretched to be bigger, do not shrink it)
-		else if (window.outerHeight < doc.documentElement.style.maxHeight) {
+		else if (window.outerHeight < doc.documentElement.style.minHeight) {
 			window.sizeToContent();
 		}
 		// Clear all these styles after resizing is done
