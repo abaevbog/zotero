@@ -612,6 +612,13 @@ var IOManager = {
 			accept();
 			return;
 		}
+		// Warn about retracted items, if any are present
+		for (let item of items) {
+			if (!Zotero.Retractions.shouldShowCitationWarning(item)) continue;
+			let canProceed = PopupsHandler.showRetractedWarning(item);
+			// User did not select "Continue", so just stop
+			if (!canProceed) return;
+		}
 		// If the last input has a locator, add it into the item
 		let input = _id("bubble-input").getCurrentInput();
 		let locator = Helpers.extractLocator(input.value || "");

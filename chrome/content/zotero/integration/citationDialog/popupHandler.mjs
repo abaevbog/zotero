@@ -180,6 +180,37 @@ export class CitationDialogPopupsHandler {
 		}
 	}
 
+	showRetractedWarning(item) {
+		var ps = Services.prompt;
+		var buttonFlags = ps.BUTTON_POS_0 * ps.BUTTON_TITLE_IS_STRING
+			+ ps.BUTTON_POS_1 * ps.BUTTON_TITLE_CANCEL
+			+ ps.BUTTON_POS_2 * ps.BUTTON_TITLE_IS_STRING;
+		var disableWarningCheckbox = { value: false };
+		var result = ps.confirmEx(null,
+			Zotero.getString('general.warning'),
+			Zotero.getString('retraction.citeWarning.text1') + '\n\n'
+				+ Zotero.getString('retraction.citeWarning.text2'),
+			buttonFlags,
+			Zotero.getString('general.continue'),
+			null,
+			Zotero.getString('pane.items.showItemInLibrary'),
+			Zotero.getString('retraction.citationWarning.dontWarn'), disableWarningCheckbox);
+		// Cancel
+		if (result == 1) {
+			return false;
+		}
+		// Show in library
+		if (result == 2) {
+			Zotero.Utilities.Internal.showInLibrary(item.id);
+			return false;
+		}
+		// Checked "Do not warn about this item"
+		if (disableWarningCheckbox.value) {
+			Zotero.Retractions.disableCitationWarningsForItem(item);
+		}
+		return true;
+	}
+
 
 	_getNode(selector) {
 		return this.doc.querySelector(selector);
