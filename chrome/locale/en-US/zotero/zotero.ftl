@@ -382,6 +382,8 @@ integration-citationDialog-aria-bubble = This item is included in the citation. 
 integration-citationDialog-aria-input = Type to search for an item to include in this citation. { integration-citationDialog-general-instructions }
 integration-citationDialog-aria-item = Press { return-or-enter } to add this item to the citation. Press Tab to go back to the search field.
 integration-citationDialog-add-all = Add all
+integration-citationDialog-duplicates-warning-title = Add a potential duplicate item into the citation?
+integration-citationDialog-duplicates-warning-message = This citation already has an item with this title and creator. Add anyway?
 
 styleEditor-locatorType =
     .aria-label = Locator type

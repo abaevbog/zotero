@@ -619,6 +619,13 @@ var IOManager = {
 			// User did not select "Continue", so just stop
 			if (!canProceed) return;
 		}
+		// Warn about potential duplicate items
+		for (let item of items) {
+			if (CitationDataManager.potentialDuplicateExists(item)) {
+				let canProceed = await PopupsHandler.showDuplicateItemWarning();
+				if (!canProceed) return;
+			}
+		}
 		// If the last input has a locator, add it into the item
 		let input = _id("bubble-input").getCurrentInput();
 		let locator = Helpers.extractLocator(input.value || "");
@@ -895,7 +902,7 @@ var CitationDataManager = {
 			let dialogReferenceID = Zotero.Utilities.randomString(5);
 			let toInsert = { citationItem: item, zoteroItem: zoteroItem, dialogReferenceID };
 			// Cannot add the same item multiple times
-			if (this.items.find(existing => this._areItemsTheSame(existing, toInsert))) continue;
+			if (this.items.find(existing => this._itemsHaveSameID(existing, toInsert))) continue;
 			if (index !== null) {
 				this.items.splice(index, 0, toInsert);
 				index += 1;
@@ -991,12 +998,24 @@ var CitationDataManager = {
 	// Check if two given items are the same to prevent an item being inserted more
 	// than once into the citation. Compare firstCreator and title fields, instead of just
 	// itemIDs to account for cited items that may not have ids.
-	_areItemsTheSame(itemOne, itemTwo) {
-		let zoteroItemOne = itemOne.zoteroItem;
-		let zoteroItemTwo = itemTwo.zoteroItem;
-		if (zoteroItemOne.getField("firstCreator") !== zoteroItemTwo.getField("firstCreator")) return false;
-		if (zoteroItemOne.getDisplayTitle() !== zoteroItemTwo.getDisplayTitle()) return false;
-		return true;
+	potentialDuplicateExists(targetZoteroItem) {
+		if (!(targetZoteroItem instanceof Zotero.Item)) {
+			targetZoteroItem = this._citationItemToZoteroItem(targetZoteroItem);
+		}
+		for (let item of this.items) {
+			if (item.zoteroItem.getField("firstCreator") === targetZoteroItem.getField("firstCreator")) return true;
+			if (item.zoteroItem.getDisplayTitle() === targetZoteroItem.getDisplayTitle()) return true;
+		}
+		return false;
+	},
+
+	// check if items have the same id, comparing .cslItemID for cited items or .id for
+	// usual items
+	_itemsHaveSameID(itemOne, itemTwo) {
+		let citationItemOneID = itemOne.citationItem.cslItemID || itemOne.citationItem.id;
+		let citationItemTwoID = itemTwo.citationItem.cslItemID || itemTwo.citationItem.id;
+		if (!citationItemOneID || !citationItemTwoID) return false;
+		return citationItemOneID == citationItemTwoID;
 	},
 
 	// Shortcut to fetch Zotero.Item based on citationItem
