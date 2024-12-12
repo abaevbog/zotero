@@ -179,7 +179,10 @@ class Layout {
 	}
 
 	// implemented by layouts
-	updateWindowMinSize() {}
+	updateWindowMinHeight() {}
+
+	// implemented by layouts
+	resizeWindow() {}
 }
 
 class LibraryLayout extends Layout {
@@ -187,6 +190,7 @@ class LibraryLayout extends Layout {
 		super("library");
 		this._initItemTree();
 		this._initCollectionTree();
+		this.lastHeight = null;
 	}
 
 	// After the search is run, library layout updates the itemsView filter
@@ -223,7 +227,8 @@ class LibraryLayout extends Layout {
 	async refreshItemsList() {
 		await super.refreshItemsList();
 		_id("library-other-items").hidden = !_id("library-layout").querySelector(".section:not([hidden])");
-		window.resizeTo(window.innerWidth, Math.max(window.innerHeight, 400));
+		this.updateWindowMinHeight();
+		this.resizeWindow();
 	}
 
 	// Refresh itemTree to properly display +/- icons column
@@ -235,11 +240,34 @@ class LibraryLayout extends Layout {
 		this.itemsView.tree.invalidate();
 	}
 
-	// Min height of the dialog is bubbleInput + a constant for the library
-	updateWindowMinSize() {
-		const minLibraryHeight = 200;
-		let { height } = _id("bubble-input").getBoundingClientRect();
-		doc.documentElement.style.minHeight = `${minLibraryHeight + height}px`;
+	updateWindowMinHeight() {
+		let bubbleInputMargins = 10;
+		let bubbleInputHeight = _id("bubble-input").getBoundingClientRect().height;
+		let suggestedItemsHeight = _id("library-other-items").getBoundingClientRect().height;
+		let minLibrariesHeight = parseInt(window.getComputedStyle(_id("library-trees")).minHeight) || 200;
+		let bottomHeight = _id("bottom-area-wrapper").getBoundingClientRect().height;
+		let minHeight = bubbleInputMargins + bubbleInputHeight + suggestedItemsHeight + bottomHeight + minLibrariesHeight;
+		doc.documentElement.style.minHeight = `${minHeight}px`;
+	}
+
+	resizeWindow() {
+		// Set document width to avoid window being stretched horizontally
+		doc.documentElement.style.maxWidth = window.innerWidth + "px";
+		doc.documentElement.style.minWidth = window.innerWidth + "px";
+		// If the height for the layout was recorded, apply it
+		if (this.lastHeight) {
+			doc.documentElement.style.height = `${this.lastHeight}px`;
+			window.sizeToContent();
+		}
+		// Only resize window if it's height would be increased
+		// (meaning, if it was stretched to be bigger, do not shrink it)
+		else if (window.outerHeight < doc.documentElement.style.maxHeight) {
+			window.sizeToContent();
+		}
+		// Clear all these styles after resizing is done
+		doc.documentElement.style.removeProperty("max-width");
+		doc.documentElement.style.removeProperty("min-width");
+		doc.documentElement.style.removeProperty("height");
 	}
 
 	async _initItemTree() {
@@ -420,13 +448,16 @@ class LibraryLayout extends Layout {
 		this.itemsView.setHighlightedRows(selectedIDs);
 	}
 
-	// removec fixed height from bubble-input when focus leaves the itemTree
-	_handleFocusOut() {
-		setTimeout(() => {
-			if (!_id("zotero-items-tree").contains(doc.activeElement)) {
-				_id("bubble-input").setHeightLock(false);
-			}
-		});
+	// remove fixed height from bubble-input when focus leaves the itemTree
+	async _handleFocusOut() {
+		await Zotero.Promise.delay();
+		if (!_id("zotero-items-tree").contains(doc.activeElement)) {
+			_id("bubble-input").setHeightLock(false);
+			// wait a moment for bubbles to resize and update window sizing
+			await Zotero.Promise.delay(10);
+			this.updateWindowMinHeight();
+			this.resizeWindow();
+		}
 	}
 }
 
@@ -463,20 +494,33 @@ class ListLayout extends Layout {
 		for (let container of [..._id("list-layout").querySelectorAll(".itemsContainer")]) {
 			container.style.height = `${container.scrollHeight}px`;
 		}
+		this.updateWindowMinHeight();
+		this.resizeWindow();
+	}
+
+
+	resizeWindow() {
 		// Set document width to avoid window being stretched horizontally
 		doc.documentElement.style.maxWidth = window.innerWidth + "px";
 		doc.documentElement.style.minWidth = window.innerWidth + "px";
 		// Set max height so the window does not end up being too tall
-		doc.documentElement.style.maxHeight = Math.max(window.innerHeight, 500) + "px";
+		doc.documentElement.style.maxHeight = `500px`;
+
 		window.sizeToContent();
+
 		// Clear all these styles after resizing is done
-		doc.documentElement.style = "";
-		this.updateWindowMinSize();
+		doc.documentElement.style.removeProperty("max-width");
+		doc.documentElement.style.removeProperty("min-width");
+		doc.documentElement.style.removeProperty("max-height");
 	}
 
 	// window min height is the height of bubble-input
-	updateWindowMinSize() {
-		let { height } = _id("bubble-input").getBoundingClientRect();
+	updateWindowMinHeight() {
+		let minSectionHeight = _id("list-layout").hidden ? 0 : 80;
+		let bubbleInputHeight = _id("bubble-input").getBoundingClientRect().height;
+		let bubbleInputMargins = 10;
+		let bottomHeight = _id("bottom-area-wrapper").getBoundingClientRect().height;
+		let height = bubbleInputHeight + bubbleInputMargins + bottomHeight + minSectionHeight;
 		doc.documentElement.style.minHeight = `${height}px`;
 	}
 }
@@ -534,6 +578,10 @@ var IOManager = {
 		_id("library-layout").hidden = newMode == "list";
 
 		_id("mode-button").setAttribute("mode", newMode);
+		// save the library layout's height to restore it if we switch back
+		if (currentLayout?.type == "library") {
+			currentLayout.lastHeight = window.innerHeight;
+		}
 
 		currentLayout = newMode === "library" ? libraryLayout : listLayout;
 		// do not show View menubar with itemTree-specific options in list mode
@@ -549,7 +597,6 @@ var IOManager = {
 	// pass current items in the citation to bubble-input to have it update the bubbles
 	updateBubbleInput() {
 		_id("bubble-input").refresh(CitationDataManager.items);
-		currentLayout.updateWindowMinSize();
 	},
 
 	async addItemsToCitation(items, { noInputRefocus } = {}) {
@@ -961,4 +1008,3 @@ var CitationDataManager = {
 
 // Top level listeners
 window.addEventListener("load", onLoad);
-window.addEventListener("resize", () => currentLayout.updateWindowMinSize());
