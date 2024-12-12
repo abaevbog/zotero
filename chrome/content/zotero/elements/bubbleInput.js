@@ -107,7 +107,7 @@
 				let bubbleDialogReferenceID = bubble.getAttribute("dialogReferenceID");
 				let itemObj = combinedItems.find(({ dialogReferenceID }) => dialogReferenceID == bubbleDialogReferenceID);
 				if (itemObj) {
-					bubble.classList.toggle("selected", itemObj.selected);
+					bubble.classList.toggle("selected", !!itemObj.selected);
 				}
 			}
 			// Make sure that all inputs occupy the right width
