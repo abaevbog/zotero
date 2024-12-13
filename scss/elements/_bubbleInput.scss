@@ -90,7 +90,7 @@ bubble-input {
 			right: calc(-2 * var(--bubble-horizontal-margin));
 		}
 		
-		&.selected {
+		&.library-selected {
 			background-color: var(--accent-blue10);
 		}
 
