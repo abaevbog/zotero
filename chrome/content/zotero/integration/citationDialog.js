@@ -242,10 +242,17 @@ class LibraryLayout extends Layout {
 	// Refresh itemTree to properly display +/- icons column
 	async refreshItemsView() {
 		this._refreshItemsViewHighlightedRows();
+		// Save selected items, clear selection to not scroll after refresh
+		let selectedItemIDs = this.itemsView.getSelectedItems(true);
+		this.itemsView.selection.clearSelection();
 		// Refresh to reset row cache to get latest data of which items are included
 		await this.itemsView.refresh();
 		// Redraw the itemTree
 		this.itemsView.tree.invalidate();
+		// Restore selection without scrolling
+		this.itemsView.selection.selectEventsSuppressed = true;
+		await this.itemsView.selectItems(selectedItemIDs, true, true);
+		this.itemsView.selection.selectEventsSuppressed = false;
 	}
 
 	updateWindowMinHeight() {
