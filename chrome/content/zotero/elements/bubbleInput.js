@@ -292,6 +292,14 @@
 				input.value += event.key;
 				input.dispatchEvent(new Event('input', { bubbles: true }));
 			}
+			// Home - focus the first input
+			if (event.key == "Home") {
+				this._body.firstChild.focus();
+			}
+			// End - focus the last input
+			if (event.key == "End") {
+				this._body.lastChild.focus();
+			}
 		}
 		
 		// Citation dialog will record that the item is removed and the bubble will be gone after refresh()
@@ -356,6 +364,14 @@
 				if (input.previousElementSibling) {
 					this._deleteBubble(input.previousElementSibling);
 				}
+			}
+			// Home from the beginning of an input - focus the first input
+			if (event.key == "Home" && Utils.isCursorAtInputStart(input)) {
+				this._body.firstChild.focus();
+			}
+			// End from the end of an input - focus the last input
+			if (event.key == "End" && Utils.isCursorAtInputEnd(input)) {
+				this._body.lastChild.focus();
 			}
 		}
 	}
@@ -448,6 +464,14 @@
 				return true;
 			}
 			return input.value.length == 0;
+		},
+
+		isCursorAtInputStart(input) {
+			return Zotero.rtl ? input.selectionStart == input.value.length : input.selectionStart == 0;
+		},
+	
+		isCursorAtInputEnd(input) {
+			return Zotero.rtl ? input.selectionStart == 0 : input.selectionStart == input.value.length;
 		},
 
 		findNextClass(className, startNode, isForward) {
