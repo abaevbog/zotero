@@ -568,8 +568,11 @@
 			// Title, if no creator (getDisplayTitle in order to get case, e-mail, statute which don't have a title field)
 			title = zoteroItem.getDisplayTitle();
 			title = title.substr(0, 32) + (title.length > 32 ? "…" : "");
-			if (!str) {
+			if (!str && title) {
 				str = Zotero.getString("punctuation.openingQMark") + title + Zotero.getString("punctuation.closingQMark");
+			}
+			else if (!str) {
+				str = Zotero.getString("integration-citationDialog-bubble-empty");
 			}
 			
 			// Date
