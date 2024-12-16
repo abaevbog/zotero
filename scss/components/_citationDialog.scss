@@ -268,9 +268,9 @@
 				min-width: 200px;
 				min-height: 100%;
 				border-inline-end: var(--material-panedivider);
-				padding-top: 8px;
 				& > #zotero-collections-tree {
 					background: var(--material-sidepane) !important;
+					padding-top: 8px;
 				}
 			}
 		
