@@ -561,8 +561,6 @@ var IOManager = {
 		doc.addEventListener("add-all-items", ({ detail: { items } }) => this.addItemsToCitation(items));
 		// expand/collapse item sections
 		doc.addEventListener("toggle-expand-section", ({ detail: { section } }) => this.toggleSectionCollapse(section));
-		// handle "Show in library" btn click
-		doc.addEventListener("show-in-library", ({ detail: { itemID } }) => this._showInLibrary(itemID));
 		
 		// accept/cancel events emitted by keyboardHandler
 		doc.addEventListener("dialog-accepted", accept);
@@ -792,17 +790,6 @@ var IOManager = {
 				item.setAttribute("tabindex", -1);
 			}
 		}
-	},
-	
-	async _showInLibrary(itemID) {
-		await Zotero.Promise.delay();
-		if (currentLayout.type == "list") {
-			this.toggleDialogMode();
-		}
-		let item = await Zotero.Items.getAsync(itemID);
-		await libraryLayout.collectionsView.selectLibrary(item.libraryID);
-		await libraryLayout.itemsView.selectItem(item.id);
-		libraryLayout.itemsView.focus();
 	},
 
 	// Handle Enter keypress on an input. If a locator has been typed, add it to previous bubble.

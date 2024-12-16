@@ -78,13 +78,7 @@ export class CitationDialogPopupsHandler {
 			this.discardItemDetailsEdits = true;
 			this.focusBubbleInputOnClose = false;
 			this._getNode("#itemDetails").hidePopup();
-			let event = new CustomEvent("show-in-library", {
-				bubbles: true,
-				detail: {
-					itemID: this.item.id
-				}
-			});
-			this.doc.dispatchEvent(event);
+			Zotero.Utilities.Internal.showInLibrary(this.item.id);
 		});
 		this._getNode("#itemDetails .done").addEventListener("click", (_) => {
 			this._getNode("#itemDetails").hidePopup();
