@@ -81,7 +81,7 @@ function accept() {
 	_id("bubble-input").hidden = true;
 	_id("progress").hidden = false;
 	document.documentElement.style.removeProperty("min-height");
-	window.sizeToContent();
+	currentLayout.resizeWindow();
 	io.accept((percent) => {
 		_id("progress").value = Math.round(percent);
 	});
@@ -187,9 +187,6 @@ class Layout {
 	}
 
 	// implemented by layouts
-	updateWindowMinHeight() {}
-
-	// implemented by layouts
 	resizeWindow() {}
 }
 
@@ -235,7 +232,6 @@ class LibraryLayout extends Layout {
 	async refreshItemsList() {
 		await super.refreshItemsList();
 		_id("library-other-items").hidden = !_id("library-layout").querySelector(".section:not([hidden])");
-		this.updateWindowMinHeight();
 		this.resizeWindow();
 	}
 
@@ -266,23 +262,27 @@ class LibraryLayout extends Layout {
 	}
 
 	resizeWindow() {
-		// Set document width to avoid window being stretched horizontally
-		doc.documentElement.style.maxWidth = window.innerWidth + "px";
-		doc.documentElement.style.minWidth = window.innerWidth + "px";
-		// If the height for the layout was recorded, apply it
+		let bubbleInputStyle = getComputedStyle(_id("search-row"));
+		let bubbleInputMargins = parseInt(bubbleInputStyle.marginTop) + parseInt(bubbleInputStyle.marginBottom);
+		let bubbleInputHeight = _id("search-row").getBoundingClientRect().height + bubbleInputMargins;
+
+		let suggestedItemsHeight = _id("library-other-items").getBoundingClientRect().height;
+
+		let minTableHeight = 200;
+
+		let bottomHeight = _id("bottom-area-wrapper").getBoundingClientRect().height;
+		
+		let minHeight = bubbleInputHeight + suggestedItemsHeight + bottomHeight + minTableHeight;
+		// set min-height to make sure suggested items and at least 200px of itemsView is always visible
+		doc.documentElement.style.minHeight = `${minHeight}px`;
+
+		// if there is lastHeight recorded, resize to that
 		if (this.lastHeight) {
-			doc.documentElement.style.height = `${this.lastHeight}px`;
-			window.sizeToContent();
+			// timeout is likely required to let updated minHeight to settle
+			setTimeout(() => {
+				window.resizeTo(window.innerWidth, this.lastHeight);
+			});
 		}
-		// Only resize window if it's height must be increased
-		// (meaning, if it was stretched to be bigger, do not shrink it)
-		else if (window.outerHeight < doc.documentElement.style.minHeight) {
-			window.sizeToContent();
-		}
-		// Clear all these styles after resizing is done
-		doc.documentElement.style.removeProperty("max-width");
-		doc.documentElement.style.removeProperty("min-width");
-		doc.documentElement.style.removeProperty("height");
 	}
 
 	async _initItemTree() {
@@ -470,7 +470,6 @@ class LibraryLayout extends Layout {
 			_id("bubble-input").setHeightLock(false);
 			// wait a moment for bubbles to resize and update window sizing
 			await Zotero.Promise.delay(10);
-			this.updateWindowMinHeight();
 			this.resizeWindow();
 		}
 	}
@@ -509,34 +508,40 @@ class ListLayout extends Layout {
 		for (let container of [..._id("list-layout").querySelectorAll(".itemsContainer")]) {
 			container.style.height = `${container.scrollHeight}px`;
 		}
-		this.updateWindowMinHeight();
 		this.resizeWindow();
 	}
 
 
 	resizeWindow() {
-		// Set document width to avoid window being stretched horizontally
-		doc.documentElement.style.maxWidth = window.innerWidth + "px";
-		doc.documentElement.style.minWidth = window.innerWidth + "px";
-		// Set max height so the window does not end up being too tall
-		doc.documentElement.style.maxHeight = `500px`;
+		// height of bubble-input
+		let bubbleInputStyle = getComputedStyle(_id("search-row"));
+		let bubbleInputMargins = parseInt(bubbleInputStyle.marginTop) + parseInt(bubbleInputStyle.marginBottom);
+		let bubbleInputHeight = _id("search-row").getBoundingClientRect().height + bubbleInputMargins;
 
-		window.sizeToContent();
+		// height of all sections
+		let sectionsHeight = 0;
+		for (let section of [..._id("list-layout").querySelectorAll(".section:not([hidden])")]) {
+			sectionsHeight += section.getBoundingClientRect().height;
+		}
+		// cap at 400px
+		sectionsHeight = Math.min(sectionsHeight, 400);
 
-		// Clear all these styles after resizing is done
-		doc.documentElement.style.removeProperty("max-width");
-		doc.documentElement.style.removeProperty("min-width");
-		doc.documentElement.style.removeProperty("max-height");
-	}
+		// account for margins of the items list
+		let sectionsWrapperStyle = getComputedStyle(_id("list-layout-wrapper"));
+		let sectionsWrapperMargins = parseInt(sectionsWrapperStyle.marginTop) + parseInt(sectionsWrapperStyle.marginBottom);
 
-	// window min height is the height of bubble-input
-	updateWindowMinHeight() {
-		let minSectionHeight = _id("list-layout").hidden ? 0 : 80;
-		let bubbleInputHeight = _id("bubble-input").getBoundingClientRect().height;
-		let bubbleInputMargins = 10;
+		// height of the bottom section
 		let bottomHeight = _id("bottom-area-wrapper").getBoundingClientRect().height;
-		let height = bubbleInputHeight + bubbleInputMargins + bottomHeight + minSectionHeight;
-		doc.documentElement.style.minHeight = `${height}px`;
+		
+		// set min height and resize the window
+		let autoHeight = bubbleInputHeight + sectionsHeight + sectionsWrapperMargins + bottomHeight;
+		let minHeight = bubbleInputHeight + bottomHeight + (_id("list-layout").hidden ? 0 : 80);
+		doc.documentElement.style.minHeight = `${minHeight}px`;
+		
+		// Timeout is required likely to allow minHeight update to settle
+		setTimeout(() => {
+			window.resizeTo(window.innerWidth, parseInt(autoHeight));
+		});
 	}
 }
 
