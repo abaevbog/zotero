@@ -666,28 +666,20 @@ var IOManager = {
 		}
 	},
 
-	// Every item in the given array is added to the citation if it is not included
-	// and removed if it is.
+	// Add all given items into the citation. If all items are already in the citation, remove them.
 	toggleAddedItem(items) {
-		let needBubbleInputRefresh = true;
-		let itemsToAdd = [];
-		for (let item of items) {
-			let inCitation = CitationDataManager.getItem({ zoteroItemID: item.id });
-			if (inCitation) {
+		let notAllItemsInCitation = items.find(item => !CitationDataManager.getItem({ zoteroItemID: item.id }));
+		if (notAllItemsInCitation) {
+			IOManager.addItemsToCitation(items, { noInputRefocus: true });
+		}
+		else {
+			for (let item of items) {
 				CitationDataManager.deleteItem({ zoteroItemID: item.id });
-				needBubbleInputRefresh = true;
 			}
-			else {
-				itemsToAdd.push(item);
-			}
-		}
-		if (itemsToAdd.length) {
-			IOManager.addItemsToCitation(itemsToAdd, { noInputRefocus: true });
-			needBubbleInputRefresh = false;
-		}
-		if (needBubbleInputRefresh) {
 			IOManager.updateBubbleInput();
-			currentLayout.refreshItemsView();
+			if (currentLayout.type == "library") {
+				currentLayout.refreshItemsView();
+			}
 		}
 	},
 
@@ -741,7 +733,7 @@ var IOManager = {
 		let itemsToAdd = [];
 		// collect all items in an array and add them
 		for (let itemID of Array.from(itemIDs)) {
-			if (itemID.includes("cited:")) {
+			if (itemID.includes("cited:") || itemID.includes("/")) {
 				let item = SearchHandler.getItem({ cslItemID: itemID });
 				itemsToAdd.push(item);
 			}
@@ -904,7 +896,7 @@ var CitationDataManager = {
 			let dialogReferenceID = Zotero.Utilities.randomString(5);
 			let toInsert = { citationItem: item, zoteroItem: zoteroItem, dialogReferenceID };
 			// Cannot add the same item multiple times
-			if (this.items.find(existing => this._itemsHaveSameID(existing, toInsert))) continue;
+			if (this.items.find(existing => this._itemsHaveSameID(existing.citationItem, toInsert.citationItem))) continue;
 			if (index !== null) {
 				this.items.splice(index, 0, toInsert);
 				index += 1;
@@ -1005,6 +997,8 @@ var CitationDataManager = {
 			targetZoteroItem = this._citationItemToZoteroItem(targetZoteroItem);
 		}
 		for (let item of this.items) {
+			// Make sure we don't count the same item as a duplicate of itself
+			if (this._itemsHaveSameID(item.citationItem, targetZoteroItem)) continue;
 			let sameCreator = item.zoteroItem.getField("firstCreator") === targetZoteroItem.getField("firstCreator");
 			let sameTitle = item.zoteroItem.getDisplayTitle() === targetZoteroItem.getDisplayTitle();
 			if (sameCreator && sameTitle) return true;
@@ -1015,10 +1009,10 @@ var CitationDataManager = {
 	// check if items have the same id, comparing .cslItemID for cited items or .id for
 	// usual items
 	_itemsHaveSameID(itemOne, itemTwo) {
-		let citationItemOneID = itemOne.citationItem.cslItemID || itemOne.citationItem.id;
-		let citationItemTwoID = itemTwo.citationItem.cslItemID || itemTwo.citationItem.id;
-		if (!citationItemOneID || !citationItemTwoID) return false;
-		return citationItemOneID == citationItemTwoID;
+		let itemOneID = itemOne.cslItemID || itemOne.id;
+		let itemTwoID = itemTwo.cslItemID || itemTwo.id;
+		if (!itemOneID || !itemTwoID) return false;
+		return itemOneID == itemTwoID;
 	},
 
 	// Shortcut to fetch Zotero.Item based on citationItem
