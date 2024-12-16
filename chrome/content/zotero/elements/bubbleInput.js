@@ -502,13 +502,14 @@
 		getLastBubbleBeforePoint(x, y) {
 			let bubbles = this.bubbleInput.querySelectorAll('.bubble');
 			let lastBubble = null;
+			let verticalBubbleMargin = parseInt(getComputedStyle(this.bubbleInput).getPropertyValue("--bubble-vertical-margin")) || 0;
 			let isClickAfterBubble = (clickX, bubbleRect) => {
 				return Zotero.rtl ? clickX < bubbleRect.right : clickX > bubbleRect.left;
 			};
 			for (let i = 0; i < bubbles.length; i++) {
 				let rect = bubbles[i].getBoundingClientRect();
 				// If within the vertical range of a bubble
-				if (y >= rect.top && y <= rect.bottom) {
+				if (y >= (rect.top - verticalBubbleMargin) && y <= (rect.bottom + verticalBubbleMargin)) {
 					// If the click is to the right of a bubble, it becomes a candidate
 					if (isClickAfterBubble(x, rect)) {
 						lastBubble = i;
