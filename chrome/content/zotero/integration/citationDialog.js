@@ -399,6 +399,8 @@ class LibraryLayout extends Layout {
 	// On mouseup, add/remove the clicked item from the citation
 	// This specific handling is required, since :active effect fires on the row and not the child button
 	_handleItemsViewRowClick(event) {
+		// only trigger on left mouse click
+		if (event.button !== 0) return;
 		let row = event.target;
 		let { clientY, clientX } = event;
 		let plusMinusIcon = row.querySelector(".icon-action");
