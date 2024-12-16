@@ -100,12 +100,11 @@
 	#library-layout {
 		#library-other-items {
 
-			margin-left: 26px;
+			margin-left: 16px;
 			border-top: 1px solid var(--fill-quinary);
 			padding-top: 8px;
 			margin-inline-end: 10px;
 			overflow-x: scroll;
-			scrollbar-width: none;
 			flex-shrink: 0; // make sure suggested items do not get shrunk when window is resized
 
 			--item-width: 210px;
@@ -116,7 +115,7 @@
 			// faded edges of the scrollable area
 			mask-image: linear-gradient(to right, transparent 0px, black 20px, black calc(100% - 20px), transparent 100%);
 			// padding to offset the faded edge above, so it's not visible upon initial load
-			padding-left: 10px;
+			padding-left: 20px;
 
 			.section {
 				margin-inline-end: 16px;
@@ -269,6 +268,7 @@
 				min-width: 200px;
 				min-height: 100%;
 				border-inline-end: var(--material-panedivider);
+				padding-top: 8px;
 				& > #zotero-collections-tree {
 					background: var(--material-sidepane) !important;
 				}
