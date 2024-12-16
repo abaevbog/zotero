@@ -1031,3 +1031,5 @@ var CitationDataManager = {
 
 // Top level listeners
 window.addEventListener("load", onLoad);
+// When the dialog is re-focused, run the search again in case selected or opened items changed
+window.addEventListener("focus", () => currentLayout.search(SearchHandler.lastSearchValue));

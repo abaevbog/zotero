@@ -126,8 +126,6 @@ export class CitationDialogSearchHandler {
 		if (str.trim().length < MIN_QUERY_LENGTH) {
 			str = "";
 		}
-		// Do not run the search if the query has not changed
-		if (str === this.lastSearchValue) return;
 
 		var s = new Zotero.Search();
 		Zotero.Feeds.getAll().forEach(feed => s.addCondition("libraryID", "isNot", feed.libraryID));
