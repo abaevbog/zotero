@@ -109,7 +109,6 @@ class Layout {
 
 	// Re-render the items based on search rersults
 	async refreshItemsList() {
-		let canAddNodes = ITEM_LIST_MAX_ITEMS;
 		let sections = [];
 		let firstItem = true;
 
@@ -118,7 +117,6 @@ class Layout {
 		// Tell SearchHandler which currently cited items are so they are not included in results
 		let citedItems = CitationDataManager.getCitationItems();
 		for (let { key, group, isLibrary } of SearchHandler.getOrderedSearchResultGroups(citedItems)) {
-			if (canAddNodes <= 0) break;
 			if (isLibrary && this.type == "library") break;
 			let isGroupCollapsible = key == "selected" && group.length > 1;
 			
@@ -136,18 +134,18 @@ class Layout {
 			let items = [];
 			let index = 0;
 			for (let item of group) {
+				// do not add an unreasonable number of nodes into the DOM
+				if (index >= ITEM_LIST_MAX_ITEMS) break;
 				// createItemNode implemented by layouts
 				let itemNode = await this.createItemNode(item, isGroupCollapsible ? index : null);
 				itemNode.addEventListener("click", IOManager.handleItemClick);
 				items.push(itemNode);
-				canAddNodes -= 1;
 
 				// Pre-select the item to be added on Enter of an input
 				if (firstItem) {
 					IOManager.markPreSelectedItem(itemNode, item);
 					firstItem = false;
 				}
-				if (canAddNodes <= 0) break;
 				index++;
 			}
 			itemContainer.replaceChildren(...items);
@@ -249,16 +247,6 @@ class LibraryLayout extends Layout {
 		this.itemsView.selection.selectEventsSuppressed = true;
 		await this.itemsView.selectItems(selectedItemIDs, true, true);
 		this.itemsView.selection.selectEventsSuppressed = false;
-	}
-
-	updateWindowMinHeight() {
-		let bubbleInputMargins = 10;
-		let bubbleInputHeight = _id("bubble-input").getBoundingClientRect().height;
-		let suggestedItemsHeight = _id("library-other-items").getBoundingClientRect().height;
-		let minLibrariesHeight = parseInt(window.getComputedStyle(_id("library-trees")).minHeight) || 200;
-		let bottomHeight = _id("bottom-area-wrapper").getBoundingClientRect().height;
-		let minHeight = bubbleInputMargins + bubbleInputHeight + suggestedItemsHeight + bottomHeight + minLibrariesHeight;
-		doc.documentElement.style.minHeight = `${minHeight}px`;
 	}
 
 	resizeWindow() {
