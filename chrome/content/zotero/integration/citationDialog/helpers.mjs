@@ -127,7 +127,7 @@ export class CitationDialogHelpers {
 		return descriptionWrapper;
 	}
 
-	buildItemsSection(id, headerText, isCollapsible, items) {
+	buildItemsSection(id, headerText, isCollapsible, deckLength, isFocusableContainer) {
 		let section = this.createNode("div", { id }, "section");
 		let header = this.createNode("div", {}, "header");
 		let headerSpan = this.createNode("span", {}, "header-label");
@@ -139,27 +139,18 @@ export class CitationDialogHelpers {
 
 		if (isCollapsible) {
 			section.classList.add("expandable");
-			section.style.setProperty('--deck-length', items.length);
+			section.style.setProperty('--deck-length', deckLength);
 			let addAllBtn = this.createNode("span", { tabindex: -1, 'data-tabindex': 32 }, "add-all");
-			addAllBtn.addEventListener("click", () => {
-				let event = new CustomEvent("add-all-items", {
-					bubbles: true,
-					detail: { items }
-				});
-				this.doc.dispatchEvent(event);
-			});
 			this.doc.l10n.setAttributes(addAllBtn, "integration-citationDialog-add-all");
 			header.append(addAllBtn);
 			
 			headerSpan.setAttribute("tabindex", -1);
 			headerSpan.setAttribute("data-tabindex", 31);
-			headerSpan.addEventListener("click", () => {
-				let event = new CustomEvent("toggle-expand-section", {
-					bubbles: true,
-					detail: { section }
-				});
-				this.doc.dispatchEvent(event);
-			});
+			if (isFocusableContainer) {
+				itemContainer.setAttribute("tabindex", -1);
+				// same data-tabidnex as on items node for horizontal arrow nav
+				itemContainer.setAttribute("data-tabindex", 40);
+			}
 		}
 		return section;
 	}

@@ -128,7 +128,7 @@ class Layout {
 			else {
 				sectionHeader = await doc.l10n.formatValue(`integration-citationDialog-section-${key}`, { count: group.length });
 			}
-			let section = Helpers.buildItemsSection(`${this.type}-${key}-items`, sectionHeader, isGroupCollapsible, group);
+			let section = Helpers.buildItemsSection(`${this.type}-${key}-items`, sectionHeader, isGroupCollapsible, group.length, this.type == "library");
 			let itemContainer = section.querySelector(".itemsContainer");
 	
 			let items = [];
@@ -151,6 +151,12 @@ class Layout {
 			itemContainer.replaceChildren(...items);
 			sections.push(section);
 			if (isGroupCollapsible) {
+				// handle click on a collapsed container to expand it and maybe focus the first item
+				itemContainer.addEventListener("click", IOManager.captureItemsContainerClick, true);
+				// just collapse/expand items when section header is clicked
+				section.querySelector(".header-label").addEventListener("click", () => IOManager.toggleSectionCollapse(section));
+				// handle click on "Add all"
+				section.querySelector(".add-all").addEventListener("click", () => IOManager.addItemsToCitation(group));
 				// Keep expanded/collapsed status of the group
 				let currentSection = _id(section.id);
 				if (currentSection) {
@@ -547,7 +553,7 @@ class ListLayout extends Layout {
 //
 // Handling of user IO
 //
-var IOManager = {
+const IOManager = {
 	preSelectedItem: null,
 
 	init() {
@@ -561,10 +567,6 @@ var IOManager = {
 		doc.addEventListener("move-item", ({ detail: { dialogReferenceID, index } }) => this._moveItem(dialogReferenceID, index));
 		// display details popup for the bubble
 		doc.addEventListener("show-details-popup", ({ detail: { dialogReferenceID } }) => this._openItemDetailsPopup(dialogReferenceID));
-		// handle click on "Add all" button above collapsible sections
-		doc.addEventListener("add-all-items", ({ detail: { items } }) => this.addItemsToCitation(items));
-		// expand/collapse item sections
-		doc.addEventListener("toggle-expand-section", ({ detail: { section } }) => this.toggleSectionCollapse(section));
 		
 		// accept/cancel events emitted by keyboardHandler
 		doc.addEventListener("dialog-accepted", accept);
@@ -702,12 +704,6 @@ var IOManager = {
 
 	handleItemClick(event) {
 		let targetItem = event.target.closest(".item");
-		// on click of a collapsed deck in library mode, just expand the deck
-		let section = targetItem.closest(".section");
-		if (section.classList.contains("expandable") && !section.classList.contains("expanded")) {
-			IOManager.toggleSectionCollapse(section);
-			return;
-		}
 		let isMultiselectable = !!targetItem.closest("[data-multiselectable]");
 		// Cmd/Ctrl + mouseclick toggles selected item node
 		if (isMultiselectable && (Zotero.isMac && event.metaKey) || (!Zotero.isMac && event.ctrlKey)) {
@@ -749,6 +745,16 @@ var IOManager = {
 		IOManager.addItemsToCitation(itemsToAdd);
 	},
 
+	captureItemsContainerClick(event) {
+		let section = event.target.closest(".section");
+		if (section.classList.contains("expanded")) return;
+		event.stopPropagation();
+		IOManager.toggleSectionCollapse(section);
+		setTimeout(() => {
+			section.querySelector(".item").focus();
+		});
+	},
+
 	// record which items in the library itemTree are currently selected to highlight them
 	updateSelectedItems() {
 		let selectedItemIDs = new Set(libraryLayout.itemsView.getSelectedItems().map(item => item.id));
@@ -779,11 +785,18 @@ var IOManager = {
 			for (let item of [...section.querySelectorAll(".item")]) {
 				item.removeAttribute("tabindex");
 			}
+			// in library, the items deck itself becomes focusable
+			if (currentLayout.type == "library") {
+				section.querySelector(".itemsContainer").setAttribute("tabindex", -1);
+			}
 		}
 		// when expanded, make them focusable again
 		else {
 			for (let item of [...section.querySelectorAll(".item")]) {
 				item.setAttribute("tabindex", -1);
+			}
+			if (currentLayout.type == "library") {
+				section.querySelector(".itemsContainer").removeAttribute("tabindex");
 			}
 		}
 	},
@@ -861,7 +874,7 @@ var IOManager = {
 // They are stored as a pair to make it easier to access both item properties (e.g. item.getDisplayTitle())
 // and properties of citation item (e.g. locator) across different components.
 //
-var CitationDataManager = {
+const CitationDataManager = {
 	items: [],
 	itemAddedCache: new Set(),
 

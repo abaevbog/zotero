@@ -82,7 +82,7 @@ export class CitationDialogKeyboardHandler {
 		}
 		else if (event.key == "ArrowDown" && this._id("bubble-input").contains(event.target) && noModifiers) {
 			// arrowDown from bubbleInput moves focus to the first item
-			this.doc.querySelector(".item")?.focus();
+			this.doc.querySelector(".itemsContainer[tabindex],.item[tabindex]")?.focus();
 			handled = true;
 		}
 		else if (event.key == "ArrowUp" && this.shouldRefocusBubbleInputOnArrowUp() && noModifiers) {
