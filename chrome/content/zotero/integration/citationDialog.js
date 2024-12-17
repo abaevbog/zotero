@@ -151,7 +151,16 @@ class Layout {
 			itemContainer.replaceChildren(...items);
 			sections.push(section);
 			if (isGroupCollapsible) {
-				IOManager.toggleSectionCollapse(section, this.type == "list" ? "expanded" : "collapsed");
+				// Keep expanded/collapsed status of the group
+				let currentSection = _id(section.id);
+				if (currentSection) {
+					let isNowExpanded = _id(section.id)?.classList.contains("expanded");
+					IOManager.toggleSectionCollapse(section, isNowExpanded ? "expanded" : "collapsed");
+				}
+				// Default to expanded for list and collapsed for library
+				else {
+					IOManager.toggleSectionCollapse(section, this.type == "list" ? "expanded" : "collapsed");
+				}
 			}
 		}
 		_id(`${this.type}-layout`).querySelector(".search-items").replaceChildren(...sections);
