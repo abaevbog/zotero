@@ -151,21 +151,8 @@ export class CitationDialogSearchHandler {
 		if (this.lastSearchValue.toLowerCase() === Zotero.getString("integration.ibid").toLowerCase()) {
 			return citedItems;
 		}
-		var splits = Zotero.Fulltext.semanticSplitter(this.lastSearchValue);
-		let result = new Set();
-		
-		for (let item of citedItems) {
-			let itemStr = item.getCreators()
-				.map(creator => creator.firstName + " " + creator.lastName)
-				.concat([item.getField("title"), item.getField("date", true, true).substr(0, 4)])
-				.join(" ");
-			
-			// See if words match
-			for (let word of splits) {
-				if (itemStr.toLowerCase().includes(word)) result.add(item);
-			}
-		}
-		return Array.from(result);
+		if (!this.lastSearchValue) return [];
+		return this._filterNonMatchingItems(citedItems);
 	}
 
 	async _getMatchingReaderOpenItems() {
@@ -191,32 +178,16 @@ export class CitationDialogSearchHandler {
 			}
 			return Zotero.Cite.getItem(itemID);
 		});
-		let matchedItems = new Set(items);
-		if (this.lastSearchValue) {
-			Zotero.debug("QuickFormat: Searching open tabs");
-			matchedItems = new Set();
-			let splits = Zotero.Fulltext.semanticSplitter(this.lastSearchValue);
-			for (let item of items) {
-				// Generate a string to search for each item
-				let itemStr = item.getCreators()
-					.map(creator => creator.firstName + " " + creator.lastName)
-					.concat([item.getField("title"), item.getField("date", true, true).substr(0, 4)])
-					.join(" ");
-				
-				// See if words match
-				for (let split of splits) {
-					if (itemStr.toLowerCase().includes(split)) matchedItems.add(item);
-				}
-			}
-			Zotero.debug("QuickFormat: Found matching open tabs");
-		}
-		return Array.from(matchedItems);
+		if (!this.lastSearchValue) return items;
+		return this._filterNonMatchingItems(items);
 	}
 
 	_getSelectedLibraryItems() {
 		let win = Zotero.getMainWindow();
 		if (win.Zotero_Tabs.selectedType !== "library") return [];
-		return Zotero.getActiveZoteroPane().getSelectedItems().filter(i => i.isRegularItem());
+		let selectedItems = Zotero.getActiveZoteroPane().getSelectedItems().filter(i => i.isRegularItem());
+		if (!this.lastSearchValue) return selectedItems;
+		return this._filterNonMatchingItems(selectedItems);
 	}
 	
 	async _getMatchingLibraryItems(skipSelected = true) {
@@ -263,6 +234,24 @@ export class CitationDialogSearchHandler {
 			items = items.filter(item => !selectedIDs.includes(item.id));
 		}
 		return items;
+	}
+
+	_filterNonMatchingItems(items) {
+		let matchedItems = new Set();
+		let splits = Zotero.Fulltext.semanticSplitter(this.lastSearchValue);
+		for (let item of items) {
+			// Generate a string to search for each item
+			let itemStr = item.getCreators()
+				.map(creator => creator.firstName + " " + creator.lastName)
+				.concat([item.getField("title"), item.getField("date", true, true).substr(0, 4)])
+				.join(" ");
+			
+			// See if words match
+			for (let split of splits) {
+				if (itemStr.toLowerCase().includes(split)) matchedItems.add(item);
+			}
+		}
+		return Array.from(matchedItems);
 	}
 
 	// Generate sort function for items
