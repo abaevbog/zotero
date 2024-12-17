@@ -51,8 +51,8 @@ function onLoad() {
 
 	_id("keepSorted").disabled = !io.sortable;
 	_id("keepSorted").checked = io.sortable && !io.citation.properties.unsorted;
-	let enabledSettings = !!_id("settings-popup").querySelector("input:not([disabled])");
-	_id("settings-button").disabled = !enabledSettings;
+	let visibleSettings = !!_id("settings-popup").querySelector("input:not([disabled])");
+	_id("settings-button").hidden = !visibleSettings;
 
 	libraryLayout = new LibraryLayout();
 	listLayout = new ListLayout();
