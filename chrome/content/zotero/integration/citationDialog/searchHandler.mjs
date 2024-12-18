@@ -78,20 +78,20 @@ export class CitationDialogSearchHandler {
 	// Items/notes in the libraries group are sorted by _createItemsSort/_createNotesSort comparators.
 	// Takes citedItems as a parameter to filter them out.
 	getOrderedSearchResultGroups(citedItems) {
-		let removeCitedItems = (items) => {
+		let removeItemsIncludedInCitation = (items) => {
 			let citedItemsIDs = new Set(citedItems.map(item => item.cslItemID || item.id));
 			return items.filter(i => !citedItemsIDs.has(i.cslItemID ? i.cslItemID : i.id));
 		};
 		let result = [];
 		// selected/open/cited go first
 		for (let groupKey of ["selected", "open", "cited"]) {
-			let groupItems = removeCitedItems(this.results[groupKey]);
+			let groupItems = removeItemsIncludedInCitation(this.results[groupKey]);
 			if (groupItems.length) {
 				result.push({ key: groupKey, group: groupItems });
 			}
 		}
 		// library items go after
-		let libraryItems = Object.values(removeCitedItems(this.results.found).reduce((acc, item) => {
+		let libraryItems = Object.values(removeItemsIncludedInCitation(this.results.found).reduce((acc, item) => {
 			if (!acc[item.libraryID]) {
 				acc[item.libraryID] = { key: item.libraryID, group: [], isLibrary: true };
 			}
@@ -121,6 +121,7 @@ export class CitationDialogSearchHandler {
 			cited: this.isCitingNotes ? [] : await this._getMatchingCitedItems(),
 			selected: this.isCitingNotes ? this._getSelectedNotes() : this._getSelectedLibraryItems(),
 		};
+		this._deduplicate();
 	}
 
 	async _updateSearchResults(str) {
@@ -147,6 +148,16 @@ export class CitationDialogSearchHandler {
 		}
 		this.lastSearchValue = str;
 		this.searchResultIDs = await s.search();
+	}
+
+	_deduplicate() {
+		let selectedIDs = new Set(this.results.selected.map(item => item.id));
+		let openIDs = new Set(this.results.open.map(item => item.id));
+		let citedIDs = new Set(this.results.cited.filter(item => item.id).map(item => item.id));
+
+		this.results.open = this.results.open.filter(item => !selectedIDs.has(item.id));
+		this.results.cited = this.results.cited.filter(item => !selectedIDs.has(item.id) && !openIDs.has(item.id));
+		this.results.found = this.results.found.filter(item => !selectedIDs.has(item.id) && !openIDs.has(item.id) && !citedIDs.has(item.id));
 	}
 	
 	async _getMatchingCitedItems() {
