@@ -118,12 +118,18 @@ class Layout {
 		let citedItems = CitationDataManager.getCitationItems();
 		for (let { key, group, isLibrary } of SearchHandler.getOrderedSearchResultGroups(citedItems)) {
 			if (isLibrary && this.type == "library") break;
-			let isGroupCollapsible = key == "selected" && group.length > 1;
+			// in list mode, selected items are always a collapsible section
+			// in library mode, selected items become a collapsible deck only if there are multiple items
+			let isGroupCollapsible = key == "selected" && (group.length > 1 || this.type == "list");
 			
 			// Construct each section and items
 			let sectionHeader = "";
 			if (isLibrary) {
 				sectionHeader = Zotero.Libraries.get(key).name;
+			}
+			// special handling for selected items to display how many total selected items there are
+			else if (key == "selected") {
+				sectionHeader = await doc.l10n.formatValue(`integration-citationDialog-section-${key}`, { count: group.length, total: SearchHandler.allSelectedItemsCount() });
 			}
 			else {
 				sectionHeader = await doc.l10n.formatValue(`integration-citationDialog-section-${key}`, { count: group.length });

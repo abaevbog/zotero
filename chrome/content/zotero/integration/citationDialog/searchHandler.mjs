@@ -64,6 +64,11 @@ export class CitationDialogSearchHandler {
 		callback();
 	}, SEARCH_TIMEOUT);
 
+	// how many selected items there are without applying the filter
+	allSelectedItemsCount() {
+		return this._getSelectedLibraryItems(true).length;
+	}
+
 	// Return results in a format that is better for rendering.
 	// Results are returned as an array of { key, group, isLibrary } objects,
 	// where key is selected/open/cited/{libraryID}, and group is the respective items.
@@ -182,11 +187,11 @@ export class CitationDialogSearchHandler {
 		return this._filterNonMatchingItems(items);
 	}
 
-	_getSelectedLibraryItems() {
+	_getSelectedLibraryItems(noFilter) {
 		let win = Zotero.getMainWindow();
 		if (win.Zotero_Tabs.selectedType !== "library") return [];
 		let selectedItems = Zotero.getActiveZoteroPane().getSelectedItems().filter(i => i.isRegularItem());
-		if (!this.lastSearchValue) return selectedItems;
+		if (!this.lastSearchValue || noFilter) return selectedItems;
 		return this._filterNonMatchingItems(selectedItems);
 	}
 	
