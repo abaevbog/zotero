@@ -290,7 +290,7 @@ class LibraryLayout extends Layout {
 			// timeout is likely required to let updated minHeight to settle
 			setTimeout(() => {
 				window.resizeTo(window.innerWidth, this.lastHeight);
-			});
+			}, 10);
 		}
 	}
 
@@ -552,7 +552,7 @@ class ListLayout extends Layout {
 		// Timeout is required likely to allow minHeight update to settle
 		setTimeout(() => {
 			window.resizeTo(window.innerWidth, parseInt(autoHeight));
-		});
+		}, 10);
 	}
 }
 
