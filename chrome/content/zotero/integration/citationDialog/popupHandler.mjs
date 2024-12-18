@@ -59,6 +59,10 @@ export class CitationDialogPopupsHandler {
 				Services.focus.moveFocus(this.doc.defaultView, event.target, Services.focus.MOVEFOCUS_FORWARD, 0);
 			}
 		});
+		// just to make sure we never end up with a stuck overlay if something goes wrong with popups
+		this._getNode(".overlay").addEventListener("mousedown", () => {
+			this._getNode(".overlay").hidden = true;
+		});
 
 		this._getNode("#itemDetails").addEventListener("popuphidden", this.handleItemDetailsClosure.bind(this));
 		// Item details Remove btn
