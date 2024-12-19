@@ -262,6 +262,18 @@
 						}
 					}
 				}
+
+				.pre-selected {
+					&::after {
+						background: var(--accent-blue10);
+						content: "";
+						width: var(--item-horizontal-size);
+						height: 100%;
+						position: absolute;
+						left: 0;
+					}
+				}
+			
 			}
 		}
 		#library-trees {
@@ -420,6 +432,9 @@
 						}
 					}
 				}
+				.pre-selected {
+					background: var(--accent-blue10) !important;
+				}
 			}
 		}
 	}
@@ -514,10 +529,6 @@
 		span:not(:last-child):not([no-comma])::after {
 			content: ", ";
 		}
-	}
-
-	.pre-selected {
-		background: var(--accent-blue10) !important;
 	}
 
 	.aria-hidden {
