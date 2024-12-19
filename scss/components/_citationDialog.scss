@@ -321,7 +321,6 @@
 		#list-layout-wrapper {
 			-moz-user-select: none;
 			overflow-y: scroll;
-			margin: 0 8px 8px 8px;
 			height: 100%;
 			.section {
 				// show dividers except for on the last section
@@ -341,6 +340,7 @@
 					padding: 4px 8px;
 				}
 				.item {
+					margin: 0 8px;
 					@include focus-ring;
 					padding: 4px 8px;
 
