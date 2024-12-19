@@ -47,12 +47,12 @@ export class CitationDialogSearchHandler {
 		this.searchResultIDs = [];
 	}
 
-	getItem({ cslItemID, zoteroItemID }) {
-		if (cslItemID) {
-			return this.results.cited.find(item => item.cslItemID === cslItemID);
+	getItem(id) {
+		if (id.includes("cited") || id.includes("/")) {
+			return this.results.cited.find(item => item.cslItemID === id);
 		}
 		for (let key of ['selected', 'open', 'found']) {
-			let item = this.results[key].find(item => item.id === zoteroItemID);
+			let item = this.results[key].find(item => item.id === parseInt(id));
 			if (item) return item;
 		}
 		return null;

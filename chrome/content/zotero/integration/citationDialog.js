@@ -110,13 +110,11 @@ class Layout {
 	// Re-render the items based on search rersults
 	async refreshItemsList() {
 		let sections = [];
-		let firstItem = true;
 
-		// Clear the current pre-selected item, it is update later
-		IOManager.markPreSelectedItem();
 		// Tell SearchHandler which currently cited items are so they are not included in results
 		let citedItems = CitationDataManager.getCitationItems();
-		for (let { key, group, isLibrary } of SearchHandler.getOrderedSearchResultGroups(citedItems)) {
+		let searchResultGroups = SearchHandler.getOrderedSearchResultGroups(citedItems);
+		for (let { key, group, isLibrary } of searchResultGroups) {
 			if (isLibrary && this.type == "library") break;
 			// in list mode, selected items are always a collapsible section
 			// in library mode, selected items become a collapsible deck only if there are multiple items
@@ -146,12 +144,6 @@ class Layout {
 				let itemNode = await this.createItemNode(item, isGroupCollapsible ? index : null);
 				itemNode.addEventListener("click", IOManager.handleItemClick);
 				items.push(itemNode);
-
-				// Pre-select the item to be added on Enter of an input
-				if (firstItem) {
-					IOManager.markPreSelectedItem(itemNode, item);
-					firstItem = false;
-				}
 				index++;
 			}
 			itemContainer.replaceChildren(...items);
@@ -176,6 +168,8 @@ class Layout {
 			}
 		}
 		_id(`${this.type}-layout`).querySelector(".search-items").replaceChildren(...sections);
+		// Pre-select the item to be added on Enter of an input
+		IOManager.markpreSelected(searchResultGroups[0]);
 	}
 
 	// Create the node for selected/cited/opened item groups.
@@ -234,7 +228,7 @@ class LibraryLayout extends Layout {
 	async createItemNode(item, index = null) {
 		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 40 }, "item");
 		let id = item.cslItemID || item.id;
-		itemNode.setAttribute("itemIDs", id);
+		itemNode.setAttribute("itemID", id);
 		let title = Helpers.createNode("div", {}, "title");
 		let description = Helpers.buildItemDescription(item);
 		title.textContent = item.getDisplayTitle();
@@ -495,7 +489,7 @@ class ListLayout extends Layout {
 	async createItemNode(item) {
 		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 40 }, "item hbox");
 		let id = item.cslItemID || item.id;
-		itemNode.setAttribute("itemIDs", id);
+		itemNode.setAttribute("itemID", id);
 		let itemInfo = Helpers.createNode("div", {}, "info");
 		let icon = Helpers.createNode("span", {}, "icon icon-css icon-item-type");
 		let dataTypeLabel = item.getItemTypeIconName(true);
@@ -560,7 +554,7 @@ class ListLayout extends Layout {
 // Handling of user IO
 //
 const IOManager = {
-	preSelectedItem: null,
+	preSelected: null,
 
 	init() {
 		// handle input receiving focus or something being typed
@@ -696,16 +690,14 @@ const IOManager = {
 	},
 
 	// Mark which item can be selected on Enter in an input
-	markPreSelectedItem(node, itemGroup) {
-		doc.querySelector(".pre-selected-item")?.classList.remove("pre-selected-item");
-		if (!node) {
-			this.preSelectedItem = null;
-			return;
-		}
-		if (SearchHandler.lastSearchValue.length) {
-			node.classList.add("pre-selected-item");
-			this.preSelectedItem = itemGroup;
-		}
+	markpreSelected({ group = [] } = {}) {
+		doc.querySelector(".pre-selected")?.classList.remove("pre-selected");
+		this.preSelected = null;
+		let firstItemNode = _id(`${currentLayout.type}-layout`).querySelector(`.item`);
+		if (!group.length || !SearchHandler.lastSearchValue.length || !firstItemNode) return;
+		firstItemNode.classList.add("pre-selected");
+		let id = firstItemNode.getAttribute("itemID");
+		this.preSelected = SearchHandler.getItem(id);
 	},
 
 	handleItemClick(event) {
@@ -724,30 +716,16 @@ const IOManager = {
 			KeyboardHandler.rangeSelect(itemNodes, firstNode, targetItem);
 			return;
 		}
-		// get itemIDs associated with the node. For selected items, there can be multiple.
-		let itemIDs = new Set(targetItem.getAttribute("itemIDs").split(","));
+		// get itemIDs associated with the nodes
+		let itemIDs = new Set([targetItem.getAttribute("itemID")]);
 		// if target item is selected, add all other selected itemIDs
 		if (targetItem.classList.contains("selected")) {
 			let selectedItemNodes = _id(`${currentLayout.type}-layout`).querySelectorAll(".item.selected");
 			for (let itemNode of selectedItemNodes) {
-				let ids = itemNode.getAttribute("itemIDs").split(",");
-				for (let id of ids) {
-					itemIDs.add(id);
-				}
+				itemIDs.add(itemNode.getAttribute("itemID"));
 			}
 		}
-		let itemsToAdd = [];
-		// collect all items in an array and add them
-		for (let itemID of Array.from(itemIDs)) {
-			if (itemID.includes("cited:") || itemID.includes("/")) {
-				let item = SearchHandler.getItem({ cslItemID: itemID });
-				itemsToAdd.push(item);
-			}
-			else {
-				let item = SearchHandler.getItem({ zoteroItemID: parseInt(itemID) });
-				itemsToAdd.push(item);
-			}
-		}
+		let itemsToAdd = Array.from(itemIDs).map(itemID => SearchHandler.getItem(itemID));
 		IOManager.addItemsToCitation(itemsToAdd);
 	},
 
@@ -820,8 +798,8 @@ const IOManager = {
 			this.updateBubbleInput();
 			return;
 		}
-		if (IOManager.preSelectedItem) {
-			IOManager.addItemsToCitation(IOManager.preSelectedItem);
+		if (IOManager.preSelected) {
+			IOManager.addItemsToCitation(IOManager.preSelected);
 		}
 		else {
 			accept();
