@@ -572,6 +572,12 @@ const IOManager = {
 		doc.addEventListener("dialog-accepted", accept);
 		doc.addEventListener("dialog-cancelled", cancel);
 
+		// if focus leaves the input, clear pre-selected item
+		_id("bubble-input").addEventListener("focusout", (event) => {
+			if (event.target.classList.contains("input") && event.relatedTarget) {
+				IOManager.markpreSelected();
+			}
+		});
 		// after item details popup closes, item may have been updated, so refresh bubble input
 		_id("itemDetails").addEventListener("popuphidden", () => this.updateBubbleInput());
 		// if keep sorted was unchecked and then checked, resort items and update bubbles
