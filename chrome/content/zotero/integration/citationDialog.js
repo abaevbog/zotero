@@ -302,25 +302,44 @@ class LibraryLayout extends Layout {
 		// Add +/- column to indicate if an item is included in a citation
 		// and add/exclude them on click
 		itemColumns.push({
-			dataKey: 'isAddedToCitation',
-			label: 'In citation',
+			dataKey: 'removeFromCitation',
+			label: 'Remove from Citation',
 			htmlLabel: ' ', // space for column label to appear empty
 			width: 26,
 			staticWidth: true,
 			fixedWidth: true,
 			showInColumnPicker: false,
-			renderer: (index, data, column) => {
-				let cell = Helpers.createNode("span", {}, `cell ${column.className}`);
+			renderer: (index, inCitation, column) => {
+				let cell = Helpers.createNode("span", {}, `cell ${column.className} clickable`);
 				let iconWrapper = Helpers.createNode("span", {}, `icon-action`);
 				cell.append(iconWrapper);
-				let icon;
-				if (data === true) {
-					icon = getCSSIcon('minus-circle');
+				let icon = getCSSIcon('minus-circle');
+				if (inCitation === null) {
+					// no icon should be shown when an item cannot be added
+					// (e.g. when citing notes, parent items are displayed but not included)
+					icon = getCSSIcon("");
 				}
-				else if (data == false) {
-					icon = getCSSIcon('plus-circle');
+				if (inCitation == false) {
+					iconWrapper.setAttribute("disabled", true);
 				}
-				else if (data === null) {
+				iconWrapper.append(icon);
+				return cell;
+			}
+		});
+		itemColumns.push({
+			dataKey: 'addToCitation',
+			label: 'Add to citation',
+			htmlLabel: ' ', // space for column label to appear empty
+			width: 26,
+			staticWidth: true,
+			fixedWidth: true,
+			showInColumnPicker: false,
+			renderer: (index, inCitation, column) => {
+				let cell = Helpers.createNode("span", {}, `cell ${column.className} clickable`);
+				let iconWrapper = Helpers.createNode("span", {}, `icon-action`);
+				cell.append(iconWrapper);
+				let icon = getCSSIcon('plus-circle');
+				if (inCitation === null) {
 					// no icon should be shown when an item cannot be added
 					// (e.g. when citing notes, parent items are displayed but not included)
 					icon = getCSSIcon("");
@@ -339,14 +358,14 @@ class LibraryLayout extends Layout {
 			},
 			regularOnly: !isCitingNotes,
 			onActivate: (event, items) => {
-				IOManager.toggleAddedItem(items);
+				IOManager.addItemsToCitation(items, { noInputRefocus: true });
 			},
 			emptyMessage: Zotero.getString('pane.items.loading'),
 			columns: itemColumns,
 			// getExtraField helps itemTree fetch the data for a column that's
 			// not a part of actual item properties
 			getExtraField: (item, key) => {
-				if (key == "isAddedToCitation") {
+				if (key == "removeFromCitation" || key == "addToCitation") {
 					if (!(item instanceof Zotero.Item)) return null;
 					if (isCitingNotes && !item.isNote()) return null;
 					if (!isCitingNotes && !item.isRegularItem()) return null;
@@ -417,15 +436,9 @@ class LibraryLayout extends Layout {
 		// only trigger on left mouse click
 		if (event.button !== 0) return;
 		let row = event.target;
-		let { clientY, clientX } = event;
-		let plusMinusIcon = row.querySelector(".icon-action");
-		if (!plusMinusIcon) return;
-		let iconRect = plusMinusIcon.getBoundingClientRect();
-		// event.target is the actual row, so check if the click happened
-		// within the bounding box of the +/- icon and handle it same as a double click
-		let overIcon = clientX > iconRect.left && clientX < iconRect.right
-			&& clientY > iconRect.top && clientY < iconRect.bottom;
-		if (!overIcon) return;
+		// find which icon we hovered over
+		let hoveredOverIcon = row.querySelector(".icon-action.hover");
+		if (!hoveredOverIcon) return;
 		if (event.type == "mouseup") {
 			// fix height on bubble input  to make sure that a change in height
 			// does not shift itemTree rows as one is clicking
@@ -433,11 +446,21 @@ class LibraryLayout extends Layout {
 			// fetch index from the row's id (e.g. item-tree-citationDialog-row-0)
 			let rowIndex = row.id.split("-")[4];
 			let clickedItem = this.itemsView.getRow(rowIndex).ref;
-			IOManager.toggleAddedItem([clickedItem]);
-			plusMinusIcon.classList.remove("active");
+			hoveredOverIcon.classList.remove("active");
+			if (hoveredOverIcon.parentNode.classList.contains("addToCitation")) {
+				IOManager.addItemsToCitation([clickedItem], { noInputRefocus: true });
+			}
+			else if (hoveredOverIcon.parentNode.classList.contains("removeFromCitation")) {
+				let citationItems = CitationDataManager.getItems({ zoteroItemID: clickedItem.id });
+				for (let citationItem of citationItems) {
+					let { dialogReferenceID } = citationItem;
+					console.log(dialogReferenceID);
+					IOManager._deleteItem(dialogReferenceID);
+				}
+			}
 		}
 		else if (event.type == "mousedown") {
-			plusMinusIcon.classList.add("active");
+			hoveredOverIcon.classList.add("active");
 		}
 		// stop propagation to not select the row
 		event.stopPropagation();
@@ -447,19 +470,23 @@ class LibraryLayout extends Layout {
 	// This  handling is required, since :hover effect fires on the row and not the actual button
 	_handleItemsViewMouseMove(event) {
 		let { clientY, clientX, target } = event;
-		let plusMinusIcon = target.querySelector(".icon-action");
-		if (!target.classList.contains("row") || !plusMinusIcon) {
+		let actionIcons = [...event.target.querySelectorAll(".icon-action")];
+		if (!actionIcons.length) return;
+		// find which icon we hovered over
+		let hoveredOverIcon = actionIcons.find((icon) => {
+			let iconRect = icon.getBoundingClientRect();
+			// event.target is the actual row, so check if the click happened
+			// within the bounding box of the +/- icon and handle it same as a double click
+			let overIcon = clientX > iconRect.left && clientX < iconRect.right
+				&& clientY > iconRect.top && clientY < iconRect.bottom;
+			return overIcon;
+		});
+		if (!target.classList.contains("row") || !hoveredOverIcon) {
 			_id('zotero-items-tree').querySelector(".icon-action.hover")?.classList.remove("hover");
 			_id('zotero-items-tree').querySelector(".icon-action.active")?.classList.remove("active");
 			return;
 		}
-		let iconRect = plusMinusIcon.getBoundingClientRect();
-		let overIcon = clientX > iconRect.left && clientX < iconRect.right
-			&& clientY > iconRect.top && clientY < iconRect.bottom;
-		plusMinusIcon.classList.toggle("hover", overIcon);
-		if (!overIcon) {
-			plusMinusIcon.classList.remove("active");
-		}
+		hoveredOverIcon.classList.add("hover");
 	}
 
 	// Highlight/de-highlight selected rows
@@ -678,23 +705,6 @@ const IOManager = {
 		}
 	},
 
-	// Add all given items into the citation. If all items are already in the citation, remove them.
-	toggleAddedItem(items) {
-		let notAllItemsInCitation = items.find(item => !CitationDataManager.getItem({ zoteroItemID: item.id }));
-		if (notAllItemsInCitation) {
-			IOManager.addItemsToCitation(items, { noInputRefocus: true });
-		}
-		else {
-			for (let item of items) {
-				CitationDataManager.deleteItem({ zoteroItemID: item.id });
-			}
-			IOManager.updateBubbleInput();
-			if (currentLayout.type == "library") {
-				currentLayout.refreshItemsView();
-			}
-		}
-	},
-
 	// Mark which item can be selected on Enter in an input
 	markpreSelected({ group = [] } = {}) {
 		doc.querySelector(".pre-selected")?.classList.remove("pre-selected");
@@ -872,18 +882,16 @@ const CitationDataManager = {
 		return this.items.map(item => item.citationItem);
 	},
 
-	getItem({ dialogReferenceID, zoteroItemID }) {
-		if (dialogReferenceID) {
-			return this.items.find(item => item.dialogReferenceID === dialogReferenceID);
-		}
-		return this.items.find(item => item.zoteroItem.id === zoteroItemID);
+	getItem({ dialogReferenceID }) {
+		return this.items.find(item => item.dialogReferenceID === dialogReferenceID);
 	},
 
-	getItemIndex({ dialogReferenceID, zoteroItemID }) {
-		if (dialogReferenceID) {
-			return this.items.findIndex(item => item.dialogReferenceID === dialogReferenceID);
-		}
-		return this.items.findIndex(item => item.zoteroItem.id === zoteroItemID);
+	getItems({ zoteroItemID }) {
+		return this.items.filter(item => item.zoteroItem.id === zoteroItemID);
+	},
+
+	getItemIndex({ dialogReferenceID }) {
+		return this.items.findIndex(item => item.dialogReferenceID === dialogReferenceID);
 	},
 
 	updateItemAddedCache() {
@@ -902,8 +910,6 @@ const CitationDataManager = {
 			// so we have a reliable way to identify which bubble refers to which citationItem.
 			let dialogReferenceID = Zotero.Utilities.randomString(5);
 			let toInsert = { citationItem: item, zoteroItem: zoteroItem, dialogReferenceID };
-			// Cannot add the same item multiple times
-			if (this.items.find(existing => this._itemsHaveSameID(existing.citationItem, toInsert.citationItem))) continue;
 			if (index !== null) {
 				this.items.splice(index, 0, toInsert);
 				index += 1;
@@ -916,8 +922,8 @@ const CitationDataManager = {
 		this.updateItemAddedCache();
 	},
 
-	deleteItem({ dialogReferenceID, zoteroItemID }) {
-		let index = this.getItemIndex({ dialogReferenceID, zoteroItemID });
+	deleteItem({ dialogReferenceID }) {
+		let index = this.getItemIndex({ dialogReferenceID });
 		if (index === -1) {
 			throw new Error("Item to delete not found");
 		}

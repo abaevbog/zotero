@@ -85,13 +85,17 @@ export class CitationDialogSearchHandler {
 		let result = [];
 		// selected/open/cited go first
 		for (let groupKey of ["selected", "open", "cited"]) {
-			let groupItems = removeItemsIncludedInCitation(this.results[groupKey]);
+			let groupItems = this.results[groupKey];
+			// in selected and opened items, do not display items already in the citation
+			if (groupKey == "selected" || groupKey == "open") {
+				groupItems = removeItemsIncludedInCitation(groupItems);
+			}
 			if (groupItems.length) {
 				result.push({ key: groupKey, group: groupItems });
 			}
 		}
 		// library items go after
-		let libraryItems = Object.values(removeItemsIncludedInCitation(this.results.found).reduce((acc, item) => {
+		let libraryItems = Object.values(this.results.found.reduce((acc, item) => {
 			if (!acc[item.libraryID]) {
 				acc[item.libraryID] = { key: item.libraryID, group: [], isLibrary: true };
 			}

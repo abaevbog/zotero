@@ -297,7 +297,7 @@
 				flex: 1; /* expand all the way to the right */
 
 				// the actual column with the +/- button
-				.isAddedToCitation {
+				.clickable {
 					// make sure the button is centered
 					display: flex;
 					justify-content: center;
@@ -316,11 +316,14 @@
 							height: 16px;
 						}
 						// class to handle hover and active effect, since :hover is applied to the entire row
-						&.hover {
+						&.hover:not([disabled]) {
 							background-color: var(--fill-quinary) !important;
 						}
-						&.active {
+						&.active:not([disabled]) {
 							background: var(--fill-quarternary) !important;
+						}
+						&[disabled] {
+							color: var(--color-gray-50);
 						}
 					}
 
