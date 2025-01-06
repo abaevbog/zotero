@@ -39,6 +39,13 @@
 		}
 	}
 
+	#accept-button {
+		@include svgicon("arrow-right", "universal", "20");
+	}
+	#cancel-button {
+		@include svgicon("x", "universal", "20");
+	}
+
 	#search-row {
 		margin: 5px 10px 5px 0;
 
@@ -63,19 +70,10 @@
 			height: 28px;
 			background-size: 60%;
 			background-repeat: no-repeat;
-			margin-inline: 6px;
-			display: inline-block;
-			visibility: hidden;
+			display: none;
 			&[status="animate"] {
-				visibility: visible;
+				display: inline-block;
 			}
-		}
-
-		#accept-button {
-			@include svgicon("arrow-right", "universal", "20");
-		}
-		#cancel-button {
-			@include svgicon("dialog-cancel", "universal", "16");
 		}
 	}
 
@@ -445,6 +443,8 @@
 			height: 36px;
 			border-top: 1px solid var(--material-panedivider);
 			align-items: center;
+			margin-inline-end: 10px;
+			gap: 10px;
 			#mode-button {
 				&[mode="library"] {
 					@include svgicon("dialog-search-list", "universal", "16");
@@ -452,11 +452,9 @@
 				&[mode="list"] {
 					@include svgicon("dialog-search-library", "universal", "16");
 				}
-				margin-inline-end: 8px;
 			}
 			#settings-button {
 				@include svgicon("dialog-options", "universal", "16");
-				margin-inline-end: 3px;
 			}
 			
 		}

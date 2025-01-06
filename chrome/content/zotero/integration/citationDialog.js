@@ -174,23 +174,27 @@ class Layout {
 	// update itemsList.
 	async searchDebounced(value) {
 		_id("loading-spinner").setAttribute("status", "animate");
+		_id("accept-button").hidden = true;
 		SearchHandler.searching = true;
 		// This is called on each typed character, so refresh item list when typing stopped
 		SearchHandler.refreshDebounced(value, () => {
 			this.refreshItemsList();
 			SearchHandler.searching = false;
 			_id("loading-spinner").removeAttribute("status");
+			_id("accept-button").hidden = false;
 		});
 	}
 
 	// Run search and refresh items list immediately
 	async search(value) {
 		_id("loading-spinner").setAttribute("status", "animate");
+		_id("accept-button").hidden = true;
 		SearchHandler.searching = true;
 		await SearchHandler.refresh(value);
 		this.refreshItemsList();
 		SearchHandler.searching = false;
 		_id("loading-spinner").removeAttribute("status");
+		_id("accept-button").hidden = false;
 	}
 
 	// implemented by layouts
