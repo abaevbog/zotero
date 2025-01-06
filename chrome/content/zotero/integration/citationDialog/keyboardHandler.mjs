@@ -80,29 +80,45 @@ export class CitationDialogKeyboardHandler {
 		if (event.key == "Tab") {
 			handled = this.tabToGroup({ forward: !event.shiftKey });
 		}
-		else if (event.key == "ArrowDown" && this._id("bubble-input").contains(event.target) && noModifiers) {
-			// arrowDown from bubbleInput moves focus to the first item
-			this.doc.querySelector(".itemsContainer[tabindex],.item[tabindex]")?.focus();
+		// arrow down from bubble input in library mode will focus the current item, if any
+		// or navigate into the suggested items group
+		else if (!this._id("library-layout").hidden && event.key == "ArrowDown" && this._id("bubble-input").contains(event.target) && noModifiers) {
+			let group = this.doc.querySelector("#library-layout [data-arrow-nav]");
+			let current = group.querySelector(".selected.current");
+			if (current) {
+				current.focus();
+			}
+			else if (group) {
+				this.navigateGroup({ group, current: null, forward: true, shouldSelect: true, shouldFocus: true, multiSelect: false });
+			}
 			handled = true;
 		}
+		// arrow up/down from bubble-input in list mode will move selection in the items list
+		else if (!this._id("list-layout").hidden && (event.key == "ArrowDown" || event.key == "ArrowUp") && this._id("bubble-input").contains(event.target) && onlyShiftModifierPossible) {
+			let group = this.doc.querySelector("#list-layout [data-arrow-nav]");
+			let current = group.querySelector(".selected.current");
+			this.navigateGroup({ group, current, forward: event.key == "ArrowDown", shouldSelect: true, shouldFocus: false, multiSelect: event.shiftKey });
+			handled = true;
+		}
+		// arrowUp from the first item will refocus bubbleInput
 		else if (event.key == "ArrowUp" && this.shouldRefocusBubbleInputOnArrowUp() && noModifiers) {
-			// arrowUp from the first item will refocus bubbleInput
 			this._id("bubble-input").refocusInput();
 			handled = true;
 		}
+		// handle handle focus and selection movement within bubble-input and item groups
 		else if (event.key.includes("Arrow") && onlyShiftModifierPossible) {
-			// handle focus movement within a group with arrow left/right or up/down
 			let arrowDirection = event.target.closest("[data-arrow-nav]")?.getAttribute("data-arrow-nav");
-			let isMultiselectable = !!event.target.closest("[data-multiselectable]");
-			// This determines if something is multiselectable
 			if (!arrowDirection) return false;
+			let multiSelect = !!event.target.closest("[data-multiselectable]") && event.shiftKey;
+			let current = this.doc.activeElement;
+			let group = current.closest("[data-arrow-nav]");
 			if (arrowDirection == "horizontal") {
 				if (!(event.key === Zotero.arrowNextKey || event.key === Zotero.arrowPreviousKey)) return false;
-				handled = this.moveWithinGroup(event.key == Zotero.arrowNextKey);
+				handled = this.navigateGroup({ group, current, forward: event.key == Zotero.arrowNextKey, shouldSelect: true, shouldFocus: true, multiSelect });
 			}
 			if (arrowDirection == "vertical") {
 				if (!(event.key == "ArrowUp" || event.key === "ArrowDown")) return false;
-				handled = this.moveWithinGroup(event.key === "ArrowDown", isMultiselectable && event.shiftKey);
+				handled = this.navigateGroup({ group, current, forward: event.key === "ArrowDown", shouldSelect: true, shouldFocus: true, multiSelect });
 			}
 		}
 		if (handled) {
@@ -123,6 +139,12 @@ export class CitationDialogKeyboardHandler {
 		let tabIndexedNodes = [...this.doc.querySelectorAll("[data-tabindex]")];
 		tabIndexedNodes = tabIndexedNodes.filter(node => (node.getAttribute("tabindex") || node.querySelector("[tabindex]")) && !node.closest("[hidden]") && !node.disabled);
 		tabIndexedNodes = tabIndexedNodes.sort((a, b) => {
+			if (a.dataset.tabindex == b.dataset.tabindex) {
+				// make sure that if there's a "current" node, it will have priority
+				let aSelected = a.classList.contains("current") ? -1 : 0;
+				let bSelected = b.classList.contains("current") ? -1 : 0;
+				return aSelected - bSelected;
+			}
 			if (forward) {
 				return parseInt(a.dataset.tabindex) - parseInt(b.dataset.tabindex);
 			}
@@ -141,7 +163,14 @@ export class CitationDialogKeyboardHandler {
 			return tabIndexedNodes[0];
 		}
 
-		if (nodeToFocus.getAttribute("tabindex")) {
+		// if node to focus is a part of arrow-navigation group (e.g. suggested items)
+		// and we are not re-focusing a previously selected item,
+		// navigate into that group to also have the item marked as selected.
+		if (nodeToFocus.dataset.arrowNavEnabled && !nodeToFocus.classList.contains("current")) {
+			let group = nodeToFocus.closest("[data-arrow-nav]");
+			this.navigateGroup({ group, current: null, forward: true, shouldSelect: true, shouldFocus: true, multiSelect: false });
+		}
+		else if (nodeToFocus.getAttribute("tabindex")) {
 			nodeToFocus.focus();
 		}
 		else {
@@ -150,40 +179,63 @@ export class CitationDialogKeyboardHandler {
 		return nodeToFocus;
 	}
 
-	moveWithinGroup(forward, multiSelect) {
-		let active = this.doc.activeElement;
-		let currentGroup = active.closest("[data-arrow-nav]");
-		if (!currentGroup) return false;
-		let allFocusableWithinGroup = [...currentGroup.querySelectorAll("[tabindex]")];
-		let nextFocusableIndex = null;
+
+	// Navigate the group by moving selection or focus between nodes in a group
+	navigateGroup({ group, current, forward, multiSelect, shouldFocus, shouldSelect }) {
+		// navigatable nodes have to be marked with data-arrow-nav-enabled
+		let allFocusableWithinGroup = [...group.querySelectorAll("[tabindex][data-arrow-nav-enabled]")];
+		let nextFocusableIndex = 0;
 		for (let i = 0; i < allFocusableWithinGroup.length; i++) {
-			if (allFocusableWithinGroup[i] == active) {
+			if (allFocusableWithinGroup[i] == current) {
 				nextFocusableIndex = forward ? (i + 1) : (i - 1);
 				break;
 			}
 		}
-		if (nextFocusableIndex === null || nextFocusableIndex < 0 || nextFocusableIndex >= allFocusableWithinGroup.length) return false;
+		if (nextFocusableIndex < 0 || nextFocusableIndex >= allFocusableWithinGroup.length) return false;
 		let nextNode = allFocusableWithinGroup[nextFocusableIndex];
-		// if there is a tab index on a node, next node must have the same tabindex
-		if (active.dataset.tabindex !== nextNode.dataset.tabindex) return false;
-		nextNode.focus();
-
+		if (shouldFocus) {
+			nextNode.focus();
+		}
+		if (shouldSelect) {
+			current?.classList.remove("current");
+			nextNode.classList.add("current");
+			// if the node is not being focused in list mode, make sure we scroll to it so it is visible
+			if (!shouldFocus) {
+				let wrapperRect = this._id("list-layout-wrapper").getBoundingClientRect();
+				let nodeRect = nextNode.getBoundingClientRect();
+				if (nodeRect.bottom > wrapperRect.bottom || nodeRect.top < wrapperRect.top) {
+					nextNode.scrollIntoView();
+				}
+			}
+		}
 		if (multiSelect) {
 			// on arrow keypressees while holding shift, move focus and also perform multiselect
 			if (this._multiselectStart === null) {
-				this._multiselectStart = active;
+				this._multiselectStart = current || nextNode;
+			}
+			console.log(nextNode);
+			// next node is a container on shift-arrow press into a collapsed deck of items in lib mode
+			// expand it and select all collapsed items
+			if (nextNode.classList.contains("itemsContainer")) {
+				let section = nextNode.closest(".section");
+				this.doc.dispatchEvent(new CustomEvent("expand-section", {
+					bubbles: true,
+					detail: {
+						section
+					}
+				}));
+				return this.navigateGroup({ group, current: null, forward: true, multiSelect: true, shouldFocus: true, shouldSelect: true });
 			}
 			this.rangeSelect(allFocusableWithinGroup, this._multiselectStart, nextNode);
 		}
 		else {
 			// on arrow keypress without shift, clear multiselect starting point
 			this._multiselectStart = null;
-			this.rangeSelect(allFocusableWithinGroup, null);
+			this.rangeSelect(allFocusableWithinGroup, nextNode, nextNode);
 		}
-
+		
 		return nextNode;
 	}
-
 
 	// select all items between startNode and endNode
 	rangeSelect(allNodes, startNode, endNode) {

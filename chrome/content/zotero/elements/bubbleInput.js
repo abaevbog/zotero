@@ -167,6 +167,15 @@
 		}
 
 		/**
+		 * Determine if there is anything typed in the current input.
+		 */
+		isSomethingTyped() {
+			let input = this.getCurrentInput();
+			if (!input) return false;
+			return input.value.length > 0;
+		}
+
+		/**
 		 * Get the index that a bubble inserted after current input would have.
 		 * Used by CitationDialog to know at which index to save the newly added item.
 		 */
@@ -221,6 +230,7 @@
 			bubble.setAttribute("aria-describedby", "bubble-description");
 			bubble.setAttribute("aria-haspopup", true);
 			bubble.setAttribute("dialogReferenceID", dialogReferenceID);
+			bubble.setAttribute("data-arrow-nav-enabled", true);
 			bubble.className = "bubble";
 			// VoiceOver works better without it
 			if (!Zotero.isMac) {
@@ -316,6 +326,7 @@
 			input.setAttribute("tabindex", 0);
 			// hide windows appearance from _input.scss
 			input.setAttribute("no-windows-native", true);
+			input.setAttribute("data-arrow-nav-enabled", true);
 			input.className = "input";
 			input.setAttribute("aria-describedby", "input-description");
 			input.addEventListener("input", (_) => {

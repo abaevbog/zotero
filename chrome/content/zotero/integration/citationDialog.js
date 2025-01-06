@@ -116,9 +116,8 @@ class Layout {
 		let searchResultGroups = SearchHandler.getOrderedSearchResultGroups(citedItems);
 		for (let { key, group, isLibrary } of searchResultGroups) {
 			if (isLibrary && this.type == "library") break;
-			// in list mode, selected items are always a collapsible section
-			// in library mode, selected items become a collapsible deck only if there are multiple items
-			let isGroupCollapsible = key == "selected" && (group.length > 1 || this.type == "list");
+			// selected items become a collapsible deck/list if there are multiple items
+			let isGroupCollapsible = key == "selected" && group.length > 1;
 			
 			// Construct each section and items
 			let sectionHeader = "";
@@ -155,21 +154,14 @@ class Layout {
 				section.querySelector(".header-label").addEventListener("click", () => IOManager.toggleSectionCollapse(section));
 				// handle click on "Add all"
 				section.querySelector(".add-all").addEventListener("click", () => IOManager.addItemsToCitation(group));
-				// Keep expanded/collapsed status of the group
-				let currentSection = _id(section.id);
-				if (currentSection) {
-					let isNowExpanded = _id(section.id)?.classList.contains("expanded");
-					IOManager.toggleSectionCollapse(section, isNowExpanded ? "expanded" : "collapsed");
-				}
-				// Default to expanded for list and collapsed for library
-				else {
-					IOManager.toggleSectionCollapse(section, this.type == "list" ? "expanded" : "collapsed");
-				}
+
+				let isSomethingTyped = _id("bubble-input").isSomethingTyped();
+				IOManager.toggleSectionCollapse(section, (isSomethingTyped || this.type == "list") ? "expanded" : "collapsed");
 			}
 		}
 		_id(`${this.type}-layout`).querySelector(".search-items").replaceChildren(...sections);
 		// Pre-select the item to be added on Enter of an input
-		IOManager.markpreSelected(searchResultGroups[0]);
+		IOManager.markPreSelected();
 	}
 
 	// Create the node for selected/cited/opened item groups.
@@ -226,7 +218,7 @@ class LibraryLayout extends Layout {
 
 	// Create item node for an item group and store item ids in itemIDs attribute
 	async createItemNode(item, index = null) {
-		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 40 }, "item");
+		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 40, "data-arrow-nav-enabled": true }, "item");
 		let id = item.cslItemID || item.id;
 		itemNode.setAttribute("itemID", id);
 		let title = Helpers.createNode("div", {}, "title");
@@ -454,7 +446,6 @@ class LibraryLayout extends Layout {
 				let citationItems = CitationDataManager.getItems({ zoteroItemID: clickedItem.id });
 				for (let citationItem of citationItems) {
 					let { dialogReferenceID } = citationItem;
-					console.log(dialogReferenceID);
 					IOManager._deleteItem(dialogReferenceID);
 				}
 			}
@@ -514,7 +505,7 @@ class ListLayout extends Layout {
 
 	// Create item node for an item group and store item ids in itemIDs attribute
 	async createItemNode(item) {
-		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 40 }, "item hbox");
+		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 40, "data-arrow-nav-enabled": true }, "item hbox");
 		let id = item.cslItemID || item.id;
 		itemNode.setAttribute("itemID", id);
 		let itemInfo = Helpers.createNode("div", {}, "info");
@@ -581,7 +572,6 @@ class ListLayout extends Layout {
 // Handling of user IO
 //
 const IOManager = {
-	preSelected: null,
 
 	init() {
 		// handle input receiving focus or something being typed
@@ -594,17 +584,13 @@ const IOManager = {
 		doc.addEventListener("move-item", ({ detail: { dialogReferenceID, index } }) => this._moveItem(dialogReferenceID, index));
 		// display details popup for the bubble
 		doc.addEventListener("show-details-popup", ({ detail: { dialogReferenceID } }) => this._openItemDetailsPopup(dialogReferenceID));
+		// handle expansion of collapsed decks initiated from other components
+		doc.addEventListener("expand-section", ({ detail: { section } }) => this.toggleSectionCollapse(section, "expanded"));
 		
 		// accept/cancel events emitted by keyboardHandler
 		doc.addEventListener("dialog-accepted", accept);
 		doc.addEventListener("dialog-cancelled", cancel);
 
-		// if focus leaves the input, clear pre-selected item
-		_id("bubble-input").addEventListener("focusout", (event) => {
-			if (event.target.classList.contains("input") && event.relatedTarget) {
-				IOManager.markpreSelected();
-			}
-		});
 		// after item details popup closes, item may have been updated, so refresh bubble input
 		_id("itemDetails").addEventListener("popuphidden", () => this.updateBubbleInput());
 		// if keep sorted was unchecked and then checked, resort items and update bubbles
@@ -628,6 +614,11 @@ const IOManager = {
 
 		_id("list-layout").hidden = newMode == "library";
 		_id("library-layout").hidden = newMode == "list";
+
+		// Delete all item nodes from the old layout
+		for (let itemNode of [...doc.querySelectorAll(".item")]) {
+			itemNode.remove();
+		}
 
 		_id("mode-button").setAttribute("mode", newMode);
 		// save the library layout's height to restore it if we switch back
@@ -700,20 +691,23 @@ const IOManager = {
 		}
 
 		this.updateBubbleInput();
+		// Always refresh items list to make sure the opened and selected items are up to date
+		currentLayout.refreshItemsList();
 		if (!noInputRefocus) {
 			_id("bubble-input").refocusInput();
 		}
 	},
 
-	// Mark which item can be selected on Enter in an input
-	markpreSelected({ group = [] } = {}) {
-		doc.querySelector(".pre-selected")?.classList.remove("pre-selected");
-		this.preSelected = null;
+	// Mark initially selected item that can be selected on Enter in an input
+	markPreSelected() {
+		for (let itemNode of [...doc.querySelectorAll(".selected")]) {
+			itemNode.classList.remove("selected");
+			itemNode.classList.remove("current");
+		}
 		let firstItemNode = _id(`${currentLayout.type}-layout`).querySelector(`.item`);
-		if (!group.length || !SearchHandler.lastSearchValue.length || !firstItemNode) return;
-		firstItemNode.classList.add("pre-selected");
-		let id = firstItemNode.getAttribute("itemID");
-		this.preSelected = SearchHandler.getItem(id);
+		let somethingIsTyped = _id("bubble-input").isSomethingTyped();
+		if (!somethingIsTyped || !firstItemNode) return;
+		firstItemNode.classList.add("selected", "current");
 	},
 
 	handleItemClick(event) {
@@ -784,10 +778,12 @@ const IOManager = {
 		if (section.classList.contains("expandable") && !section.classList.contains("expanded")) {
 			for (let item of [...section.querySelectorAll(".item")]) {
 				item.removeAttribute("tabindex");
+				item.classList.remove("current");
 			}
 			// in library, the items deck itself becomes focusable
 			if (currentLayout.type == "library") {
 				section.querySelector(".itemsContainer").setAttribute("tabindex", -1);
+				section.querySelector(".itemsContainer").dataset.arrowNavEnabled = true;
 			}
 		}
 		// when expanded, make them focusable again
@@ -796,7 +792,9 @@ const IOManager = {
 				item.setAttribute("tabindex", -1);
 			}
 			if (currentLayout.type == "library") {
-				section.querySelector(".itemsContainer").removeAttribute("tabindex");
+				let container = section.querySelector(".itemsContainer");
+				container.removeAttribute("tabindex");
+				container.classList.remove("selected", "current");
 			}
 		}
 	},
@@ -814,8 +812,10 @@ const IOManager = {
 			this.updateBubbleInput();
 			return;
 		}
-		if (IOManager.preSelected) {
-			IOManager.addItemsToCitation(IOManager.preSelected);
+		// add whatever items are selected
+		if (doc.querySelector(".selected")) {
+			let selectedIDs = [...doc.querySelectorAll(".selected")].map(node => node.getAttribute("itemID"));
+			IOManager.addItemsToCitation(Zotero.Items.get(selectedIDs));
 		}
 		else {
 			accept();
@@ -828,6 +828,8 @@ const IOManager = {
 			libraryLayout.refreshItemsView();
 		}
 		this.updateBubbleInput();
+		// Always refresh items list to make sure the opened and selected items are up to date
+		currentLayout.refreshItemsList();
 	},
 
 	_moveItem(dialogReferenceID, newIndex) {
@@ -844,6 +846,9 @@ const IOManager = {
 	},
 
 	_handleInput({ query, debounce }) {
+		// Do not rerun search if the search value is the same
+		// (e.g. focus returns into the last input)
+		if (query == SearchHandler.lastSearchValue) return;
 		// If there is a locator typed, exclude it from the query
 		let locator = Helpers.extractLocator(query);
 		if (locator) {
