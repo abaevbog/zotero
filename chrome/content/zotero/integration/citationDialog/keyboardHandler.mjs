@@ -114,7 +114,8 @@ export class CitationDialogKeyboardHandler {
 			let group = current.closest("[data-arrow-nav]");
 			if (arrowDirection == "horizontal") {
 				if (!(event.key === Zotero.arrowNextKey || event.key === Zotero.arrowPreviousKey)) return false;
-				handled = this.navigateGroup({ group, current, forward: event.key == Zotero.arrowNextKey, shouldSelect: true, shouldFocus: true, multiSelect });
+				let shouldSelect = !this._id("bubble-input").contains(event.target); // selections only apply to items, not bubbles
+				handled = this.navigateGroup({ group, current, forward: event.key == Zotero.arrowNextKey, shouldSelect, shouldFocus: true, multiSelect });
 			}
 			if (arrowDirection == "vertical") {
 				if (!(event.key == "ArrowUp" || event.key === "ArrowDown")) return false;
@@ -196,24 +197,24 @@ export class CitationDialogKeyboardHandler {
 		if (shouldFocus) {
 			nextNode.focus();
 		}
-		if (shouldSelect) {
-			current?.classList.remove("current");
-			nextNode.classList.add("current");
-			// if the node is not being focused in list mode, make sure we scroll to it so it is visible
-			if (!shouldFocus) {
-				let wrapperRect = this._id("list-layout-wrapper").getBoundingClientRect();
-				let nodeRect = nextNode.getBoundingClientRect();
-				if (nodeRect.bottom > wrapperRect.bottom || nodeRect.top < wrapperRect.top) {
-					nextNode.scrollIntoView();
-				}
+		if (!shouldSelect) return nextNode;
+		
+		current?.classList.remove("current");
+		nextNode.classList.add("current");
+		// if the node is not being focused in list mode, make sure we scroll to it so it is visible
+		if (!shouldFocus) {
+			let wrapperRect = this._id("list-layout-wrapper").getBoundingClientRect();
+			let nodeRect = nextNode.getBoundingClientRect();
+			if (nodeRect.bottom > wrapperRect.bottom || nodeRect.top < wrapperRect.top) {
+				nextNode.scrollIntoView();
 			}
 		}
+		
 		if (multiSelect) {
 			// on arrow keypressees while holding shift, move focus and also perform multiselect
 			if (this._multiselectStart === null) {
 				this._multiselectStart = current || nextNode;
 			}
-			console.log(nextNode);
 			// next node is a container on shift-arrow press into a collapsed deck of items in lib mode
 			// expand it and select all collapsed items
 			if (nextNode.classList.contains("itemsContainer")) {
@@ -226,35 +227,27 @@ export class CitationDialogKeyboardHandler {
 				}));
 				return this.navigateGroup({ group, current: null, forward: true, multiSelect: true, shouldFocus: true, shouldSelect: true });
 			}
-			this.rangeSelect(allFocusableWithinGroup, this._multiselectStart, nextNode);
+			this.doc.dispatchEvent(new CustomEvent("select-items", {
+				bubbles: true,
+				detail: {
+					startNode: this._multiselectStart,
+					endNode: nextNode
+				}
+			}));
 		}
 		else {
 			// on arrow keypress without shift, clear multiselect starting point
 			this._multiselectStart = null;
-			this.rangeSelect(allFocusableWithinGroup, nextNode, nextNode);
+			this.doc.dispatchEvent(new CustomEvent("select-items", {
+				bubbles: true,
+				detail: {
+					startNode: nextNode
+				}
+			}));
 		}
 		
 		return nextNode;
 	}
-
-	// select all items between startNode and endNode
-	rangeSelect(allNodes, startNode, endNode) {
-		for (let node of allNodes) {
-			node.classList.remove("selected");
-		}
-		if (startNode === null) return;
-
-		let startIndex = allNodes.indexOf(startNode);
-		let endIndex = allNodes.indexOf(endNode);
-
-		// if startIndex is after endIndex, just swap them
-		if (startIndex > endIndex) [startIndex, endIndex] = [endIndex, startIndex];
-
-		for (let i = startIndex; i <= endIndex; i++) {
-			allNodes[i].classList.add("selected");
-		}
-	}
-
 
 	shouldRefocusBubbleInputOnArrowUp() {
 		if (!this._id("library-layout").hidden) {

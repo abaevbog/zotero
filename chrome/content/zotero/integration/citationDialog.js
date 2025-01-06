@@ -160,6 +160,8 @@ class Layout {
 			}
 		}
 		_id(`${this.type}-layout`).querySelector(".search-items").replaceChildren(...sections);
+		// Update which bubbles need to be highlighted
+		this.updateSelectedItems();
 		// Pre-select the item to be added on Enter of an input
 		IOManager.markPreSelected();
 	}
@@ -193,6 +195,8 @@ class Layout {
 
 	// implemented by layouts
 	resizeWindow() {}
+
+	updateSelectedItems() {}
 }
 
 class LibraryLayout extends Layout {
@@ -254,6 +258,19 @@ class LibraryLayout extends Layout {
 		this.itemsView.selection.selectEventsSuppressed = true;
 		await this.itemsView.selectItems(selectedItemIDs, true, true);
 		this.itemsView.selection.selectEventsSuppressed = false;
+	}
+
+	updateSelectedItems() {
+		let selectedItemIDs = new Set(libraryLayout.itemsView.getSelectedItems().map(item => item.id));
+		for (let itemObj of CitationDataManager.items) {
+			if (selectedItemIDs.has(itemObj.zoteroItem.id)) {
+				itemObj.selected = true;
+			}
+			else {
+				itemObj.selected = false;
+			}
+		}
+		IOManager.updateBubbleInput();
 	}
 
 	resizeWindow() {
@@ -346,7 +363,7 @@ class LibraryLayout extends Layout {
 			persistColumns: true,
 			columnPicker: true,
 			onSelectionChange: () => {
-				IOManager.updateSelectedItems();
+				libraryLayout.updateSelectedItems();
 			},
 			regularOnly: !isCitingNotes,
 			onActivate: (event, items) => {
@@ -534,6 +551,20 @@ class ListLayout extends Layout {
 		this.resizeWindow();
 	}
 
+	updateSelectedItems() {
+		let selectedIDs = new Set([...doc.querySelectorAll(".selected")].map(node => parseInt(node.getAttribute("itemID"))));
+		console.log(selectedIDs);
+		for (let itemObj of CitationDataManager.items) {
+			console.log(itemObj.zoteroItem.id);
+			if (selectedIDs.has(itemObj.zoteroItem.id)) {
+				itemObj.selected = true;
+			}
+			else {
+				itemObj.selected = false;
+			}
+		}
+		IOManager.updateBubbleInput();
+	}
 
 	resizeWindow() {
 		// height of bubble-input
@@ -586,6 +617,8 @@ const IOManager = {
 		doc.addEventListener("show-details-popup", ({ detail: { dialogReferenceID } }) => this._openItemDetailsPopup(dialogReferenceID));
 		// handle expansion of collapsed decks initiated from other components
 		doc.addEventListener("expand-section", ({ detail: { section } }) => this.toggleSectionCollapse(section, "expanded"));
+		// mark item nodes as selected to highlight them and mark relevant bubbles
+		doc.addEventListener("select-items", ({ detail: { startNode, endNode } }) => this.selectItemNodes(startNode, endNode));
 		
 		// accept/cancel events emitted by keyboardHandler
 		doc.addEventListener("dialog-accepted", accept);
@@ -632,7 +665,7 @@ const IOManager = {
 		// when switching from library to list, make sure all selected items are de-selected
 		if (currentLayout.type == "list") {
 			libraryLayout.itemsView.selection.clearSelection();
-			IOManager.updateSelectedItems();
+			currentLayout.updateSelectedItems();
 		}
 		currentLayout.refreshItemsList();
 	},
@@ -707,7 +740,28 @@ const IOManager = {
 		let firstItemNode = _id(`${currentLayout.type}-layout`).querySelector(`.item`);
 		let somethingIsTyped = _id("bubble-input").isSomethingTyped();
 		if (!somethingIsTyped || !firstItemNode) return;
-		firstItemNode.classList.add("selected", "current");
+		firstItemNode.classList.add("current");
+		this.selectItemNodes(firstItemNode);
+	},
+
+	// select all items between startNode and endNode
+	selectItemNodes(startNode, endNode = null) {
+		let itemNodes = [...doc.querySelectorAll(".item")];
+		for (let node of itemNodes) {
+			node.classList.remove("selected");
+		}
+		if (startNode === null) return;
+
+		let startIndex = itemNodes.indexOf(startNode);
+		let endIndex = endNode ? itemNodes.indexOf(endNode) : startIndex;
+
+		// if startIndex is after endIndex, just swap them
+		if (startIndex > endIndex) [startIndex, endIndex] = [endIndex, startIndex];
+
+		for (let i = startIndex; i <= endIndex; i++) {
+			itemNodes[i].classList.add("selected");
+		}
+		currentLayout.updateSelectedItems();
 	},
 
 	handleItemClick(event) {
@@ -723,7 +777,7 @@ const IOManager = {
 		if (isMultiselectable && event.shiftKey) {
 			let itemNodes = [..._id(`${currentLayout.type}-layout`).querySelectorAll(".item")];
 			let firstNode = _id(`${currentLayout.type}-layout`).querySelector(".item.selected") || itemNodes[0];
-			KeyboardHandler.rangeSelect(itemNodes, firstNode, targetItem);
+			IOManager.selectItemNodes(firstNode, targetItem);
 			return;
 		}
 		// get itemIDs associated with the nodes
