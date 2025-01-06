@@ -81,17 +81,24 @@ export class CitationDialogKeyboardHandler {
 			handled = this.tabToGroup({ forward: !event.shiftKey });
 		}
 		// arrow down from bubble input in library mode will focus the current item, if any
-		// or navigate into the suggested items group
+		// or navigate into the suggested items group. If the suggested items are empty, focus items table below
 		else if (!this._id("library-layout").hidden && event.key == "ArrowDown" && this._id("bubble-input").contains(event.target) && noModifiers) {
 			let group = this.doc.querySelector("#library-layout [data-arrow-nav]");
 			let current = group.querySelector(".selected.current");
 			if (current) {
 				current.focus();
 			}
-			else if (group) {
+			else if (!group.hidden) {
 				this.navigateGroup({ group, current: null, forward: true, shouldSelect: true, shouldFocus: true, multiSelect: false });
 			}
+			else {
+				this._id("zotero-items-tree").querySelector("[tabindex]").focus();
+			}
 			handled = true;
+		}
+		// arrow down from suggested items in library mode will focus items table
+		else if (!this._id("library-layout").hidden && event.key == "ArrowDown" && event.target.closest(".itemsContainer") && noModifiers) {
+			this._id("zotero-items-tree").querySelector("[tabindex]").focus();
 		}
 		// arrow up/down from bubble-input in list mode will move selection in the items list
 		else if (!this._id("list-layout").hidden && (event.key == "ArrowDown" || event.key == "ArrowUp") && this._id("bubble-input").contains(event.target) && onlyShiftModifierPossible) {
@@ -257,5 +264,30 @@ export class CitationDialogKeyboardHandler {
 			return this.doc.activeElement == this.doc.querySelector(".item");
 		}
 		return false;
+	}
+
+	captureKeydown(event) {
+		let noModifiers = !['ctrlKey', 'metaKey', 'shiftKey', 'altKey'].some(key => event[key]);
+		if (this._id("zotero-items-tree").contains(event.target) && event.key == "ArrowUp" && noModifiers) {
+			let focusedRow = this._id("zotero-items-tree").querySelector(".row.focused");
+			if (!focusedRow) return;
+			// fetch index from the row's id (e.g. item-tree-citationDialog-row-0)
+			let rowIndex = focusedRow.id.split("-")[4];
+			if (rowIndex !== "0") return;
+			if (!this._id("library-other-items").hidden) {
+				let current = this.doc.querySelector(".selected.current");
+				if (current) {
+					current.focus();
+				}
+				else {
+					this.navigateGroup({ group: this._id("library-other-items"), current: null, forward: true, shouldSelect: true, shouldFocus: true, multiSelect: false });
+				}
+			}
+			else {
+				this._id("bubble-input").focus();
+			}
+			event.stopPropagation();
+			event.preventDefault();
+		}
 	}
 }
