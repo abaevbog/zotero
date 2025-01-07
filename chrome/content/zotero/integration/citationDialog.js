@@ -85,6 +85,7 @@ function accept() {
 	_id("progress").hidden = false;
 	document.documentElement.style.removeProperty("min-height");
 	currentLayout.resizeWindow();
+	Zotero.Prefs.set("integration.citationDialogLastClosedMode", currentLayout.type);
 	io.accept((percent) => {
 		_id("progress").value = Math.round(percent);
 	});
@@ -636,8 +637,8 @@ const IOManager = {
 		_id("keepSorted").addEventListener("change", () => this._resortItems());
 
 		// set initial dialog mode and attach listener to button
-		this.toggleDialogMode();
-		_id("mode-button").addEventListener("click", this.toggleDialogMode);
+		this._setInitialDialogMode();
+		_id("mode-button").addEventListener("click", () => this.toggleDialogMode());
 
 		// open settings popup on btn click
 		_id("settings-button").addEventListener("click", event => _id("settings-popup").openPopup(event.target, "before_end"));
@@ -647,10 +648,12 @@ const IOManager = {
 	},
 
 	// switch between list and library modes
-	toggleDialogMode() {
-		let mode = _id("mode-button").getAttribute("mode");
-		let newMode = mode == "library" ? "list" : "library";
-
+	toggleDialogMode(newMode) {
+		if (!newMode) {
+			let mode = _id("mode-button").getAttribute("mode");
+			newMode = mode == "library" ? "list" : "library";
+		}
+		console.log(newMode);
 		_id("list-layout").hidden = newMode == "library";
 		_id("library-layout").hidden = newMode == "list";
 
@@ -670,7 +673,7 @@ const IOManager = {
 		doc.querySelector("item-tree-menu-bar").suppressed = currentLayout.type == "list";
 		// when switching from library to list, make sure all selected items are de-selected
 		if (currentLayout.type == "list") {
-			libraryLayout.itemsView.selection.clearSelection();
+			libraryLayout.itemsView?.selection.clearSelection();
 			currentLayout.updateSelectedItems();
 		}
 		currentLayout.refreshItemsList();
@@ -960,6 +963,15 @@ const IOManager = {
 		CitationDataManager.sort().then(() => {
 			this.updateBubbleInput();
 		});
+	},
+
+	// Set the initial dialog mode per user's preference
+	_setInitialDialogMode() {
+		let desiredMode = Zotero.Prefs.get("integration.citationDialogMode");
+		if (desiredMode == "last-closed") {
+			desiredMode = Zotero.Prefs.get("integration.citationDialogLastClosedMode");
+		}
+		this.toggleDialogMode(desiredMode);
 	}
 };
 

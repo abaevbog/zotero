@@ -55,6 +55,22 @@
 				&zotero.preferences.export.citePaperJournalArticleURL.description;
 			</label>
 		</groupbox>
+
+		<groupbox aria-labelledby="citation-dialog-title">
+			<label><html:h2 id="citation-dialog-title">Citation Dialog</html:h2></label>
+
+			<groupbox aria-labelledby="citation-dialog-mode-labe">
+				<hbox align="center">
+					<label id="citation-dialog-mode-label">Citation Dialog Mode:</label>
+					<radiogroup orient="horizontal" id="citation-dialog-mode" preference="extensions.zotero.integration.citationDialogMode">
+						<radio label="Last Closed" value="last-closed"/>
+						<radio label="Library Mode" value="library"/>
+						<radio label="List Mode" value="list"/>
+					</radiogroup>
+				</hbox>
+			</groupbox>
+
+		</groupbox>
 		
 		<groupbox aria-label="&zotero.general.tools;">
 			<label><html:h2>&zotero.general.tools;</html:h2></label>
