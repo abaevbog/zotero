@@ -718,6 +718,7 @@ const IOManager = {
 		}
 
 		_id("mode-button").setAttribute("mode", newMode);
+		doc.l10n.setAttributes(_id("mode-button"), "integration-citationDialog-btn-mode", { mode: newMode });
 		// save the library layout's height to restore it if we switch back
 		if (currentLayout?.type == "library") {
 			currentLayout.lastHeight = window.innerHeight;

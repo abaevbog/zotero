@@ -50,9 +50,6 @@
 		margin: 5px 10px 5px 0;
 
 		#z-icon-container {
-			display: flex;
-			justify-content: center;
-			align-items: center;
 			width: 36px; // same as left margin on .library-other-items
 
 			#z-icon {
@@ -62,6 +59,7 @@
 				pointer-events: all;
 				align-self: baseline;
   				margin-top: 7px;
+				margin-left: 12px;
 			}
 		}
 
@@ -81,10 +79,10 @@
 		border-bottom: 1px solid var(--color-panedivider);
 		margin: 0;
 	}
-	.vertical-divider {
-		border-left: 1px solid var(--color-panedivider);
-		margin-inline: 6px;
-		height: 28px;
+	.secondary-divider {
+		border-bottom: 1px solid var(--fill-quinary);
+		margin-left: 36px;
+		margin-right: 10px;
 	}
 
 	.add-all {
@@ -101,9 +99,9 @@
 		#library-other-items {
 
 			margin-left: 16px;
-			border-top: 1px solid var(--fill-quinary);
+			// border-top: 1px solid var(--fill-quinary);
 			padding-top: 8px;
-			margin-inline-end: 10px;
+			margin-inline-end: 4px;
 			overflow-x: scroll;
 			flex-shrink: 0; // make sure suggested items do not get shrunk when window is resized
 
@@ -238,17 +236,17 @@
 							gap: 0;
 						}
 						.item:nth-child(1) {
-							box-shadow: 5px -5px 10px -5px rgba(0,0,0,.1);
+							box-shadow: 2px 0px 4px 0px rgba(0, 0, 0, 0.10)
 						}
 						// 2nd and 3rd children are moved behind the first item, shrunk slightly and moved a bit to the right
 						// (by 16px and 32px) so their edge peaks out behind the top item
 						.item:nth-child(2) {
 							transform: translateX(calc(-1 * var(--deck-index) * (var(--item-horizontal-size)) + 16px)) scale(0.9);
-							box-shadow: 5px -5px 10px -5px rgba(0,0,0,.1);
+							box-shadow: 2px 0px 4px 0px rgba(0, 0, 0, 0.10)
 						}
 						.item:nth-child(3) {
 							transform:  translateX(calc(-1 * var(--deck-index) * (var(--item-horizontal-size)) + 32px)) scale(0.8);
-							box-shadow: 5px -5px 10px -5px rgba(0,0,0,.1);
+							box-shadow: 2px 0px 4px 0px rgba(0, 0, 0, 0.10)
 						}
 						// remaining item cards are just hidden behind the top item
 						.item:nth-child(n + 4) {
@@ -313,16 +311,26 @@
 						}
 						// class to handle hover and active effect, since :hover is applied to the entire row
 						&.hover:not([disabled]) {
-							background-color: var(--fill-quinary) !important;
+							background-color: var(--fill-quinary);
 						}
 						&.active:not([disabled]) {
-							background: var(--fill-quarternary) !important;
+							background-color: var(--fill-quarternary);
 						}
 						&[disabled] {
 							color: var(--color-gray-50);
 						}
 					}
-
+				}
+				// lighter hover and active effects on +/- buttons in selected rows
+				.row.selected {
+					.icon-action {
+						&.hover:not([disabled]) {
+							background-color: #ffffff1a;
+						}
+						&.active:not([disabled]) {
+							background-color: #ffffff33;
+						}
+					}
 				}
 			}
 		}
@@ -347,8 +355,7 @@
 					font-weight: 700;
 					font-size: 13px;
 					color: var(--fill-secondary);
-					margin-inline-start: 8px;
-					padding: 4px 8px;
+					padding: 4px 8px 4px 16px;
 				}
 				.item {
 					margin: 0 8px;
@@ -448,12 +455,9 @@
 
 	#bottom-area-wrapper {
 		border-top: var(--material-panedivider);
+		padding: 4px 10px 4px 12px;
 
 		#bottom-btn-group {
-			height: 36px;
-			border-top: 1px solid var(--material-panedivider);
-			align-items: center;
-			margin-inline-end: 10px;
 			gap: 10px;
 			#mode-button {
 				&[mode="library"] {

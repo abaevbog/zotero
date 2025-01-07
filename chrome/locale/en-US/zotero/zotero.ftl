@@ -369,7 +369,12 @@ integration-citationDialog-settings-keepSorted = Keep sources sorted
 integration-citationDialog-btn-settings =
     .title = { general-open-settings }
 integration-citationDialog-btn-mode =
-    .title = Switch Mode
+    .title = {
+        $mode ->
+            [library] Switch to List Mode
+            [list] Switch to Library Mode
+            *[other] Switch Mode
+    }
 integration-citationDialog-btn-accept = 
     .title = { general-accept }
 integration-citationDialog-btn-cancel = 
