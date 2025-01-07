@@ -222,18 +222,6 @@ export class CitationDialogKeyboardHandler {
 			if (this._multiselectStart === null) {
 				this._multiselectStart = current || nextNode;
 			}
-			// next node is a container on shift-arrow press into a collapsed deck of items in lib mode
-			// expand it and select all collapsed items
-			if (nextNode.classList.contains("itemsContainer")) {
-				let section = nextNode.closest(".section");
-				this.doc.dispatchEvent(new CustomEvent("expand-section", {
-					bubbles: true,
-					detail: {
-						section
-					}
-				}));
-				return this.navigateGroup({ group, current: null, forward: true, multiSelect: true, shouldFocus: true, shouldSelect: true });
-			}
 			this.doc.dispatchEvent(new CustomEvent("select-items", {
 				bubbles: true,
 				detail: {
