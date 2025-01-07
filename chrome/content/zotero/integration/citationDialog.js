@@ -152,8 +152,10 @@ class Layout {
 			itemContainer.replaceChildren(...items);
 			sections.push(section);
 			if (isGroupCollapsible) {
-				// handle click on a collapsed container to expand it and maybe focus the first item
-				itemContainer.addEventListener("click", IOManager.captureItemsContainerClick, true);
+				// handle click on a collapsed item deck
+				if (currentLayout.type === "library") {
+					itemContainer.addEventListener("click", libraryLayout.captureItemsContainerClick, true);
+				}
 				// just collapse/expand items when section header is clicked
 				section.querySelector(".header-label").addEventListener("click", () => IOManager.toggleSectionCollapse(section));
 				// handle click on "Add all"
@@ -303,6 +305,37 @@ class LibraryLayout extends Layout {
 				window.resizeTo(window.innerWidth, this.lastHeight);
 			}, 10);
 		}
+	}
+
+	// handle click on the items container
+	captureItemsContainerClick(event) {
+		// only handle clicks without a modifier or meta/ctrl+click
+		let withModifier = ['ctrlKey', 'metaKey', 'shiftKey', 'altKey'].some(key => event[key]);
+		if (withModifier && !(Zotero.isMac && event.metaKey) || (!Zotero.isMac && event.ctrlKey)) return;
+
+		event.stopPropagation();
+		let section = event.target.closest(".section");
+		// if the section is expanded, do nothing
+		if (section.classList.contains("expanded")) return;
+		// on meta/ctrl+click, toggle selected status of all items in the container
+		if (withModifier) {
+			for (let item of [...section.querySelectorAll(".item")]) {
+				IOManager.toggleItemNodeSelect(item);
+			}
+			currentLayout.updateSelectedItems();
+			return;
+		}
+		// on click without modifier, if all items in the container are selected, add all selected items.
+		// otherwise, add just items from this container
+		let selectedIDs = [];
+		if (section.querySelector(".item").classList.contains("selected")) {
+			let selectedItemNodes = _id(`${currentLayout.type}-layout`).querySelectorAll(".item.selected");
+			selectedIDs = [...selectedItemNodes].map(node => node.getAttribute("itemID"));
+		}
+		else {
+			selectedIDs = [...section.querySelectorAll(".item")].map(node => node.getAttribute("itemID"));
+		}
+		IOManager.addItemsToCitation(Zotero.Items.get(selectedIDs));
 	}
 
 	async _initItemTree() {
@@ -562,7 +595,6 @@ class ListLayout extends Layout {
 	updateSelectedItems() {
 		let selectedIDs = new Set([...doc.querySelectorAll(".selected")].map(node => parseInt(node.getAttribute("itemID"))));
 		for (let itemObj of CitationDataManager.items) {
-			console.log(itemObj.zoteroItem.id);
 			if (selectedIDs.has(itemObj.zoteroItem.id)) {
 				itemObj.selected = true;
 			}
@@ -677,7 +709,6 @@ const IOManager = {
 			let mode = _id("mode-button").getAttribute("mode");
 			newMode = mode == "library" ? "list" : "library";
 		}
-		console.log(newMode);
 		_id("list-layout").hidden = newMode == "library";
 		_id("library-layout").hidden = newMode == "list";
 
@@ -819,7 +850,6 @@ const IOManager = {
 		}
 		currentLayout.updateSelectedItems();
 		if (currentLayout.type == "list") {
-			console.log("?");
 			listLayout._markRoundedCorners();
 		}
 	},
@@ -851,37 +881,6 @@ const IOManager = {
 		}
 		let itemsToAdd = Array.from(itemIDs).map(itemID => SearchHandler.getItem(itemID));
 		IOManager.addItemsToCitation(itemsToAdd);
-	},
-
-	// handle click on the items container
-	captureItemsContainerClick(event) {
-		// only handle clicks without a modifier or meta/ctrl+click
-		let withModifier = ['ctrlKey', 'metaKey', 'shiftKey', 'altKey'].some(key => event[key]);
-		if (withModifier && !(Zotero.isMac && event.metaKey) || (!Zotero.isMac && event.ctrlKey)) return;
-
-		event.stopPropagation();
-		let section = event.target.closest(".section");
-		// if the section is expanded, do nothing
-		if (section.classList.contains("expanded")) return;
-		// on meta/ctrl+click, toggle selected status of all items in the container
-		if (withModifier) {
-			for (let item of [...section.querySelectorAll(".item")]) {
-				IOManager.toggleItemNodeSelect(item);
-			}
-			currentLayout.updateSelectedItems();
-			return;
-		}
-		// on click without modifier, if all items in the container are selected, add all selected items.
-		// otherwise, add just items from this container
-		let selectedIDs = [];
-		if (section.querySelector(".item").classList.contains("selected")) {
-			let selectedItemNodes = _id(`${currentLayout.type}-layout`).querySelectorAll(".item.selected");
-			selectedIDs = [...selectedItemNodes].map(node => node.getAttribute("itemID"));
-		}
-		else {
-			selectedIDs = [...section.querySelectorAll(".item")].map(node => node.getAttribute("itemID"));
-		}
-		IOManager.addItemsToCitation(Zotero.Items.get(selectedIDs));
 	},
 
 	// record which items in the library itemTree are currently selected to highlight them
