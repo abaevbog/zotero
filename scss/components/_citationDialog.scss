@@ -362,6 +362,16 @@
 					}
 					&.selected {
 						background: var(--accent-blue30);
+						border-radius: 0;
+						
+					}
+					&.selected-first {
+						border-top-left-radius: 5px;
+						border-top-right-radius: 5px;
+					}
+					&.selected-last {
+						border-bottom-left-radius: 5px;
+						border-bottom-right-radius: 5px;
 					}
 
 					.icon {

@@ -604,6 +604,30 @@ class ListLayout extends Layout {
 			window.resizeTo(window.innerWidth, parseInt(autoHeight));
 		}, 10);
 	}
+
+	_markRoundedCorners() {
+		let selectedGroupStarted = false;
+		let previousRow;
+		for (let row of [...doc.querySelectorAll(".item")]) {
+			row.classList.remove("selected-first", "selected-last");
+			// stop if we reached the end of the container
+			if (previousRow && selectedGroupStarted && row.parentNode !== previousRow.parentNode) {
+				selectedGroupStarted = false;
+				previousRow.classList.add("selected-last");
+			}
+			// mark the first item in a group of consecutively selected
+			if (row.classList.contains("selected") && !selectedGroupStarted) {
+				row.classList.add("selected-first");
+				selectedGroupStarted = true;
+			}
+			// mark the last item in a group of consecutively selected
+			if (!row.classList.contains("selected") && selectedGroupStarted && previousRow) {
+				previousRow.classList.add("selected-last");
+				selectedGroupStarted = false;
+			}
+			previousRow = row;
+		}
+	}
 }
 
 //
@@ -625,7 +649,7 @@ const IOManager = {
 		// handle expansion of collapsed decks initiated from other components
 		doc.addEventListener("expand-section", ({ detail: { section } }) => this.toggleSectionCollapse(section, "expanded"));
 		// mark item nodes as selected to highlight them and mark relevant bubbles
-		doc.addEventListener("select-items", ({ detail: { startNode, endNode } }) => this.selectItemNodes(startNode, endNode));
+		doc.addEventListener("select-items", ({ detail: { startNode, endNode } }) => this.selectItemNodesRange(startNode, endNode));
 		
 		// accept/cancel events emitted by keyboardHandler
 		doc.addEventListener("dialog-accepted", accept);
@@ -750,11 +774,11 @@ const IOManager = {
 		let somethingIsTyped = _id("bubble-input").isSomethingTyped();
 		if (!somethingIsTyped || !firstItemNode) return;
 		firstItemNode.classList.add("current");
-		this.selectItemNodes(firstItemNode);
+		this.selectItemNodesRange(firstItemNode);
 	},
 
 	// select all items between startNode and endNode
-	selectItemNodes(startNode, endNode = null) {
+	selectItemNodesRange(startNode, endNode = null) {
 		let itemNodes = [...doc.querySelectorAll(".item")];
 		for (let node of itemNodes) {
 			node.classList.remove("selected");
@@ -778,9 +802,26 @@ const IOManager = {
 		if (startIndex > endIndex) [startIndex, endIndex] = [endIndex, startIndex];
 
 		for (let i = startIndex; i <= endIndex; i++) {
-			itemNodes[i].classList.add("selected");
+			IOManager.toggleItemNodeSelect(itemNodes[i], true);
 		}
 		currentLayout.updateSelectedItems();
+	},
+
+	toggleItemNodeSelect(itemNode, isSelected = null) {
+		if (isSelected === true) {
+			itemNode.classList.add("selected");
+		}
+		else if (isSelected === false) {
+			itemNode.classList.remove("selected");
+		}
+		else {
+			itemNode.classList.toggle("selected");
+		}
+		currentLayout.updateSelectedItems();
+		if (currentLayout.type == "list") {
+			console.log("?");
+			listLayout._markRoundedCorners();
+		}
 	},
 
 	handleItemClick(event) {
@@ -789,14 +830,14 @@ const IOManager = {
 		// Cmd/Ctrl + mouseclick toggles selected item node
 		if (isMultiselectable && (Zotero.isMac && event.metaKey) || (!Zotero.isMac && event.ctrlKey)) {
 			targetItem.focus();
-			targetItem.classList.toggle("selected");
+			IOManager.toggleItemNodeSelect(targetItem);
 			return;
 		}
 		// Shift + click selects a range
 		if (isMultiselectable && event.shiftKey) {
 			let itemNodes = [..._id(`${currentLayout.type}-layout`).querySelectorAll(".item")];
 			let firstNode = _id(`${currentLayout.type}-layout`).querySelector(".item.selected") || itemNodes[0];
-			IOManager.selectItemNodes(firstNode, targetItem);
+			IOManager.selectItemNodesRange(firstNode, targetItem);
 			return;
 		}
 		// get itemIDs associated with the nodes
@@ -825,7 +866,7 @@ const IOManager = {
 		// on meta/ctrl+click, toggle selected status of all items in the container
 		if (withModifier) {
 			for (let item of [...section.querySelectorAll(".item")]) {
-				item.classList.toggle("selected");
+				IOManager.toggleItemNodeSelect(item);
 			}
 			currentLayout.updateSelectedItems();
 			return;
