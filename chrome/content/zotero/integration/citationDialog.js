@@ -152,10 +152,6 @@ class Layout {
 			itemContainer.replaceChildren(...items);
 			sections.push(section);
 			if (isGroupCollapsible) {
-				// handle click on a collapsed item deck
-				if (currentLayout.type === "library") {
-					itemContainer.addEventListener("click", libraryLayout.captureItemsContainerClick, true);
-				}
 				// just collapse/expand items when section header is clicked
 				section.querySelector(".header-label").addEventListener("click", () => IOManager.toggleSectionCollapse(section));
 				// handle click on "Add all"
@@ -252,6 +248,15 @@ class LibraryLayout extends Layout {
 		await super.refreshItemsList();
 		_id("library-other-items").hidden = !_id("library-layout").querySelector(".section:not([hidden])");
 		this.resizeWindow();
+		if (!_id("library-other-items").hidden) {
+			// on mouse scrollwheel in suggested items, scroll the list horizontally 
+			_id("library-other-items").addEventListener('wheel', this._scrollHorizontallyOnWheel);
+			// clicking on the collapsed deck of items will add all of them
+			let collapsibleDecks = [..._id("library-other-items").querySelectorAll(".section.expandable")];
+			for (let collapsibleDeck of collapsibleDecks) {
+				collapsibleDeck.querySelector(".itemsContainer").addEventListener("click", this._captureItemsContainerClick, true);
+			}
+		}
 	}
 
 	// Refresh itemTree to properly display +/- icons column
@@ -308,7 +313,7 @@ class LibraryLayout extends Layout {
 	}
 
 	// handle click on the items container
-	captureItemsContainerClick(event) {
+	_captureItemsContainerClick(event) {
 		// only handle clicks without a modifier or meta/ctrl+click
 		let withModifier = ['ctrlKey', 'metaKey', 'shiftKey', 'altKey'].some(key => event[key]);
 		if (withModifier && !(Zotero.isMac && event.metaKey) || (!Zotero.isMac && event.ctrlKey)) return;
@@ -552,6 +557,13 @@ class LibraryLayout extends Layout {
 			// wait a moment for bubbles to resize and update window sizing
 			await Zotero.Promise.delay(10);
 			this.resizeWindow();
+		}
+	}
+
+	_scrollHorizontallyOnWheel(event) {
+		if (event.deltaY !== 0 && event.deltaX === 0) {
+			_id("library-other-items").scrollLeft += event.deltaY;
+			event.preventDefault();
 		}
 	}
 }
