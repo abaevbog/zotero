@@ -772,12 +772,21 @@ const IOManager = {
 			// User did not select "Continue", so just stop
 			if (!canProceed) return;
 		}
-		// Warn about potential duplicate items
-		for (let item of items) {
-			if (CitationDataManager.potentialDuplicateExists(item)) {
+		// Handle potential duplicate items.
+		// If a single item is being added, display a warning to confirm that this item should be included.
+		// If multiple items are being added, it's likely that the user just selected a range
+		// of items wanting to have all of them in the citation, regardless if some items
+		// from that range were included or not. To not bother the user with a warning,
+		// filter out potential duplicates (as they are already included) and
+		// include all remaining items.
+		if (items.length == 1) {
+			if (CitationDataManager.potentialDuplicateExists(items[0])) {
 				let canProceed = await PopupsHandler.showDuplicateItemWarning();
 				if (!canProceed) return;
 			}
+		}
+		else {
+			items = items.filter(item => !CitationDataManager.potentialDuplicateExists(item));
 		}
 		// If the last input has a locator, add it into the item
 		let input = _id("bubble-input").getCurrentInput();
@@ -1171,8 +1180,6 @@ const CitationDataManager = {
 			targetZoteroItem = this._citationItemToZoteroItem(targetZoteroItem);
 		}
 		for (let item of this.items) {
-			// Make sure we don't count the same item as a duplicate of itself
-			if (this._itemsHaveSameID(item.citationItem, targetZoteroItem)) continue;
 			let sameCreator = item.zoteroItem.getField("firstCreator") === targetZoteroItem.getField("firstCreator");
 			let sameTitle = item.zoteroItem.getDisplayTitle() === targetZoteroItem.getDisplayTitle();
 			if (sameCreator && sameTitle) return true;
