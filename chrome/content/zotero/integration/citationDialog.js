@@ -699,6 +699,8 @@ const IOManager = {
 		doc.addEventListener("dialog-accepted", accept);
 		doc.addEventListener("dialog-cancelled", cancel);
 
+		doc.addEventListener("DOMMenuBarActive", () => this._handleMenuBarAppearance());
+
 		// after item details popup closes, item may have been updated, so refresh bubble input
 		_id("itemDetails").addEventListener("popuphidden", () => this.updateBubbleInput());
 		// if keep sorted was unchecked and then checked, resort items and update bubbles
@@ -1016,6 +1018,18 @@ const IOManager = {
 		}
 		else {
 			currentLayout.search(query);
+		}
+	},
+
+	_handleMenuBarAppearance() {
+		if (Zotero.isMac) return;
+		let bottomAreaBox = _id("bottom-area-wrapper").getBoundingClientRect();
+		// if the bottom-area was pushed outside of the bounds of the window by itemTree's menubar
+		// increase the window's width a bit so it is still accessible.
+		// + 1 is the margin of safety needed to account for tiny differences in positioning
+		// (e.g. on windows, bottomAreaBox.bottom may have a decimal)
+		if (bottomAreaBox.bottom > window.innerHeight + 1) {
+			window.resizeTo(window.innerWidth, window.innerHeight + 30);
 		}
 	},
 
