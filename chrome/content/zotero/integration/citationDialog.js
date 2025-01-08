@@ -973,7 +973,8 @@ const IOManager = {
 		// add whatever items are selected
 		if (doc.querySelector(".selected")) {
 			let selectedIDs = [...doc.querySelectorAll(".selected")].map(node => node.getAttribute("itemID"));
-			IOManager.addItemsToCitation(Zotero.Items.get(selectedIDs));
+			let items = selectedIDs.map(id => SearchHandler.getItem(id));
+			IOManager.addItemsToCitation(items);
 		}
 		else {
 			accept();
