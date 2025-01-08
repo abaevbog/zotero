@@ -974,8 +974,8 @@ const IOManager = {
 			return;
 		}
 		// add whatever items are selected
-		if (doc.querySelector(".selected")) {
-			let selectedIDs = [...doc.querySelectorAll(".selected")].map(node => node.getAttribute("itemID"));
+		if (doc.querySelector(".item.selected")) {
+			let selectedIDs = [...doc.querySelectorAll(".item.selected")].map(node => node.getAttribute("itemID"));
 			let items = selectedIDs.map(id => SearchHandler.getItem(id));
 			IOManager.addItemsToCitation(items);
 		}
@@ -1226,13 +1226,13 @@ const CitationDataManager = {
 				ioResult.prefix = item.prefix || null;
 				ioResult.suffix = item.suffix || null;
 				ioResult['suppress-author'] = item["suppress-author"] || null;
-				if (!final) {
-					ioResult.dialogReferenceID = dialogReferenceID;
-				}
 				result.push(ioResult);
 			}
 			else {
 				result.push(item);
+			}
+			if (!final) {
+				result[result.length - 1].dialogReferenceID = dialogReferenceID;
 			}
 		}
 		io.citation.citationItems = result;
@@ -1252,6 +1252,7 @@ const CitationDataManager = {
 		for (let item of this.items) {
 			let currentIndex = this.getItemIndex({ dialogReferenceID: item.dialogReferenceID });
 			let expectedIndex = sortedItems.findIndex(ioItem => ioItem.dialogReferenceID == item.dialogReferenceID);
+			console.log("Indicies", currentIndex, expectedIndex);
 			if (currentIndex !== expectedIndex) {
 				this.items.splice(currentIndex, 1);
 				this.items.splice(expectedIndex, 0, item);
