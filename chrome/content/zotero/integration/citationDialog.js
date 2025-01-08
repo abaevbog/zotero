@@ -715,6 +715,9 @@ const IOManager = {
 		// handle accept/cancel buttons
 		_id("accept-button").addEventListener("click", accept);
 		_id("cancel-button").addEventListener("click", cancel);
+
+		// some additional logic to keep focus on relevant nodes during mouse interactions
+		this._initFocusRetention();
 	},
 
 	// switch between list and library modes
@@ -989,6 +992,11 @@ const IOManager = {
 		this.updateBubbleInput();
 		// Always refresh items list to make sure the opened and selected items are up to date
 		currentLayout.refreshItemsList();
+		// if the focus was lost (e.g. after clicking on the X icon of a bubble)
+		// try to return focus to previously-focused node
+		if (doc.activeElement.tagName == "body") {
+			IOManager._restorePreClickFocus();
+		}
 	},
 
 	_moveItem(dialogReferenceID, newIndex) {
@@ -1049,6 +1057,82 @@ const IOManager = {
 			desiredMode = Zotero.Prefs.get("integration.citationDialogLastClosedMode");
 		}
 		this.toggleDialogMode(desiredMode);
+	},
+
+	// Return focus to where it was before click moved focus.
+	// If it's not possible, refocus the last input in bubble-input so that
+	// focus is not just lost.
+	_restorePreClickFocus() {
+		if (doc.contains(IOManager._focusedBeforeClick)) {
+			IOManager._focusedBeforeClick.focus();
+			return;
+		}
+		_id("bubble-input").refocusInput();
+	},
+
+	// We want to not place focus on some of the focusable nodes on mouse click.
+	// These listeners try to keep focus on main components of the interface for
+	// a more consistent navigation.
+	_initFocusRetention() {
+		IOManager._noRefocusing = null;
+		IOManager._focusBeforePanelShow = null;
+		IOManager._clicked = null;
+		IOManager._focusedBeforeClick = null;
+
+		// When focus changes, check if the newly focused node is the node that was last clicked.
+		// If so, return focus to whatever  node was focused before the click.
+		// That way, one can click a button without moving focus onto it.
+		doc.addEventListener("focusout", (_) => {
+			setTimeout(() => {
+				// bubble-input and itemTree/collectionTree are the main interactable elements,
+				// so don't move focus from them
+				if (_id("bubble-input").contains(doc.activeElement)) return;
+				if (_id("library-trees").contains(doc.activeElement)) return;
+				if (IOManager._noRefocusing) return;
+				let focused = doc.activeElement;
+				if (focused.contains(IOManager._clicked) && !focused.closest("panel")) {
+					IOManager._restorePreClickFocus();
+				}
+			});
+		});
+		// Record which node was last clicked for the focusout handler above
+		doc.addEventListener("mousedown", (event) => {
+			if (event.target.closest("panel")) return;
+			IOManager._clicked = event.target;
+			IOManager._focusedBeforeClick = doc.activeElement;
+		});
+		// Clear record of last clicked node if some other interaction happened (e.g. keydown)
+		doc.addEventListener("keydown", (event) => {
+			if (event.target.closest("panel")) return;
+			IOManager._clicked = null;
+		});
+
+		// When a popup is appearing after click, record which node was focused before click happened
+		doc.addEventListener("popupshowing", (event) => {
+			if (!["xul:panel"].includes(event.target.tagName)) return;
+			IOManager._noRefocusing = true;
+			IOManager._focusBeforePanelShow = null;
+			if (doc.activeElement.contains(IOManager._clicked)) {
+				IOManager._focusBeforePanelShow = IOManager._focusedBeforeClick;
+			}
+		});
+		// When the popup is closed, return focus to where it was before the popup was
+		// opened by click.
+		doc.addEventListener("popuphidden", (event) => {
+			let popup = event.target;
+			if (!["xul:panel"].includes(popup.tagName)) return;
+			IOManager._noRefocusing = false;
+			// after item details popup closes on Enter, refocus the last input
+			if (popup.id == "itemDetails" && popup.getAttribute("refocus-input")) {
+				_id("bubble-input").refocusInput();
+				popup.removeAttribute("refocus-input");
+				return;
+			}
+			if (IOManager._focusBeforePanelShow) {
+				IOManager._focusBeforePanelShow.focus();
+			}
+			IOManager._focusBeforePanelShow = null;
+		});
 	}
 };
 

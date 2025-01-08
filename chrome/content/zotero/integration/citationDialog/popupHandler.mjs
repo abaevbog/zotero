@@ -33,8 +33,6 @@ export class CitationDialogPopupsHandler {
 		this.item = null;
 		this.citationItem = null;
 		this.discardItemDetailsEdits = false;
-		this.focusBubbleOnClose = false;
-		this.focusBubbleInputOnClose = true;
 
 		this.setupListeners();
 	}
@@ -80,7 +78,6 @@ export class CitationDialogPopupsHandler {
 		// Item details Show in Library btn
 		this._getNode("#itemDetails .show").addEventListener("click", (_) => {
 			this.discardItemDetailsEdits = true;
-			this.focusBubbleInputOnClose = false;
 			this._getNode("#itemDetails").hidePopup();
 			Zotero.Utilities.Internal.showInLibrary(this.item.id);
 		});
@@ -145,13 +142,6 @@ export class CitationDialogPopupsHandler {
 		let bubble = this._getNode(`[dialogReferenceID='${this.dialogReferenceID}']`);
 		if (!bubble) return;
 		bubble.classList.remove("showingDetails");
-		if (this.focusBubbleOnClose) {
-			this.focusBubbleOnClose = false;
-			bubble.focus();
-		}
-		else if (this.focusBubbleInputOnClose) {
-			this._getNode("#bubble-input").refocusInput();
-		}
 		if (this.discardItemDetailsEdits) {
 			this.discardItemDetailsEdits = false;
 			return;
@@ -173,8 +163,13 @@ export class CitationDialogPopupsHandler {
 
 	handleItemDetailsKeypress(event) {
 		if (event.key == "ArrowUp" || event.key == "Enter") {
-			this.focusBubbleOnClose = event.key == "ArrowUp";
+			// On Enter, refocus last input. Otherwise, keep focus where it was before opening the popup.
+			if (event.key == "Enter") {
+				this._getNode("#itemDetails").setAttribute("refocus-input", true);
+			}
 			this._getNode("#itemDetails").hidePopup();
+			// Do not let event propagate so it is not picked up by global keyboard handler
+			event.stopPropagation();
 		}
 	}
 
