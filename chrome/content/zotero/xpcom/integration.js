@@ -1527,20 +1527,8 @@ Zotero.Integration.Session.prototype.cite = async function (field, addNote=false
 	Zotero.debug(`Editing citation:`);
 	Zotero.debug(JSON.stringify(citation.toJSON()));
 
-	var mode = (!Zotero.isMac && Zotero.Prefs.get('integration.keepAddCitationDialogRaised')
-		? 'popup' : 'alwaysRaised')+',resizable=false';
-	if (addNote) {
-		Zotero.Integration.displayDialog('chrome://zotero/content/integration/citationDialog.xhtml',
-			mode, io);
-	}
-	else if (Zotero.Prefs.get("integration.useClassicAddCitationDialog")) {
-		Zotero.Integration.displayDialog('chrome://zotero/content/integration/addCitationDialog.xhtml',
-			'alwaysRaised,resizable', io);
-	}
-	else {
-		Zotero.Integration.displayDialog('chrome://zotero/content/integration/citationDialog.xhtml',
-			mode, io);
-	}
+	var mode = "chrome,centerscreen,resizable=true";
+	Zotero.Integration.displayDialog('chrome://zotero/content/integration/citationDialog.xhtml', mode, io);
 
 	// -------------------
 	// io.promise resolves when the citation dialog is closed
