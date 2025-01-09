@@ -153,7 +153,7 @@ class Layout {
 			sections.push(section);
 			if (isGroupCollapsible) {
 				// just collapse/expand items when section header is clicked
-				section.querySelector(".header-label").addEventListener("click", () => IOManager.toggleSectionCollapse(section));
+				section.querySelector(".header-label").addEventListener("click", event => IOManager.handleCollapsedSectionHeaderClick(section, event));
 				// handle click on "Add all"
 				section.querySelector(".add-all").addEventListener("click", () => IOManager.addItemsToCitation(group));
 
@@ -249,7 +249,7 @@ class LibraryLayout extends Layout {
 		_id("library-other-items").hidden = !_id("library-layout").querySelector(".section:not([hidden])");
 		this.resizeWindow();
 		if (!_id("library-other-items").hidden) {
-			// on mouse scrollwheel in suggested items, scroll the list horizontally 
+			// on mouse scrollwheel in suggested items, scroll the list horizontally
 			_id("library-other-items").addEventListener('wheel', this._scrollHorizontallyOnWheel);
 			// clicking on the collapsed deck of items will add all of them
 			let collapsibleDecks = [..._id("library-other-items").querySelectorAll(".section.expandable")];
@@ -318,10 +318,10 @@ class LibraryLayout extends Layout {
 		let withModifier = ['ctrlKey', 'metaKey', 'shiftKey', 'altKey'].some(key => event[key]);
 		if (withModifier && !(Zotero.isMac && event.metaKey) || (!Zotero.isMac && event.ctrlKey)) return;
 
-		event.stopPropagation();
 		let section = event.target.closest(".section");
 		// if the section is expanded, do nothing
 		if (section.classList.contains("expanded")) return;
+		event.stopPropagation();
 		// on meta/ctrl+click, toggle selected status of all items in the container
 		if (withModifier) {
 			for (let item of [...section.querySelectorAll(".item")]) {
@@ -922,6 +922,14 @@ const IOManager = {
 			}
 		}
 		IOManager.updateBubbleInput();
+	},
+
+	handleCollapsedSectionHeaderClick(section, event) {
+		IOManager.toggleSectionCollapse(section);
+		// When section is expanded by a click via keyboard, navigate into the section
+		if (IOManager._clicked !== event.target && section.classList.contains("expanded")) {
+			KeyboardHandler.navigateGroup({ group: section, current: null, forward: true, shouldSelect: true, shouldFocus: true, multiSelect: false });
+		}
 	},
 
 	toggleSectionCollapse(section, status) {
