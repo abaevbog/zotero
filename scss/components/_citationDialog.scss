@@ -1,7 +1,6 @@
 #citation-dialog {
 	min-width: 800px;
 	height: 100%;
-	-moz-window-dragging: drag;
 
 	body {
 		height: inherit;
@@ -29,7 +28,6 @@
 		background-size: 60% !important;
 		background-repeat: no-repeat;
 		border-radius: 5px;
-		-moz-window-dragging: no-drag;
 		&:hover:not([disabled]) {
 			cursor: pointer;
 			background-color: var(--fill-quinary) !important;
@@ -51,7 +49,7 @@
 
 		#z-icon-container {
 			width: 36px; // same as left margin on .library-other-items
-
+			-moz-window-dragging: drag;
 			#z-icon {
 				background-image: url(chrome://zotero/skin/z.svg);
 				width: 16px;
@@ -142,7 +140,6 @@
 						white-space: nowrap;
 						border: 1px solid var(--fill-quarternary);
 						border-radius: 5px;
-						-moz-window-dragging: no-drag;
 		
 						display: flex;
 						flex-direction: column;
@@ -193,7 +190,6 @@
 					// header has underline effect on hover and has an icon before it
 					// indicating current state
 					.header {
-						-moz-window-dragging: no-drag;
 						-moz-user-select: none;
 						width: var(--item-horizontal-size);
 
@@ -273,7 +269,6 @@
 		#library-trees {
 			min-height: 200px;
 			flex: 1;
-			-moz-window-dragging: no-drag;
 			-moz-user-select: none;
 	
 			#collections-tree-container {
@@ -362,7 +357,6 @@
 					padding: 4px 8px;
 					border-radius: 5px;
 					color: var(--fill-primary);
-					-moz-window-dragging: no-drag;
 					cursor: default;
 					&:hover {
 						background-color: var(--fill-quarternary);
@@ -403,7 +397,6 @@
 				&.expandable {
 					// styling for expandable header with a twisty
 					.header {
-						-moz-window-dragging: no-drag;
 						-moz-user-select: none;
 						display: flex;
 						justify-content: space-between;
@@ -456,6 +449,7 @@
 	#bottom-area-wrapper {
 		border-top: var(--material-panedivider);
 		padding: 4px 10px 4px 12px;
+		-moz-window-dragging: drag;
 
 		#bottom-btn-group {
 			gap: 10px;
