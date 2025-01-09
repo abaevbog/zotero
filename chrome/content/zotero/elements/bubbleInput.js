@@ -153,6 +153,21 @@
 		}
 
 		/**
+		 * Set on inputs which item is currently selected for screen readers to
+		 * announce.
+		 */
+		ariaSetCurrentItem(id) {
+			for (let input of [...this.querySelectorAll(".input")]) {
+				if (id) {
+					input.setAttribute("aria-activedescendant", id);
+				}
+				else {
+					input.removeAttribute("aria-activedescendant");
+				}
+			}
+		}
+		
+		/**
 		 * Get the input that the user interacted with last. If an input is focused, return that.
 		 * Otherwise, return last focused input, if it is still part of the bubbleInput.
 		 */
@@ -327,6 +342,7 @@
 			// hide windows appearance from _input.scss
 			input.setAttribute("no-windows-native", true);
 			input.setAttribute("data-arrow-nav-enabled", true);
+			input.setAttribute("role", "combobox");
 			input.className = "input";
 			input.setAttribute("aria-describedby", "input-description");
 			input.addEventListener("input", (_) => {

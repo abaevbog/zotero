@@ -164,6 +164,8 @@ class Layout {
 		_id(`${this.type}-layout`).querySelector(".search-items").replaceChildren(...sections);
 		// Update which bubbles need to be highlighted
 		this.updateSelectedItems();
+		// Clear the record of currently selected item from inputs
+		_id("bubble-input").ariaSetCurrentItem(null);
 		// Pre-select the item to be added on Enter of an input
 		IOManager.markPreSelected();
 	}
@@ -231,6 +233,8 @@ class LibraryLayout extends Layout {
 		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 40, "data-arrow-nav-enabled": true }, "item");
 		let id = item.cslItemID || item.id;
 		itemNode.setAttribute("itemID", id);
+		itemNode.setAttribute("role", "option");
+		itemNode.id = id;
 		let title = Helpers.createNode("div", {}, "title");
 		let description = Helpers.buildItemDescription(item);
 		title.textContent = item.getDisplayTitle();
@@ -578,6 +582,8 @@ class ListLayout extends Layout {
 		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 40, "data-arrow-nav-enabled": true }, "item hbox");
 		let id = item.cslItemID || item.id;
 		itemNode.setAttribute("itemID", id);
+		itemNode.setAttribute("role", "option");
+		itemNode.id = id;
 		let itemInfo = Helpers.createNode("div", {}, "info");
 		let icon = Helpers.createNode("span", {}, "icon icon-css icon-item-type");
 		let dataTypeLabel = item.getItemTypeIconName(true);
@@ -832,6 +838,7 @@ const IOManager = {
 		let somethingIsTyped = _id("bubble-input").isSomethingTyped();
 		if (!somethingIsTyped || !firstItemNode) return;
 		firstItemNode.classList.add("current");
+		_id("bubble-input").ariaSetCurrentItem(firstItemNode.id);
 		this.selectItemNodesRange(firstItemNode);
 	},
 

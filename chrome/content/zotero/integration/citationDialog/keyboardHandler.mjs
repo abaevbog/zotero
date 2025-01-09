@@ -208,6 +208,7 @@ export class CitationDialogKeyboardHandler {
 		
 		current?.classList.remove("current");
 		nextNode.classList.add("current");
+		this.doc.querySelector("#bubble-input").ariaSetCurrentItem(nextNode.id);
 		// if the node is not being focused in list mode, make sure we scroll to it so it is visible
 		if (!shouldFocus) {
 			let wrapperRect = this._id("list-layout-wrapper").getBoundingClientRect();
