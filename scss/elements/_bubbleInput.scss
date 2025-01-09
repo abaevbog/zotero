@@ -41,7 +41,7 @@ bubble-input {
 	}
 	
 	.bubble {
-		@include focus-ring;
+		@include focus-ring(true);
 		--bubble-horizontal-margin: 2px;
 		height: var(--bubble-height);
 		border-radius: 5px;

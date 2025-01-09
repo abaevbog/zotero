@@ -658,7 +658,9 @@ class ListLayout extends Layout {
 	_markRoundedCorners() {
 		let selectedGroupStarted = false;
 		let previousRow;
-		for (let row of [...doc.querySelectorAll(".item")]) {
+		let items = [...doc.querySelectorAll(".item")];
+		for (let rowIndex = 0; rowIndex < items.length; rowIndex++) {
+			let row = items[rowIndex];
 			row.classList.remove("selected-first", "selected-last");
 			// stop if we reached the end of the container
 			if (previousRow && selectedGroupStarted && row.parentNode !== previousRow.parentNode) {
@@ -674,6 +676,10 @@ class ListLayout extends Layout {
 			if (!row.classList.contains("selected") && selectedGroupStarted && previousRow) {
 				previousRow.classList.add("selected-last");
 				selectedGroupStarted = false;
+			}
+			// if this is the last selected item, mark it as the last selected too
+			if (row.classList.contains("selected") && rowIndex == items.length - 1) {
+				row.classList.add("selected-last");
 			}
 			previousRow = row;
 		}
