@@ -10,6 +10,7 @@ bubble-input {
 		display: flex;
 		flex-flow: row wrap;
 		align-items: center;
+		align-content: start; // does not let bubbles spread out when setHeightLock is used
 		min-height: 28px;
 		width: 100%;
 		padding-inline-end: 6px;
@@ -21,6 +22,12 @@ bubble-input {
 			white-space: pre;
 		}
 		cursor: text;
+
+		-moz-window-dragging: no-drag;
+
+		// increase the clickable area before each bubble a bit
+		padding-inline-start: 5px;
+		margin-inline-start: -5px;
 	}
 	
 	input {

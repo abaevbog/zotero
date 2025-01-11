@@ -47,24 +47,22 @@ export class CitationDialogKeyboardHandler {
 
 	handleTopLevelKeypress(event) {
 		let handled = false;
-		// Shift-Enter will always accept the existing dialog's state
-		if (event.key == "Enter" && event.shiftKey) {
+		let tgt = event.target;
+		let isKeyboardClickable = tgt.classList.contains("keyboard-clickable") || tgt.tagName.includes("button");
+		// Space/Enter will click on a button or keyboard-clickable components
+		if (["Enter", " "].includes(event.key) && isKeyboardClickable) {
+			tgt.click();
+			handled = true;
+		}
+		// Unhandled Enter will accept the existing dialog's state
+		else if (event.key == "Enter" && !tgt.closest("panel")) {
 			handled = true;
 			this.doc.dispatchEvent(new CustomEvent("dialog-accepted"));
 		}
+		// Unhandled Escape will close the dialog
 		else if (event.key == "Escape") {
 			handled = true;
 			this.doc.dispatchEvent(new CustomEvent("dialog-cancelled"));
-		}
-		// Unhandled Enter or Space triggers a click
-		else if ((event.key == "Enter" || event.key == " ")) {
-			let isButton = event.target.tagName == "button";
-			let isCheckbox = event.target.getAttribute("type") == "checkbox";
-			let inInput = event.target.tagName == "input";
-			if (!(isButton || isCheckbox || inInput)) {
-				event.target.click();
-				handled = true;
-			}
 		}
 		if (handled) {
 			event.preventDefault();
@@ -256,6 +254,13 @@ export class CitationDialogKeyboardHandler {
 	}
 
 	captureKeydown(event) {
+		// Shift-Enter will always accept the dialog regardless of the target
+		if (event.key == "Enter" && event.shiftKey) {
+			this.doc.dispatchEvent(new CustomEvent("dialog-accepted"));
+			event.stopPropagation();
+			event.preventDefault();
+			return;
+		}
 		let noModifiers = !['ctrlKey', 'metaKey', 'shiftKey', 'altKey'].some(key => event[key]);
 		if (this._id("zotero-items-tree").contains(event.target) && event.key == "ArrowUp" && noModifiers) {
 			let focusedRow = this._id("zotero-items-tree").querySelector(".row.focused");

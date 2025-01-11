@@ -91,7 +91,7 @@
 			</div>
 		</div>
 
-		<div id="popups">
+		<div id="popups" keyboard-dialog-closure="false">
 			<div class="overlay" hidden="true"></div>
 			<xul:panel id="itemDetails" focus-target-id="locator">
 				<div class="vbox popup">
@@ -113,7 +113,7 @@
 							<input id="suffix" class="details-data"/>
 						<div class="dummy-for-checkbox-placement"></div>	
 						<div id="suppress-author-row">
-							<input id="suppress-author" type="checkbox"/>
+							<input id="suppress-author" type="checkbox" class="keyboard-clickable"/>
 							<label for="suppress-author" data-l10n-id="integration-citationDialog-details-suppressAuthor"></label>
 						</div>
 						

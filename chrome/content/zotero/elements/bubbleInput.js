@@ -246,7 +246,7 @@
 			bubble.setAttribute("aria-haspopup", true);
 			bubble.setAttribute("dialogReferenceID", dialogReferenceID);
 			bubble.setAttribute("data-arrow-nav-enabled", true);
-			bubble.className = "bubble";
+			bubble.className = "bubble keyboard-clickable";
 			// VoiceOver works better without it
 			if (!Zotero.isMac) {
 				bubble.setAttribute("aria-label", content);
@@ -382,6 +382,7 @@
 			// Enter on an input can have multiple outcomes, they are handled in citationDialog
 			if (event.key == "Enter" && !event.shiftKey) {
 				Utils.notifyDialog("input-enter", { input });
+				event.stopPropagation();
 			}
 			if (["Backspace", "Delete"].includes(event.key)
 				&& (input.selectionStart + input.selectionEnd) === 0) {

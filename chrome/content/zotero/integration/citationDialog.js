@@ -86,6 +86,9 @@ function accept() {
 	document.documentElement.style.removeProperty("min-height");
 	currentLayout.resizeWindow();
 	Zotero.Prefs.set("integration.citationDialogLastClosedMode", currentLayout.type);
+	if (currentLayout.type == "library") {
+		Zotero.Prefs.set("integration.citationDialogCollectionLastSelected", libraryLayout.collectionsView.selectedTreeRow.ref.treeViewID);
+	}
 	io.accept((percent) => {
 		_id("progress").value = Math.round(percent);
 	});
@@ -230,7 +233,7 @@ class LibraryLayout extends Layout {
 
 	// Create item node for an item group and store item ids in itemIDs attribute
 	async createItemNode(item, index = null) {
-		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 40, "data-arrow-nav-enabled": true }, "item");
+		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 40, "data-arrow-nav-enabled": true }, "item keyboard-clickable");
 		let id = item.cslItemID || item.id;
 		itemNode.setAttribute("itemID", id);
 		itemNode.setAttribute("role", "option");
@@ -259,6 +262,7 @@ class LibraryLayout extends Layout {
 			let collapsibleDecks = [..._id("library-other-items").querySelectorAll(".section.expandable")];
 			for (let collapsibleDeck of collapsibleDecks) {
 				collapsibleDeck.querySelector(".itemsContainer").addEventListener("click", this._captureItemsContainerClick, true);
+				collapsibleDeck.querySelector(".itemsContainer").classList.add("keyboard-clickable");
 			}
 		}
 	}
@@ -280,6 +284,7 @@ class LibraryLayout extends Layout {
 	}
 
 	updateSelectedItems() {
+		if (!libraryLayout.itemsView) return;
 		let selectedItemIDs = new Set(libraryLayout.itemsView.getSelectedItems().map(item => item.id));
 		for (let itemObj of CitationDataManager.items) {
 			if (selectedItemIDs.has(itemObj.zoteroItem.id)) {
@@ -417,6 +422,9 @@ class LibraryLayout extends Layout {
 			},
 			regularOnly: !isCitingNotes,
 			onActivate: (event, items) => {
+				// PreventDefault needed to stop Enter event from reaching KeyboardHandler
+				// which would accept the dialog
+				event.preventDefault();
 				IOManager.addItemsToCitation(items, { noInputRefocus: true });
 			},
 			emptyMessage: Zotero.getString('pane.items.loading'),
@@ -440,7 +448,8 @@ class LibraryLayout extends Layout {
 		itemsTree.addEventListener("focusout", event => this._handleFocusOut(event));
 		// manually handle hover effect on +/- icon, since css :hover applies to the entire row
 		itemsTree.addEventListener("mousemove", event => this._handleItemsViewMouseMove(event));
-		// itemsTree.addEventListener("mouseleave", event => this._handleFocusOut(event));
+		// handle backspace to remove an item from citation
+		itemsTree.addEventListener("keypress", event => this._handleItemsViewKeyPress(event));
 		this._refreshItemsViewHighlightedRows();
 	}
 	
@@ -448,7 +457,9 @@ class LibraryLayout extends Layout {
 		const CollectionTree = require('zotero/collectionTree');
 		this.collectionsView = await CollectionTree.init(_id('zotero-collections-tree'), {
 			onSelectionChange: this._onCollectionSelection.bind(this),
-			hideSources: ['duplicates', 'trash', 'feeds']
+			hideSources: ['duplicates', 'trash', 'feeds'],
+			initialFolder: Zotero.Prefs.get("integration.citationDialogCollectionLastSelected"),
+			onActivate: () => {}
 		});
 	}
 	
@@ -547,6 +558,20 @@ class LibraryLayout extends Layout {
 		hoveredOverIcon.classList.add("hover");
 	}
 
+	// backspace in itemsView deletes items from the citation
+	_handleItemsViewKeyPress(event) {
+		if (event.key == "Backspace") {
+			let itemsToRemove = this.itemsView.getSelectedItems();
+			for (let item of itemsToRemove) {
+				let citationItems = CitationDataManager.getItems({ zoteroItemID: item.id });
+				for (let citationItem of citationItems) {
+					let { dialogReferenceID } = citationItem;
+					IOManager._deleteItem(dialogReferenceID);
+				}
+			}
+		}
+	}
+
 	// Highlight/de-highlight selected rows
 	_refreshItemsViewHighlightedRows() {
 		let selectedIDs = CitationDataManager.items.map(({ zoteroItem }) => zoteroItem.id).filter(id => !!id);
@@ -579,7 +604,7 @@ class ListLayout extends Layout {
 
 	// Create item node for an item group and store item ids in itemIDs attribute
 	async createItemNode(item) {
-		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 40, "data-arrow-nav-enabled": true }, "item hbox");
+		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 40, "data-arrow-nav-enabled": true }, "item hbox keyboard-clickable");
 		let id = item.cslItemID || item.id;
 		itemNode.setAttribute("itemID", id);
 		itemNode.setAttribute("role", "option");
@@ -756,10 +781,17 @@ const IOManager = {
 		currentLayout = newMode === "library" ? libraryLayout : listLayout;
 		// do not show View menubar with itemTree-specific options in list mode
 		doc.querySelector("item-tree-menu-bar").suppressed = currentLayout.type == "list";
-		// when switching from library to list, make sure all selected items are de-selected
 		if (currentLayout.type == "list") {
+			// when switching from library to list, make sure all selected items are de-selected
 			libraryLayout.itemsView?.selection.clearSelection();
 			currentLayout.updateSelectedItems();
+		}
+		else {
+			// when switching to the library mode, invalidate collection tree to make sure
+			// the selected row is properly rendered
+			setTimeout(() => {
+				libraryLayout.collectionsView?.tree.invalidate();
+			});
 		}
 		currentLayout.refreshItemsList();
 	},
@@ -770,7 +802,7 @@ const IOManager = {
 	},
 
 	async addItemsToCitation(items, { noInputRefocus } = {}) {
-		if (accepted) return;
+		if (accepted || SearchHandler.searching) return;
 		if (!Array.isArray(items)) {
 			items = [items];
 		}
@@ -789,22 +821,12 @@ const IOManager = {
 			// User did not select "Continue", so just stop
 			if (!canProceed) return;
 		}
-		// Handle potential duplicate items.
-		// If a single item is being added, display a warning to confirm that this item should be included.
-		// If multiple items are being added, it's likely that the user just selected a range
-		// of items wanting to have all of them in the citation, regardless if some items
-		// from that range were included or not. To not bother the user with a warning,
-		// filter out potential duplicates (as they are already included) and
-		// include all remaining items.
-		if (items.length == 1) {
-			if (CitationDataManager.potentialDuplicateExists(items[0])) {
-				let canProceed = await PopupsHandler.showDuplicateItemWarning();
-				if (!canProceed) return;
-			}
+		
+		// If multiple items are being added, only add ones that are not included in the citation
+		if (items.length > 1) {
+			items = items.filter(item => !CitationDataManager.getItems({ zoteroItemID: item.id }).length);
 		}
-		else {
-			items = items.filter(item => !CitationDataManager.potentialDuplicateExists(item));
-		}
+
 		// If the last input has a locator, add it into the item
 		let input = _id("bubble-input").getCurrentInput();
 		let locator = Helpers.extractLocator(input.value || "");
@@ -923,20 +945,6 @@ const IOManager = {
 		IOManager.addItemsToCitation(itemsToAdd);
 	},
 
-	// record which items in the library itemTree are currently selected to highlight them
-	updateSelectedItems() {
-		let selectedItemIDs = new Set(libraryLayout.itemsView.getSelectedItems().map(item => item.id));
-		for (let itemObj of CitationDataManager.items) {
-			if (selectedItemIDs.has(itemObj.zoteroItem.id)) {
-				itemObj.selected = true;
-			}
-			else {
-				itemObj.selected = false;
-			}
-		}
-		IOManager.updateBubbleInput();
-	},
-
 	handleCollapsedSectionHeaderClick(section, event) {
 		IOManager.toggleSectionCollapse(section);
 		// When section is expanded by a click via keyboard, navigate into the section
@@ -1000,7 +1008,13 @@ const IOManager = {
 			let items = selectedIDs.map(id => SearchHandler.getItem(id));
 			IOManager.addItemsToCitation(items);
 		}
-		else {
+		// if there are no selected items in library mode and something was searched for add the first row from items table
+		else if (currentLayout.type == "library" && libraryLayout.itemsView.rowCount > 0 && input.value.length) {
+			let firstRowID = libraryLayout.itemsView.getRow(0).ref.id;
+			IOManager.addItemsToCitation(Zotero.Items.get(firstRowID));
+		}
+		// Enter on an empty input accepts the dialog
+		else if (!input.value.length) {
 			accept();
 		}
 	},
@@ -1015,9 +1029,12 @@ const IOManager = {
 		currentLayout.refreshItemsList();
 		// if the focus was lost (e.g. after clicking on the X icon of a bubble)
 		// try to return focus to previously-focused node
-		if (doc.activeElement.tagName == "body") {
-			IOManager._restorePreClickFocus();
-		}
+		setTimeout(() => {
+			// timeout needed to handle deleteing the bubble from itemDetails popup
+			if (doc.activeElement.tagName == "body") {
+				IOManager._restorePreClickFocus();
+			}
+		});
 	},
 
 	_moveItem(dialogReferenceID, newIndex) {
@@ -1269,16 +1286,11 @@ const CitationDataManager = {
 		this.updateCitationObject();
 		await io.sort();
 		// sync the order of this.items with io.citation.sortedItems
-		let sortedItems = io.citation.sortedItems.map(entry => entry[1]);
-		for (let item of this.items) {
-			let currentIndex = this.getItemIndex({ dialogReferenceID: item.dialogReferenceID });
-			let expectedIndex = sortedItems.findIndex(ioItem => ioItem.dialogReferenceID == item.dialogReferenceID);
-			console.log("Indicies", currentIndex, expectedIndex);
-			if (currentIndex !== expectedIndex) {
-				this.items.splice(currentIndex, 1);
-				this.items.splice(expectedIndex, 0, item);
-			}
-		}
+		let sortedIOItems = io.citation.sortedItems.map(entry => entry[1]);
+		let sortedItems = sortedIOItems.map((sortedItem) => {
+			return this.items.find(item => item.dialogReferenceID === sortedItem.dialogReferenceID);
+		});
+		this.items = sortedItems;
 	},
 	
 	// Construct citation upon initial load

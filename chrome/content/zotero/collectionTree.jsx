@@ -113,7 +113,7 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 	
 	async makeVisible() {
 		await this.refresh();
-		var lastViewedID = Zotero.Prefs.get('lastViewedFolder');
+		var lastViewedID = this.props.initialFolder || Zotero.Prefs.get('lastViewedFolder');
 		if (lastViewedID) {
 			var selected = await this.selectByID(lastViewedID);
 		}
@@ -472,7 +472,7 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 				onItemContextMenu: (...args) => this.props.onContextMenu && this.props.onContextMenu(...args),
 
 				onKeyDown: this.handleKeyDown,
-				onActivate: this.handleActivate,
+				onActivate: (...args) => (this.props.onActivate ? this.props.onActivate(...args) : this.handleActivate(...args)),
 
 				role: 'tree',
 				label: Zotero.getString('pane.collections.title')
@@ -494,7 +494,7 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 	async refresh() {
 		try {
 			Zotero.debug("Refreshing collections pane");
-			
+			console.log("Refreshing!");
 			if (this.props.hideSources.indexOf('duplicates') == -1) {
 				this._virtualCollectionLibraries.duplicates =
 					Zotero.Prefs.getVirtualCollectionState('duplicates');

@@ -121,6 +121,10 @@
 				}
 				.header {
 					color: var(--fill-secondary);
+					// keep header stuck to the top left corner as the user scrolls
+					position: sticky;
+					top: 0;
+					left: 0;
 				}
 		
 				.itemsContainer {
@@ -455,6 +459,7 @@
 
 		#bottom-btn-group {
 			gap: 10px;
+			-moz-window-dragging: no-drag;
 			#mode-button {
 				&[mode="library"] {
 					@include svgicon("dialog-search-list", "universal", "16");
