@@ -156,12 +156,18 @@ class Layout {
 			sections.push(section);
 			if (isGroupCollapsible) {
 				// just collapse/expand items when section header is clicked
-				section.querySelector(".header-label").addEventListener("click", event => IOManager.handleCollapsedSectionHeaderClick(section, event));
+				section.querySelector(".header-label").addEventListener("click", event => IOManager.handleCollapsibleSectionHeaderClick(section, event));
 				// handle click on "Add all"
 				section.querySelector(".add-all").addEventListener("click", () => IOManager.addItemsToCitation(group));
-
-				let isSomethingTyped = _id("bubble-input").isSomethingTyped();
-				IOManager.toggleSectionCollapse(section, (isSomethingTyped || this.type == "list") ? "expanded" : "collapsed");
+				// if the user explicitly expanded or collapsed the section, keep it as such
+				if (IOManager.sectionExpandedStatus[section.id]) {
+					IOManager.toggleSectionCollapse(section, IOManager.sectionExpandedStatus[section.id]);
+				}
+				// otherwise, expand the section if something is typed or whenever the list layout is opened
+				else {
+					let isSomethingTyped = _id("bubble-input").isSomethingTyped();
+					IOManager.toggleSectionCollapse(section, (isSomethingTyped || this.type == "list") ? "expanded" : "collapsed");
+				}
 			}
 		}
 		_id(`${this.type}-layout`).querySelector(".search-items").replaceChildren(...sections);
@@ -715,6 +721,7 @@ class ListLayout extends Layout {
 // Handling of user IO
 //
 const IOManager = {
+	sectionExpandedStatus: {},
 
 	init() {
 		// handle input receiving focus or something being typed
@@ -945,8 +952,11 @@ const IOManager = {
 		IOManager.addItemsToCitation(itemsToAdd);
 	},
 
-	handleCollapsedSectionHeaderClick(section, event) {
+	handleCollapsibleSectionHeaderClick(section, event) {
 		IOManager.toggleSectionCollapse(section);
+		// Record if the user explicitly expanded or collapsed the section to not undo it
+		// during next refresh
+		IOManager.sectionExpandedStatus[section.id] = section.classList.contains("expanded") ? "expanded" : "collapsed";
 		// When section is expanded by a click via keyboard, navigate into the section
 		if (IOManager._clicked !== event.target && section.classList.contains("expanded")) {
 			KeyboardHandler.navigateGroup({ group: section, current: null, forward: true, shouldSelect: true, shouldFocus: true, multiSelect: false });
