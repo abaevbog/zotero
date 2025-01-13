@@ -61,14 +61,20 @@
 			}
 		}
 
-		#loading-spinner {
-			width: 28px;
-			height: 28px;
-			background-size: 60%;
-			background-repeat: no-repeat;
-			display: none;
-			&[status="animate"] {
-				display: inline-block;
+		#top-level-btn-group {
+			display: flex;
+			width: 30px;
+  			justify-content: end;
+			
+			#loading-spinner {
+				width: 28px;
+				height: 28px;
+				background-size: 60%;
+				background-repeat: no-repeat;
+				display: none;
+				&[status="animate"] {
+					display: inline-block;
+				}
 			}
 		}
 	}

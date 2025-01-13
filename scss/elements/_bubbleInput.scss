@@ -32,7 +32,6 @@ bubble-input {
 	
 	input {
 		outline: none;
-		width: 2px;
 		border: none !important;
 		height: 22px; // bubble height
 		/* Keep the background and text color unchanged in dark mode */
@@ -45,11 +44,14 @@ bubble-input {
 			margin-bottom: 4px;
 			width: 100% !important;
 		}
+		&.empty:focus {
+			min-width: 1px;
+			margin-inline-start: -1px;
+		}
 	}
 	
 	.bubble {
 		@include focus-ring(true);
-		--bubble-horizontal-margin: 2px;
 		height: var(--bubble-height);
 		border-radius: 5px;
 		border: 1px solid var(--fill-quarternary);

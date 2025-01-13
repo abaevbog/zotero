@@ -343,7 +343,7 @@
 			input.setAttribute("no-windows-native", true);
 			input.setAttribute("data-arrow-nav-enabled", true);
 			input.setAttribute("role", "combobox");
-			input.className = "input";
+			input.className = "input empty";
 			input.setAttribute("aria-describedby", "input-description");
 			input.addEventListener("input", (_) => {
 				// .full-width class is used on first input to fully display placeholder
@@ -352,6 +352,7 @@
 					// Expand/shrink the input field to match the width of content
 					input.style.width = Utils.getContentWidth(input) + 'px';
 				}
+				input.classList.toggle("empty", input.value.length == 0);
 				Utils.notifyDialog("handle-input", { query: input.value, debounce: true });
 			});
 			input.addEventListener("keypress", e => this._onInputKeypress(input, e));
@@ -532,7 +533,7 @@
 			let lastBubble = null;
 			let verticalBubbleMargin = parseInt(getComputedStyle(this.bubbleInput).getPropertyValue("--bubble-vertical-margin")) || 0;
 			let isClickAfterBubble = (clickX, bubbleRect) => {
-				return Zotero.rtl ? clickX < bubbleRect.right : clickX > bubbleRect.left;
+				return Zotero.rtl ? clickX <= bubbleRect.right : clickX >= bubbleRect.left;
 			};
 			for (let i = 0; i < bubbles.length; i++) {
 				let rect = bubbles[i].getBoundingClientRect();
@@ -643,7 +644,7 @@
 			this.bubbleInput._body.appendChild(span);
 			let spanWidth = span.getBoundingClientRect().width;
 			span.remove();
-			return spanWidth + 2;
+			return spanWidth;
 		},
 
 		// If a bubble is removed between two inputs we need to combine them
