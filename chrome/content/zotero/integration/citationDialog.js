@@ -783,13 +783,6 @@ const IOManager = {
 			libraryLayout.itemsView?.selection.clearSelection();
 			currentLayout.updateSelectedItems();
 		}
-		else {
-			// when switching to the library mode, invalidate collection tree to make sure
-			// the selected row is properly rendered
-			setTimeout(() => {
-				libraryLayout.collectionsView?.tree.invalidate();
-			});
-		}
 		currentLayout.refreshItemsList();
 	},
 
@@ -855,7 +848,7 @@ const IOManager = {
 
 	// Mark initially selected item that can be selected on Enter in an input
 	markPreSelected() {
-		for (let itemNode of [...doc.querySelectorAll(".selected")]) {
+		for (let itemNode of [...doc.querySelectorAll(".item.selected")]) {
 			itemNode.classList.remove("selected");
 			itemNode.classList.remove("current");
 		}
