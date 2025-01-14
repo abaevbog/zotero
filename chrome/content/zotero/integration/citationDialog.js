@@ -663,7 +663,7 @@ class ListLayout extends Layout {
 		if (sectionsHeight > 0) {
 			sectionsWrapperPadding = parseInt(sectionsWrapperStyle.paddingTop) + parseInt(sectionsWrapperStyle.paddingBottom);
 			// margin of error to ensure that the scrollbar does not appear unless really necessary
-			marginOfError = 2;
+			marginOfError = Zotero.isWin ? 6 : 2;
 		}
 
 		// height of the bottom section
