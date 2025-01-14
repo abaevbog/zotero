@@ -1043,7 +1043,7 @@ var ItemTree = class ItemTree extends LibraryTree {
 	 * Select the first row when the tree is focused by the keyboard.
 	 */
 	handleKeyUp = (event) => {
-		if (!Zotero.locked && event.code === 'Tab' && this.selection.count == 0) {
+		if (!Zotero.locked && (event.code === 'Tab' || event.key.includes("Arrow")) && this.selection.count == 0) {
 			this.selection.select(this.selection.focused);
 		}
 	};
