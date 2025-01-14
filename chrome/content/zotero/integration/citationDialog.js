@@ -64,7 +64,7 @@ function onLoad() {
 
 	// top-level keypress handling and focus navigation across the dialog
 	// keypresses for lower-level bubble-specific behavior are handled in bubbleInput.js
-	doc.addEventListener("keypress", event => KeyboardHandler.handleKeypress(event));
+	doc.addEventListener("keydown", event => KeyboardHandler.handleKeydown(event));
 	// capturing keypress listener for a few special cases, such as handling arrowUp
 	// keypress from the top-most row in the items table
 	doc.addEventListener("keydown", event => KeyboardHandler.captureKeydown(event), true);
@@ -629,7 +629,7 @@ class ListLayout extends Layout {
 	}
 
 	updateSelectedItems() {
-		let selectedIDs = new Set([...doc.querySelectorAll(".selected")].map(node => parseInt(node.getAttribute("itemID"))));
+		let selectedIDs = new Set([...doc.querySelectorAll(".item.selected")].map(node => parseInt(node.getAttribute("itemID"))));
 		for (let itemObj of CitationDataManager.items) {
 			if (selectedIDs.has(itemObj.zoteroItem.id)) {
 				itemObj.selected = true;

@@ -162,16 +162,10 @@ export class CitationDialogPopupsHandler {
 	}
 
 	handleItemDetailsKeypress(event) {
-		if (event.key == "ArrowUp") {
+		// Enter on a an input will save changes, hide the popup and refocus last input
+		if (event.key == "Enter" && ["input"].includes(event.target.tagName) && !event.target.getAttribute("type")) {
+			this._getNode("#itemDetails").setAttribute("refocus-input", true);
 			this._getNode("#itemDetails").hidePopup();
-			// Do not let event propagate so it is not picked up by global keyboard handler
-			event.stopPropagation();
-		}
-		else if (event.key == "Enter") {
-			if (["input"].includes(event.target.tagName) && !event.target.getAttribute("type")) {
-				this._getNode("#itemDetails").setAttribute("refocus-input", true);
-				this._getNode("#itemDetails").hidePopup();
-			}
 		}
 	}
 

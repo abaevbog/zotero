@@ -38,14 +38,14 @@ export class CitationDialogKeyboardHandler {
 
 	// main keydown listener that will call more specific handlers
 	// until the event is handled
-	handleKeypress(event) {
-		let handled = this.handleTopLevelKeypress(event);
+	handleKeydown(event) {
+		let handled = this.handleTopLevelKeydown(event);
 		if (!handled) {
 			handled = this.handleKeyboardNavigation(event);
 		}
 	}
 
-	handleTopLevelKeypress(event) {
+	handleTopLevelKeydown(event) {
 		let handled = false;
 		let tgt = event.target;
 		let isKeyboardClickable = tgt.classList.contains("keyboard-clickable") || tgt.tagName.includes("button");
@@ -254,8 +254,8 @@ export class CitationDialogKeyboardHandler {
 	}
 
 	captureKeydown(event) {
-		// Shift-Enter will always accept the dialog regardless of the target
-		if (event.key == "Enter" && event.shiftKey) {
+		// Shift-Enter will always accept the dialog regardless of the target (unless within a panel)
+		if (event.key == "Enter" && event.shiftKey && !event.target.closest("panel")) {
 			this.doc.dispatchEvent(new CustomEvent("dialog-accepted"));
 			event.stopPropagation();
 			event.preventDefault();

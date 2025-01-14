@@ -253,7 +253,7 @@
 			}
 			// On click, tell citationDialog to display the details popup
 			bubble.addEventListener("click", () => Utils.notifyDialog("show-details-popup", { dialogReferenceID: bubble.getAttribute("dialogReferenceID") }));
-			bubble.addEventListener("keypress", this._onBubbleKeypress.bind(this));
+			bubble.addEventListener("keydown", this._onBubbleKeydown.bind(this));
 			let text = document.createElement("span");
 			text.textContent = content;
 			text.className = "text";
@@ -273,15 +273,9 @@
 		/**
 		 * Handle keypresses on a bubble.
 		 */
-		_onBubbleKeypress(event) {
+		_onBubbleKeydown(event) {
 			let bubble = event.target;
-			if (event.key == "ArrowDown" || event.key == " ") {
-				// On arrow down or whitespace, open new citation properties panel
-				Utils.notifyDialog("show-details-popup", { dialogReferenceID: bubble.getAttribute("dialogReferenceID") });
-				event.preventDefault();
-				event.stopPropagation();
-			}
-			else if (["ArrowLeft", "ArrowRight"].includes(event.key) && event.shiftKey) {
+			if (["ArrowLeft", "ArrowRight"].includes(event.key) && event.shiftKey) {
 				// On Shift-Left/Right swap focused bubble with it's neighbor
 				event.preventDefault();
 				event.stopPropagation();
@@ -325,6 +319,15 @@
 			if (event.key == "End") {
 				this._body.lastChild.focus();
 			}
+			// Navigate bubble rows on arrow up/down
+			if (["ArrowUp", "ArrowDown"].includes(event.key)) {
+				let { x, y, width } = bubble.getBoundingClientRect();
+				let nextBubble = Utils.getLastBubbleBeforePoint(x + (width / 2), event.key == "ArrowUp" ? y - 25 : y + 30);
+				if (!nextBubble) return;
+				nextBubble.focus();
+				event.preventDefault();
+				event.stopPropagation();
+			}
 		}
 		
 		// Citation dialog will record that the item is removed and the bubble will be gone after refresh()
@@ -355,7 +358,7 @@
 				input.classList.toggle("empty", input.value.length == 0);
 				Utils.notifyDialog("handle-input", { query: input.value, debounce: true });
 			});
-			input.addEventListener("keypress", e => this._onInputKeypress(input, e));
+			input.addEventListener("keydown", e => this._onInputKeydown(input, e));
 			input.addEventListener("focus", (_) => {
 				// When input is re-focused, tell citationDialog that search can be rerun
 				// without debounce
@@ -373,7 +376,7 @@
 		/**
 		 * Handle keypresses on inputs created in _createInputElem()
 		 */
-		_onInputKeypress(input, event) {
+		_onInputKeydown(input, event) {
 			// Do not allow focus handler to interfere on arrow key navigation within the input
 			if ((event.key == Zotero.arrowPreviousKey && input.selectionStart !== 0)
 				|| (event.key == Zotero.arrowNextKey && input.selectionEnd !== input.value.length)) {
@@ -401,6 +404,15 @@
 			// End from the end of an input - focus the last input
 			if (event.key == "End" && Utils.isCursorAtInputEnd(input)) {
 				this._body.lastChild.focus();
+			}
+			// Navigate bubble rows on arrow up/down
+			if (["ArrowUp", "ArrowDown"].includes(event.key)) {
+				let { x, y, width } = input.getBoundingClientRect();
+				let nextBubble = Utils.getLastBubbleBeforePoint(x + (width / 2), event.key == "ArrowUp" ? y - 25 : y + 30);
+				if (!nextBubble) return;
+				nextBubble.focus();
+				event.preventDefault();
+				event.stopPropagation();
 			}
 		}
 	}
