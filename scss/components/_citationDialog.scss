@@ -240,7 +240,7 @@
 						// collapsed deck's width = width of an item + 5px for each item peaking behind the top one (max of 2)
 						width: calc(var(--item-horizontal-size) + 5px * min(2, var(--deck-length)));
 						.itemsContainer {
-							@include focus-ring;
+							@include focus-ring(true);
 							gap: 0;
 						}
 						.item:nth-child(1) {
