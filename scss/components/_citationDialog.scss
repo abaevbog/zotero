@@ -339,6 +339,18 @@
 						}
 					}
 				}
+				.row.highlighted {
+					border-radius: 0;
+					
+				}
+				.row.first-highlighted {
+					border-top-left-radius: 5px;
+					border-top-right-radius: 5px;
+				}
+				.row.last-highlighted {
+					border-bottom-left-radius: 5px;
+					border-bottom-right-radius: 5px;
+				}
 			}
 		}
 	}

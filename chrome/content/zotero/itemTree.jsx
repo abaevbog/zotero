@@ -3108,6 +3108,11 @@ var ItemTree = class ItemTree extends LibraryTree {
 		div.classList.toggle('context-row', !!rowData.contextRow);
 		div.classList.toggle('unread', !!rowData.unread);
 		div.classList.toggle('highlighted', this._highlightedRows.has(rowData.id));
+		let nextRowID = this.getRow(index + 1)?.id;
+		let prevRowID = this.getRow(index - 1)?.id;
+		div.classList.toggle('first-highlighted', this._highlightedRows.has(rowData.id) && !this._highlightedRows.has(prevRowID));
+		div.classList.toggle('last-highlighted', this._highlightedRows.has(rowData.id) && !this._highlightedRows.has(nextRowID));
+		
 		if (this._dropRow == index) {
 			let span;
 			if (Zotero.DragDrop.currentOrientation != 0) {

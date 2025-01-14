@@ -901,6 +901,7 @@ const IOManager = {
 			itemNode.classList.toggle("selected");
 		}
 		currentLayout.updateSelectedItems();
+		// For library view, this is handled in itemTree.jsx
 		if (currentLayout.type == "list") {
 			listLayout._markRoundedCorners();
 		}
