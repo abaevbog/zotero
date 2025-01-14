@@ -101,8 +101,17 @@ export class CitationDialogKeyboardHandler {
 		// arrow up/down from bubble-input in list mode will move selection in the items list
 		else if (!this._id("list-layout").hidden && (event.key == "ArrowDown" || event.key == "ArrowUp") && this._id("bubble-input").contains(event.target) && onlyShiftModifierPossible) {
 			let group = this.doc.querySelector("#list-layout [data-arrow-nav]");
-			let current = group.querySelector(".selected.current");
-			this.navigateGroup({ group, current, forward: event.key == "ArrowDown", shouldSelect: true, shouldFocus: false, multiSelect: event.shiftKey });
+			let current = group.querySelector(".current");
+			let firstRow = group.querySelector('[data-arrow-nav-enabled="true"][tabindex]');
+			// on arrowUp from the first row, clear selection
+			if (current === firstRow && event.key == "ArrowUp") {
+				this.selectItems(null);
+				firstRow.classList.remove("current");
+				group.scrollTo(0, 0);
+			}
+			else if (current || event.key == "ArrowDown") {
+				this.navigateGroup({ group, current, forward: event.key == "ArrowDown", shouldSelect: true, shouldFocus: false, multiSelect: event.shiftKey });
+			}
 			handled = true;
 		}
 		// arrowUp from the first item will refocus bubbleInput
@@ -221,23 +230,12 @@ export class CitationDialogKeyboardHandler {
 			if (this._multiselectStart === null) {
 				this._multiselectStart = current || nextNode;
 			}
-			this.doc.dispatchEvent(new CustomEvent("select-items", {
-				bubbles: true,
-				detail: {
-					startNode: this._multiselectStart,
-					endNode: nextNode
-				}
-			}));
+			this.selectItems(this._multiselectStart, nextNode);
 		}
 		else {
 			// on arrow keypress without shift, clear multiselect starting point
 			this._multiselectStart = null;
-			this.doc.dispatchEvent(new CustomEvent("select-items", {
-				bubbles: true,
-				detail: {
-					startNode: nextNode
-				}
-			}));
+			this.selectItems(nextNode);
 		}
 		
 		return nextNode;
@@ -283,5 +281,14 @@ export class CitationDialogKeyboardHandler {
 			event.stopPropagation();
 			event.preventDefault();
 		}
+	}
+
+	selectItems(startNode, endNode) {
+		this.doc.dispatchEvent(new CustomEvent("select-items", {
+			bubbles: true,
+			detail: {
+				startNode, endNode
+			}
+		}));
 	}
 }

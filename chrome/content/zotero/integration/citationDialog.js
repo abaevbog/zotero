@@ -868,7 +868,7 @@ const IOManager = {
 	selectItemNodesRange(startNode, endNode = null) {
 		let itemNodes = [...doc.querySelectorAll(".item")];
 		for (let node of itemNodes) {
-			node.classList.remove("selected");
+			node.classList.remove("selected", "selected-first", "selected-last");
 		}
 		if (startNode === null) return;
 
