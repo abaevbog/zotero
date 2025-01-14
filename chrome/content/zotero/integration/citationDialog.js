@@ -329,6 +329,7 @@ class LibraryLayout extends Layout {
 			// timeout is likely required to let updated minHeight to settle
 			setTimeout(() => {
 				window.resizeTo(window.innerWidth, this.lastHeight);
+				this.lastHeight = null;
 			}, 10);
 		}
 	}
@@ -569,9 +570,12 @@ class LibraryLayout extends Layout {
 		await Zotero.Promise.delay();
 		if (!_id("zotero-items-tree").contains(doc.activeElement)) {
 			_id("bubble-input").setHeightLock(false);
-			// wait a moment for bubbles to resize and update window sizing
+			// wait a moment for bubbles to resize
 			await Zotero.Promise.delay(10);
-			this.resizeWindow();
+			// update window sizing unless the layout was switched
+			if (currentLayout.type == "library") {
+				this.resizeWindow();
+			}
 		}
 	}
 
