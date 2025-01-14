@@ -323,8 +323,7 @@
 			if (["ArrowUp", "ArrowDown"].includes(event.key)) {
 				let { x, y, width } = bubble.getBoundingClientRect();
 				let nextBubble = Utils.getLastBubbleBeforePoint(x + (width / 2), event.key == "ArrowUp" ? y - 25 : y + 30);
-				if (!nextBubble) return;
-				nextBubble.focus();
+				nextBubble?.focus();
 				event.preventDefault();
 				event.stopPropagation();
 			}
@@ -404,15 +403,6 @@
 			// End from the end of an input - focus the last input
 			if (event.key == "End" && Utils.isCursorAtInputEnd(input)) {
 				this._body.lastChild.focus();
-			}
-			// Navigate bubble rows on arrow up/down
-			if (["ArrowUp", "ArrowDown"].includes(event.key)) {
-				let { x, y, width } = input.getBoundingClientRect();
-				let nextBubble = Utils.getLastBubbleBeforePoint(x + (width / 2), event.key == "ArrowUp" ? y - 25 : y + 30);
-				if (!nextBubble) return;
-				nextBubble.focus();
-				event.preventDefault();
-				event.stopPropagation();
 			}
 		}
 	}
