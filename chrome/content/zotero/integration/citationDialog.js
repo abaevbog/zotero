@@ -23,6 +23,11 @@
 	***** END LICENSE BLOCK *****
 */
 
+
+const ItemTree = require('zotero/itemTree');
+const { getCSSIcon } = require('components/icons');
+const { COLUMNS } = require('zotero/itemTreeColumns');
+
 var doc, io, isCitingNotes, accepted;
 
 var currentLayout, libraryLayout, listLayout;
@@ -306,7 +311,8 @@ class LibraryLayout extends Layout {
 	resizeWindow() {
 		let bubbleInputStyle = getComputedStyle(_id("search-row"));
 		let bubbleInputMargins = parseInt(bubbleInputStyle.marginTop) + parseInt(bubbleInputStyle.marginBottom);
-		let bubbleInputHeight = _id("search-row").getBoundingClientRect().height + bubbleInputMargins;
+		let bubbleInputBorder = 1;
+		let bubbleInputHeight = _id("search-row").getBoundingClientRect().height + bubbleInputMargins + bubbleInputBorder;
 
 		let suggestedItemsHeight = _id("library-other-items").getBoundingClientRect().height;
 
@@ -359,9 +365,9 @@ class LibraryLayout extends Layout {
 	}
 
 	async _initItemTree() {
-		const ItemTree = require('zotero/itemTree');
-		const { getCSSIcon } = require('components/icons');
-		const { COLUMNS } = require('zotero/itemTreeColumns');
+		// const ItemTree = require('zotero/itemTree');
+		// const { getCSSIcon } = require('components/icons');
+		// const { COLUMNS } = require('zotero/itemTreeColumns');
 
 		var itemsTree = _id('zotero-items-tree');
 		let itemColumns = COLUMNS.map((column) => {
@@ -369,33 +375,7 @@ class LibraryLayout extends Layout {
 			column.hidden = !['title', 'firstCreator', 'date'].includes(column.dataKey);
 			return column;
 		});
-		// Add +/- column to indicate if an item is included in a citation
-		// and add/exclude them on click
-		itemColumns.push({
-			dataKey: 'removeFromCitation',
-			label: 'Remove from Citation',
-			htmlLabel: ' ', // space for column label to appear empty
-			width: 26,
-			staticWidth: true,
-			fixedWidth: true,
-			showInColumnPicker: false,
-			renderer: (index, inCitation, column) => {
-				let cell = Helpers.createNode("span", {}, `cell ${column.className} clickable`);
-				let iconWrapper = Helpers.createNode("span", {}, `icon-action`);
-				cell.append(iconWrapper);
-				let icon = getCSSIcon('minus-circle');
-				if (inCitation === null) {
-					// no icon should be shown when an item cannot be added
-					// (e.g. when citing notes, parent items are displayed but not included)
-					icon = getCSSIcon("");
-				}
-				if (inCitation == false) {
-					iconWrapper.setAttribute("disabled", true);
-				}
-				iconWrapper.append(icon);
-				return cell;
-			}
-		});
+		// Add + column to add an item to the citation on click
 		itemColumns.push({
 			dataKey: 'addToCitation',
 			label: 'Add to citation',
@@ -610,22 +590,25 @@ class ListLayout extends Layout {
 
 	// Create item node for an item group and store item ids in itemIDs attribute
 	async createItemNode(item) {
-		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 40, "data-arrow-nav-enabled": true }, "item hbox keyboard-clickable");
+		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 40, "data-arrow-nav-enabled": true }, "item vbox keyboard-clickable");
 		let id = item.cslItemID || item.id;
 		itemNode.setAttribute("itemID", id);
 		itemNode.setAttribute("role", "option");
 		itemNode.id = id;
-		let itemInfo = Helpers.createNode("div", {}, "info");
 		let icon = Helpers.createNode("span", {}, "icon icon-css icon-item-type");
 		let dataTypeLabel = item.getItemTypeIconName(true);
 		icon.setAttribute("data-item-type", dataTypeLabel);
 
 		let title = Helpers.createNode("div", {}, "title");
+		let titleContent = Helpers.createNode("span", {}, "");
 		let description = Helpers.buildItemDescription(item);
-		title.textContent = item.getDisplayTitle();
-
-		itemInfo.append(title, description);
-		itemNode.append(icon, itemInfo);
+		titleContent.textContent = item.getDisplayTitle();
+		title.append(icon, titleContent);
+		itemNode.append(title, description);
+		if (Zotero.Retractions.isRetracted(item)) {
+			let retractedIcon = getCSSIcon("IconCross");
+			icon.after(retractedIcon);
+		}
 		return itemNode;
 	}
 
@@ -658,7 +641,8 @@ class ListLayout extends Layout {
 		// height of bubble-input
 		let bubbleInputStyle = getComputedStyle(_id("search-row"));
 		let bubbleInputMargins = parseInt(bubbleInputStyle.marginTop) + parseInt(bubbleInputStyle.marginBottom);
-		let bubbleInputHeight = _id("search-row").getBoundingClientRect().height + bubbleInputMargins;
+		let bubbleInputBorder = 1;
+		let bubbleInputHeight = _id("search-row").getBoundingClientRect().height + bubbleInputMargins + bubbleInputBorder;
 
 		// height of all sections
 		let sectionsHeight = 0;
@@ -668,15 +652,21 @@ class ListLayout extends Layout {
 		// cap at 400px
 		sectionsHeight = Math.min(sectionsHeight, 400);
 
-		// account for margins of the items list
+		// account for padding of the items list
 		let sectionsWrapperStyle = getComputedStyle(_id("list-layout-wrapper"));
-		let sectionsWrapperMargins = parseInt(sectionsWrapperStyle.marginTop) + parseInt(sectionsWrapperStyle.marginBottom);
+		let sectionsWrapperPadding = 0;
+		let marginOfError = 0;
+		if (sectionsHeight > 0) {
+			sectionsWrapperPadding = parseInt(sectionsWrapperStyle.paddingTop) + parseInt(sectionsWrapperStyle.paddingBottom);
+			// margin of error to ensure that the scrollbar does not appear unless really necessary
+			marginOfError = 2;
+		}
 
 		// height of the bottom section
 		let bottomHeight = _id("bottom-area-wrapper").getBoundingClientRect().height;
 		
 		// set min height and resize the window
-		let autoHeight = bubbleInputHeight + sectionsHeight + sectionsWrapperMargins + bottomHeight;
+		let autoHeight = bubbleInputHeight + sectionsHeight + sectionsWrapperPadding + bottomHeight + marginOfError;
 		let minHeight = bubbleInputHeight + bottomHeight + (_id("list-layout").hidden ? 0 : 80);
 		doc.documentElement.style.minHeight = `${minHeight}px`;
 		

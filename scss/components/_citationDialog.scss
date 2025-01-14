@@ -7,6 +7,7 @@
 		margin: 0;
 		color: var(--fill-primary);
 		background: var(--material-background);
+		overflow-y: hidden;
 	}
 
 	[hidden] {
@@ -65,7 +66,7 @@
 			display: flex;
 			width: 30px;
   			justify-content: end;
-			
+
 			#loading-spinner {
 				width: 28px;
 				height: 28px;
@@ -131,6 +132,7 @@
 					position: sticky;
 					top: 0;
 					left: 0;
+					width: var(--item-horizontal-size);
 				}
 		
 				.itemsContainer {
@@ -202,7 +204,6 @@
 					// indicating current state
 					.header {
 						-moz-user-select: none;
-						width: var(--item-horizontal-size);
 
 						display: flex;
 						justify-content: space-between;
@@ -265,13 +266,13 @@
 				// a collapsed expandable group, in which case the whole group is hovered
 				&:not(.expandable), &.expandable.expanded {
 					.item:hover {
-						background-color: var(--color-quarternary-on-background);
+						background-color: var(--fill-quinary);
 					}
 				}
 				&.expandable:not(.expanded) {
 					.itemsContainer:hover {
 						.item {
-							background-color: var(--color-quarternary-on-background);
+							background-color: var(--color-quinary-on-background);
 						}
 					}
 				}	
@@ -327,7 +328,7 @@
 						}
 					}
 				}
-				// lighter hover and active effects on +/- buttons in selected rows
+				// lighter hover and active effects on + buttons in selected rows
 				.row.selected {
 					.icon-action {
 						&.hover:not([disabled]) {
@@ -347,6 +348,8 @@
 			-moz-user-select: none;
 			overflow-y: scroll;
 			height: 100%;
+			padding-top: 4px;
+			padding-bottom: 8px;
 			.section {
 				// show dividers except for on the last section
 				.divider {
@@ -371,7 +374,7 @@
 					color: var(--fill-primary);
 					cursor: default;
 					&:hover {
-						background-color: var(--fill-quarternary);
+						background-color: var(--fill-quinary);
 					}
 					&.selected {
 						background: var(--accent-blue30);
@@ -388,22 +391,19 @@
 					}
 
 					.icon {
-						margin-top: 1px;
+						margin-top: -4px;
 						margin-inline-end: 4px;
 						flex-shrink: 0;
 					}
-
-					.info {
+					.description {
+						// Needed to have empty item row description to still occupy height
+						white-space: pre;
+						margin-inline-start: 20px;
+					}
+					.title {
 						overflow: hidden;
-						.description {
-							// Needed to have empty item row description to still occupy height
-							white-space: pre;
-						}
-						.title {
-							overflow: hidden;
-							text-wrap: nowrap;
-							text-overflow: ellipsis;
-						}
+						text-wrap: nowrap;
+						text-overflow: ellipsis;
 					}
 				}
 				&.expandable {
@@ -442,11 +442,11 @@
 					}
 					// item container has no height when it is collapsed
 					.itemsContainer {
-						overflow: hidden;
 						transition: height 0.3s ease;
 					}
 					&:not(.expanded) {
 						.itemsContainer {
+							overflow: hidden;
 							height: 0 !important; // important to override inline height with items displayed
 						}
 					}

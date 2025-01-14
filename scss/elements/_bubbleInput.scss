@@ -66,7 +66,7 @@ bubble-input {
 		cursor: pointer;
 		
 		&:hover:not(.showingDetails) {
-			background-color: var(--fill-quarternary);
+			background-color: var(--fill-quinary);
 			
 			.cross {
 				display: block;
@@ -80,7 +80,7 @@ bubble-input {
 			}
 		}
 		&.showingDetails {
-			background-color: var(--fill-quarternary) !important;
+			background-color: var(--fill-quinary) !important;
 			z-index: 2;
 		}
 		

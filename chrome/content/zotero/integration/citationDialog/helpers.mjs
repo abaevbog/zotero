@@ -80,7 +80,7 @@ export class CitationDialogHelpers {
 		var nodes = [];
 		// Add a red label to retracted items
 		if (Zotero.Retractions.isRetracted(item)) {
-			let label = wrapTextInSpan(Zotero.getString("retraction.banner"), { color: 'red', 'margin-inline-end': '5px' });
+			let label = wrapTextInSpan(Zotero.getString("retraction.banner"), { color: 'var(--accent-red)', 'margin-inline-end': '5px' });
 			label.setAttribute("no-comma", true);
 			nodes.push(label);
 		}
@@ -88,7 +88,7 @@ export class CitationDialogHelpers {
 		if (item.firstCreator) authorDate = item.firstCreator;
 		var date = item.getField("date", true, true);
 		if (date && (date = date.substr(0, 4)) !== "0000") {
-			authorDate += ` ( ${parseInt(date)} )`;
+			authorDate += ` (${parseInt(date)})`;
 		}
 		authorDate = authorDate.trim();
 		if (authorDate) nodes.push(wrapTextInSpan(authorDate));
