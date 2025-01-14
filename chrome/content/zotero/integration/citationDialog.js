@@ -409,9 +409,9 @@ class LibraryLayout extends Layout {
 			},
 			regularOnly: !isCitingNotes,
 			onActivate: (event, items) => {
-				// PreventDefault needed to stop Enter event from reaching KeyboardHandler
-				// which would accept the dialog
+				// Enter event from reaching KeyboardHandler which would accept the dialog
 				event.preventDefault();
+				event.stopPropagation();
 				IOManager.addItemsToCitation(items, { noInputRefocus: true });
 			},
 			emptyMessage: Zotero.getString('pane.items.loading'),
@@ -504,16 +504,7 @@ class LibraryLayout extends Layout {
 			let rowIndex = row.id.split("-")[4];
 			let clickedItem = this.itemsView.getRow(rowIndex).ref;
 			hoveredOverIcon.classList.remove("active");
-			if (hoveredOverIcon.parentNode.classList.contains("addToCitation")) {
-				IOManager.addItemsToCitation([clickedItem], { noInputRefocus: true });
-			}
-			else if (hoveredOverIcon.parentNode.classList.contains("removeFromCitation")) {
-				let citationItems = CitationDataManager.getItems({ zoteroItemID: clickedItem.id });
-				for (let citationItem of citationItems) {
-					let { dialogReferenceID } = citationItem;
-					IOManager._deleteItem(dialogReferenceID);
-				}
-			}
+			IOManager.addItemsToCitation([clickedItem], { noInputRefocus: true });
 		}
 		else if (event.type == "mousedown") {
 			hoveredOverIcon.classList.add("active");
