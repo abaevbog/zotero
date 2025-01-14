@@ -426,6 +426,8 @@
 						justify-content: space-between;
 
 						.header-label {
+							@include focus-ring;
+							border-radius: 5px;
 							&:hover {
 								cursor: pointer;
 								text-decoration: underline;

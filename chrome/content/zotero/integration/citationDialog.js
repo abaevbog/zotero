@@ -244,7 +244,7 @@ class LibraryLayout extends Layout {
 
 	// Create item node for an item group and store item ids in itemIDs attribute
 	async createItemNode(item, index = null) {
-		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 40, "data-arrow-nav-enabled": true }, "item keyboard-clickable");
+		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 30, "data-arrow-nav-enabled": true }, "item keyboard-clickable");
 		let id = item.cslItemID || item.id;
 		itemNode.setAttribute("itemID", id);
 		itemNode.setAttribute("role", "option");
@@ -590,7 +590,7 @@ class ListLayout extends Layout {
 
 	// Create item node for an item group and store item ids in itemIDs attribute
 	async createItemNode(item) {
-		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 40, "data-arrow-nav-enabled": true }, "item vbox keyboard-clickable");
+		let itemNode = Helpers.createNode("div", { tabindex: "-1", "aria-describedby": "item-description", role: "option", "data-tabindex": 30, "data-arrow-nav-enabled": true }, "item vbox keyboard-clickable");
 		let id = item.cslItemID || item.id;
 		itemNode.setAttribute("itemID", id);
 		itemNode.setAttribute("role", "option");

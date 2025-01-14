@@ -140,16 +140,16 @@ export class CitationDialogHelpers {
 		if (isCollapsible) {
 			section.classList.add("expandable");
 			section.style.setProperty('--deck-length', deckLength);
-			let addAllBtn = this.createNode("span", { tabindex: -1, 'data-tabindex': 32 }, "add-all");
+			let addAllBtn = this.createNode("span", { tabindex: -1, 'data-tabindex': 22 }, "add-all keyboard-clickable");
 			this.doc.l10n.setAttributes(addAllBtn, "integration-citationDialog-add-all");
 			header.append(addAllBtn);
 			
 			headerSpan.setAttribute("tabindex", -1);
-			headerSpan.setAttribute("data-tabindex", 31);
+			headerSpan.setAttribute("data-tabindex", 21);
+			headerSpan.classList.add("keyboard-clickable");
 			if (isFocusableContainer) {
 				itemContainer.setAttribute("tabindex", -1);
-				// same data-tabidnex as on items node for horizontal arrow nav
-				itemContainer.setAttribute("data-tabindex", 40);
+				itemContainer.setAttribute("data-tabindex", 30);
 			}
 		}
 		return section;
