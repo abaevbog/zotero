@@ -145,7 +145,7 @@
 					border-radius: 5px;
 		
 					.item {
-						@include focus-ring;
+						@include focus-ring(true);
 						height: 42px;
 						flex-shrink: 0;
 						width: var(--item-width);
