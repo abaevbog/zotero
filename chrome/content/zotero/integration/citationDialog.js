@@ -103,6 +103,9 @@ function cancel() {
 	if (accepted) return;
 	accepted = true;
 	io.citation.citationItems = [];
+	if (currentLayout.type == "library") {
+		Zotero.Prefs.set("integration.citationDialogCollectionLastSelected", libraryLayout.collectionsView.selectedTreeRow.ref.treeViewID);
+	}
 	io.accept();
 	window.close();
 }
