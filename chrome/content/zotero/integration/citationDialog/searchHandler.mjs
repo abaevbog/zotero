@@ -48,10 +48,12 @@ export class CitationDialogSearchHandler {
 	}
 
 	getItem(id) {
-		if (id.includes("cited") || id.includes("/")) {
+		// if id is in form "cited:" or ".../...", it must be a cited item with cslItemID
+		if (typeof id == "string" && (id.includes("cited") || id.includes("/"))) {
 			return this.results.cited.find(item => item.cslItemID === id);
 		}
-		for (let key of ['selected', 'open', 'found']) {
+		// otherwise, it will be a item with an ordinary id from the database (still potentially cited)
+		for (let key of ['selected', 'open', 'found', 'cited']) {
 			let item = this.results[key].find(item => item.id === parseInt(id));
 			if (item) return item;
 		}
