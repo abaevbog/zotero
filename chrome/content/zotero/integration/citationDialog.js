@@ -498,22 +498,18 @@ class LibraryLayout extends Layout {
 			let clickedItem = this.itemsView.getRow(rowIndex).ref;
 			hoveredOverIcon.classList.remove("active");
 			let rowTopBeforeRefresh = row.getBoundingClientRect().top;
-			IOManager.addItemsToCitation([clickedItem], { noInputRefocus: true });
-			// after an item is added, wait for the itemTree to refresh and if the bubble-input's
-			// height increased and pushed the itemTree down, scroll it up so that the mouse remains
-			// over the same row as before click
-			// do not do it after click on the first row, since then the mouse will be out of the
-			// scrollable area, over the headers
-			if (rowIndex === 0) return;
-			(async () => {
-				await this.itemsView._refreshPromise;
+			IOManager.addItemsToCitation([clickedItem], { noInputRefocus: true }).then(() => {
+				// after an item is added, bubble-input's height may increase and push the itemTree down
+				// scroll it back up so that the mouse remains over the same row as before click
+				// do not do it on click of the first row, since then the mouse will be on a header
+				if (rowIndex === 0) return;
 				let rowAfterRefresh = doc.querySelector(`#zotero-items-tree #${row.id}`);
 				let rowTopAfterRefresh = rowAfterRefresh.getBoundingClientRect().top;
 				let delta = rowTopAfterRefresh - rowTopBeforeRefresh;
 				if (delta > 0.1) {
 					rowAfterRefresh.closest(".virtualized-table-body").scrollTop += delta;
 				}
-			})();
+			});
 		}
 		else if (event.type == "mousedown") {
 			hoveredOverIcon.classList.add("active");
