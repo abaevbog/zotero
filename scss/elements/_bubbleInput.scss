@@ -39,12 +39,9 @@ bubble-input {
 		padding: 0;
 		margin-inline: 0;
 		&.full-width {
-			// Same top/bottom margin as for bubbles + 1px for borders
-			// margin-top: 4px;
-			// margin-bottom: 4px;
 			width: 100% !important;
 		}
-		&.empty:focus {
+		&.empty:not(.full-width):focus {
 			min-width: 1px;
 			margin-inline-start: -1px;
 		}

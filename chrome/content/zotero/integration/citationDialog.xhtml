@@ -104,21 +104,23 @@
 						</div>
 					</div>
 					<div class="details" aria-labelledby="itemDetails-combinedInfo" role="group">
-							<!--fx128: size="0" forces select have default native style -->
-							<select name="locator" id="label" class="details-label" size="0"></select>
-							<input id="locator" class="details-data" aria-describedby="label"/>
-						
-							<label class="details-label" for="prefix" data-l10n-id="integration-citationDialog-details-prefix"></label>
-							<input id="prefix" class="details-data"/>
-					
-							<label class="details-label" for="suffix" data-l10n-id="integration-citationDialog-details-suffix"></label>
-							<input id="suffix" class="details-data"/>
-						<div class="dummy-for-checkbox-placement"></div>	
-						<div id="suppress-author-row">
-							<input id="suppress-author" type="checkbox" class="keyboard-clickable"/>
-							<label for="suppress-author" data-l10n-id="integration-citationDialog-details-suppressAuthor"></label>
-						</div>
-						
+							<div class="row">
+								<!--fx128: size="0" forces select have default native style -->
+								<select name="locator" id="label" class="details-label" size="0"></select>
+								<input id="locator" class="details-data" aria-describedby="label"/>
+							</div>
+							<div class="row">
+								<label class="details-label" for="prefix" data-l10n-id="integration-citationDialog-details-prefix"></label>
+								<input id="prefix" class="details-data"/>					
+							</div>
+							<div class="row">
+								<label class="details-label" for="suffix" data-l10n-id="integration-citationDialog-details-suffix"></label>
+								<input id="suffix" class="details-data"/>
+							</div>
+							<div id="suppress-author-row" class="row">
+								<input id="suppress-author" type="checkbox" class="keyboard-clickable"/>
+								<label for="suppress-author" data-l10n-id="integration-citationDialog-details-suppressAuthor"></label>
+							</div>				
 					</div>
 					<div class="buttons">
 						<button class="remove" data-l10n-id="integration-citationDialog-details-remove"></button>

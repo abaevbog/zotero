@@ -87,9 +87,11 @@ function accept() {
 	_id("library-layout").hidden = true;
 	_id("list-layout").hidden = true;
 	_id("bubble-input").hidden = true;
+	_id("bottom-area").hidden = true;
 	_id("progress").hidden = false;
 	document.documentElement.style.removeProperty("min-height");
-	currentLayout.resizeWindow();
+	let progressHeight = Helpers.getSearchRowHeight();
+	window.resizeTo(window.innerWidth, progressHeight);
 	Zotero.Prefs.set("integration.citationDialogLastClosedMode", currentLayout.type);
 	if (currentLayout.type == "library") {
 		Zotero.Prefs.set("integration.citationDialogCollectionLastSelected", libraryLayout.collectionsView.selectedTreeRow.ref.treeViewID);
@@ -313,10 +315,7 @@ class LibraryLayout extends Layout {
 	}
 
 	resizeWindow() {
-		let bubbleInputStyle = getComputedStyle(_id("search-row"));
-		let bubbleInputMargins = parseInt(bubbleInputStyle.marginTop) + parseInt(bubbleInputStyle.marginBottom);
-		let bubbleInputBorder = 1;
-		let bubbleInputHeight = _id("search-row").getBoundingClientRect().height + bubbleInputMargins + bubbleInputBorder;
+		let bubbleInputHeight = Helpers.getSearchRowHeight();
 
 		let suggestedItemsHeight = _id("library-other-items").getBoundingClientRect().height;
 
@@ -629,11 +628,7 @@ class ListLayout extends Layout {
 	}
 
 	resizeWindow() {
-		// height of bubble-input
-		let bubbleInputStyle = getComputedStyle(_id("search-row"));
-		let bubbleInputMargins = parseInt(bubbleInputStyle.marginTop) + parseInt(bubbleInputStyle.marginBottom);
-		let bubbleInputBorder = 1;
-		let bubbleInputHeight = _id("search-row").getBoundingClientRect().height + bubbleInputMargins + bubbleInputBorder;
+		let bubbleInputHeight = Helpers.getSearchRowHeight();
 
 		// height of all sections
 		let sectionsHeight = 0;

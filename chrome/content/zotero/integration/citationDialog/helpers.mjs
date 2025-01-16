@@ -196,4 +196,14 @@ export class CitationDialogHelpers {
 		}
 		return null;
 	}
+
+	getSearchRowHeight() {
+		let searchRow = this.doc.querySelector("#search-row");
+		let height = searchRow.getBoundingClientRect().height;
+		let win = this.doc.defaultView;
+		let style = win.getComputedStyle(searchRow);
+		let margins = parseInt(style.marginTop) + parseInt(style.marginBottom);
+		let border = 1;
+		return height + margins + border;
+	}
 }
