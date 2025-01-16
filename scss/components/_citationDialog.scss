@@ -114,39 +114,31 @@
 			--item-horizontal-size: calc(var(--item-width) + 2*var(--item-padding-horizontal) + 2px);
 
 			position: relative;
-
-			// fade effect by edges of suggested items
-			&::before,
-			&::after {
-				content: "";
-				position: absolute;
-				top: 0;
-				width: 25px;
-				height: 75px;
-				pointer-events: none;
-				z-index: 1000; 
-			}
-			&::before {
-				left: 0;
-				background: linear-gradient( to right, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 100% );
-			}
-			&::after {
-				right: 0;
-				background: linear-gradient( to left, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 100% );
-			}
+			overflow-x: scroll;
 
 			// wrapper for horizontal scrollable suggested items
 			.search-items {
-				display: flex;
-				overflow-x: scroll;
-				padding-bottom: 16px;
-				padding-inline-start: 20px;
-				// spacer for the right edge to leave a gap between the last item and fade effect
-				// padding would not work same as padding-inline-start above because
-				// flex items fill out all available space and the gap disappears
-				.itemsContainer:last-of-type:after {
+				display: flex;	
+				padding-bottom: 10px;
+
+				// fade effect on the edges of scrollable area
+				&::before,
+				&::after {
 					content: "";
-					flex: 0 0 15px;
+					position: sticky;
+					top: 0;
+					width: 20px;
+					height: 100%;
+					pointer-events: none;
+					z-index: 1000; 
+				}
+				&::before {
+					left: 0;
+					background: linear-gradient( to right, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 100% );
+				}
+				&::after {
+					right: 0;
+					background: linear-gradient( to left, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 100% );
 				}
 
 				.section {
@@ -160,7 +152,7 @@
 						// keep header stuck to the top left corner as the user scrolls
 						position: sticky;
 						top: 0;
-						left: 0;
+						left: 20px; // same as the width of sticky faded edges pseudo-elements
 						width: var(--item-horizontal-size);
 					}
 			
