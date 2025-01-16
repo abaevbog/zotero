@@ -268,6 +268,7 @@ class LibraryLayout extends Layout {
 	async refreshItemsList() {
 		await super.refreshItemsList();
 		_id("library-other-items").hidden = !_id("library-layout").querySelector(".section:not([hidden])");
+		_id("library-layout").querySelector(".secondary-divider").hidden = _id("library-other-items").hidden;
 		this.resizeWindow();
 		if (!_id("library-other-items").hidden) {
 			// on mouse scrollwheel in suggested items, scroll the list horizontally

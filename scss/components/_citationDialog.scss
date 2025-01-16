@@ -104,10 +104,8 @@
 		#library-other-items {
 
 			margin-left: 16px;
-			// border-top: 1px solid var(--fill-quinary);
 			padding-top: 8px;
-			margin-inline-end: 4px;
-			overflow-x: scroll;
+			margin-inline-end: 16px;
 			flex-shrink: 0; // make sure suggested items do not get shrunk when window is resized
 
 			--item-width: 210px;
@@ -115,167 +113,198 @@
 			--item-margin: 4px;
 			--item-horizontal-size: calc(var(--item-width) + 2*var(--item-padding-horizontal) + 2px);
 
-			// faded edges of the scrollable area
-			mask-image: linear-gradient(to right, transparent 0px, black 20px, black calc(100% - 20px), transparent 100%);
-			// padding to offset the faded edge above, so it's not visible upon initial load
-			padding-left: 20px;
+			position: relative;
 
-			.section {
-				margin-inline-end: 16px;
-				// hide vertical divider
-				.divider {
-					display: none;
+			// fade effect by edges of suggested items
+			&::before,
+			&::after {
+				content: "";
+				position: absolute;
+				top: 0;
+				width: 25px;
+				height: 75px;
+				pointer-events: none;
+				z-index: 1000; 
+			}
+			&::before {
+				left: 0;
+				background: linear-gradient( to right, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 100% );
+			}
+			&::after {
+				right: 0;
+				background: linear-gradient( to left, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 100% );
+			}
+
+			// wrapper for horizontal scrollable suggested items
+			.search-items {
+				display: flex;
+				overflow-x: scroll;
+				padding-bottom: 16px;
+				padding-inline-start: 20px;
+				// spacer for the right edge to leave a gap between the last item and fade effect
+				// padding would not work same as padding-inline-start above because
+				// flex items fill out all available space and the gap disappears
+				.itemsContainer:last-of-type:after {
+					content: "";
+					flex: 0 0 15px;
 				}
-				.header {
-					color: var(--fill-secondary);
-					// keep header stuck to the top left corner as the user scrolls
-					position: sticky;
-					top: 0;
-					left: 0;
-					width: var(--item-horizontal-size);
-				}
-		
-				.itemsContainer {
-					flex-direction: row;
-					display: flex;
-					margin-bottom: 10px;
-					margin-top: 4px;
-					gap: var(--item-margin);
-					transition: gap 0.2s ease-in-out;
-					border-radius: 5px;
-		
-					.item {
-						@include focus-ring(true);
-						height: 42px;
-						flex-shrink: 0;
-						width: var(--item-width);
-						overflow: hidden;
-						white-space: nowrap;
-						border: 1px solid var(--fill-quarternary);
-						border-radius: 5px;
-		
-						display: flex;
-						flex-direction: column;
-						justify-content: center;
-		
-						cursor: default;
-						padding: 0 var(--item-padding-horizontal);
-						line-height: 18px;
-						-moz-user-select: none;
 
-						transform: translateX(0);
-						transition: transform 0.2s ease-in-out;//, margin-inline 0.3s ease-in-out;
-						
-						// color has to be without opacity to the selected items deck
-						background-color: var(--color-background);
-		
-						.title {
-							overflow: hidden;
-							text-overflow: ellipsis;
-						}
-		
-						.description {
-							color: var(--fill-secondary);
-							font-size: 12px;
-							line-height: 16px;
-							overflow: hidden;
-							text-overflow: ellipsis;
-						}
-
-						&.selected {
-							&::after {
-								background: var(--accent-blue10);
-								content: "";
-								width: var(--item-horizontal-size);
-								height: 100%;
-								position: absolute;
-								left: 0;
-							}
-						}
+				.section {
+					margin-inline-end: 16px;
+					// hide vertical divider
+					.divider {
+						display: none;
 					}
-				}
-
-				// handle sections that can be expanded or collapsed
-				&.expandable {
-					transition: width 0.2s ease-in-out;
-					width: calc((var(--item-horizontal-size) * var(--deck-length)) + (var(--item-margin) * (var(--deck-length) - 1)));
-
-					// header has underline effect on hover and has an icon before it
-					// indicating current state
 					.header {
-						-moz-user-select: none;
-
+						color: var(--fill-secondary);
+						// keep header stuck to the top left corner as the user scrolls
+						position: sticky;
+						top: 0;
+						left: 0;
+						width: var(--item-horizontal-size);
+					}
+			
+					.itemsContainer {
+						flex-direction: row;
 						display: flex;
-						justify-content: space-between;
-				
-						.header-label {
-							@include focus-ring;
-							border-radius: 5px;
-							&:hover {
-								cursor: pointer;
-								text-decoration: underline;
-							}
-							&::before {
-								@include svgicon("expand-horizontal", "universal", "16");
-								width: 16px;
-								height: 16px;
-								display: inline-block;
-								content: "";
-								white-space: pre;
-								margin-inline-end: 3px;
-								vertical-align: bottom;
-							}
-						}
-					}
-					&.expanded {
-						.header-label::before {
-							@include svgicon("collapse-horizontal", "universal", "16");
-						}
-					}
-					.item {
-						z-index: calc(var(--deck-length) - var(--deck-index));
-					}
-					// collapsed sections move all items under the top first item
-					&:not(.expanded) {
-						// collapsed deck's width = width of an item + 5px for each item peaking behind the top one (max of 2)
-						width: calc(var(--item-horizontal-size) + 5px * min(2, var(--deck-length)));
-						.itemsContainer {
-							@include focus-ring(true);
-							gap: 0;
-						}
-						.item:nth-child(1) {
-							box-shadow: 2px 0px 4px 0px rgba(0, 0, 0, 0.10)
-						}
-						// 2nd and 3rd children are moved behind the first item, shrunk slightly and moved a bit to the right
-						// (by 16px and 32px) so their edge peaks out behind the top item
-						.item:nth-child(2) {
-							transform: translateX(calc(-1 * var(--deck-index) * (var(--item-horizontal-size)) + 16px)) scale(0.9);
-							box-shadow: 2px 0px 4px 0px rgba(0, 0, 0, 0.10)
-						}
-						.item:nth-child(3) {
-							transform:  translateX(calc(-1 * var(--deck-index) * (var(--item-horizontal-size)) + 32px)) scale(0.8);
-							box-shadow: 2px 0px 4px 0px rgba(0, 0, 0, 0.10)
-						}
-						// remaining item cards are just hidden behind the top item
-						.item:nth-child(n + 4) {
-							transform: translateX(calc(-1 * var(--deck-index) * (var(--item-horizontal-size))));
-						}
-					}
-				}
-				// separate items get a hover effect, unless they are in
-				// a collapsed expandable group, in which case the whole group is hovered
-				&:not(.expandable), &.expandable.expanded {
-					.item:hover {
-						background-color: var(--fill-quinary);
-					}
-				}
-				&.expandable:not(.expanded) {
-					.itemsContainer:hover {
+						margin-top: 4px;
+						gap: var(--item-margin);
+						transition: gap 0.2s ease-in-out;
+						border-radius: 5px;
+			
 						.item {
-							background-color: var(--color-quinary-on-background);
+							@include focus-ring(true);
+							height: 42px;
+							flex-shrink: 0;
+							width: var(--item-width);
+							overflow: hidden;
+							white-space: nowrap;
+							border: 1px solid var(--fill-quarternary);
+							border-radius: 5px;
+			
+							display: flex;
+							flex-direction: column;
+							justify-content: center;
+			
+							cursor: default;
+							padding: 0 var(--item-padding-horizontal);
+							line-height: 18px;
+							-moz-user-select: none;
+	
+							transform: translateX(0);
+							transition: transform 0.2s ease-in-out;//, margin-inline 0.3s ease-in-out;
+							
+							// color has to be without opacity to the selected items deck
+							background-color: var(--color-background);
+			
+							.title {
+								overflow: hidden;
+								text-overflow: ellipsis;
+							}
+			
+							.description {
+								color: var(--fill-secondary);
+								font-size: 12px;
+								line-height: 16px;
+								overflow: hidden;
+								text-overflow: ellipsis;
+							}
+	
+							&.selected {
+								&::after {
+									background: var(--accent-blue10);
+									content: "";
+									width: var(--item-horizontal-size);
+									height: 100%;
+									position: absolute;
+									left: 0;
+								}
+							}
 						}
 					}
-				}	
+	
+					// handle sections that can be expanded or collapsed
+					&.expandable {
+						transition: width 0.2s ease-in-out;
+						width: calc((var(--item-horizontal-size) * var(--deck-length)) + (var(--item-margin) * (var(--deck-length) - 1)));
+	
+						// header has underline effect on hover and has an icon before it
+						// indicating current state
+						.header {
+							-moz-user-select: none;
+	
+							display: flex;
+							justify-content: space-between;
+					
+							.header-label {
+								@include focus-ring;
+								border-radius: 5px;
+								&:hover {
+									cursor: pointer;
+									text-decoration: underline;
+								}
+								&::before {
+									@include svgicon("expand-horizontal", "universal", "16");
+									width: 16px;
+									height: 16px;
+									display: inline-block;
+									content: "";
+									white-space: pre;
+									margin-inline-end: 3px;
+									vertical-align: bottom;
+								}
+							}
+						}
+						&.expanded {
+							.header-label::before {
+								@include svgicon("collapse-horizontal", "universal", "16");
+							}
+						}
+						.item {
+							z-index: calc(var(--deck-length) - var(--deck-index));
+						}
+						// collapsed sections move all items under the top first item
+						&:not(.expanded) {
+							// collapsed deck's width = width of an item + 5px for each item peaking behind the top one (max of 2)
+							width: calc(var(--item-horizontal-size) + 5px * min(2, var(--deck-length)));
+							.itemsContainer {
+								@include focus-ring(true);
+								gap: 0;
+							}
+							.item:nth-child(1) {
+								box-shadow: 2px 0px 4px 0px rgba(0, 0, 0, 0.10)
+							}
+							// 2nd and 3rd children are moved behind the first item, shrunk slightly and moved a bit to the right
+							// (by 16px and 32px) so their edge peaks out behind the top item
+							.item:nth-child(2) {
+								transform: translateX(calc(-1 * var(--deck-index) * (var(--item-horizontal-size)) + 16px)) scale(0.9);
+								box-shadow: 2px 0px 4px 0px rgba(0, 0, 0, 0.10)
+							}
+							.item:nth-child(3) {
+								transform:  translateX(calc(-1 * var(--deck-index) * (var(--item-horizontal-size)) + 32px)) scale(0.8);
+								box-shadow: 2px 0px 4px 0px rgba(0, 0, 0, 0.10)
+							}
+							// remaining item cards are just hidden behind the top item
+							.item:nth-child(n + 4) {
+								transform: translateX(calc(-1 * var(--deck-index) * (var(--item-horizontal-size))));
+							}
+						}
+					}
+					// separate items get a hover effect, unless they are in
+					// a collapsed expandable group, in which case the whole group is hovered
+					&:not(.expandable), &.expandable.expanded {
+						.item:hover {
+							background-color: var(--fill-quinary);
+						}
+					}
+					&.expandable:not(.expanded) {
+						.itemsContainer:hover {
+							.item {
+								background-color: var(--color-quinary-on-background);
+							}
+						}
+					}	
+				}
 			}
 		}
 		#library-trees {
