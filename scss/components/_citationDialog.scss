@@ -134,11 +134,11 @@
 				}
 				&::before {
 					left: 0;
-					background: linear-gradient( to right, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 100% );
+					background: linear-gradient( to right, var(--material-background) 0%, rgba(255, 255, 255, 0) 100% );
 				}
 				&::after {
 					right: 0;
-					background: linear-gradient( to left, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 100% );
+					background: linear-gradient( to left, var(--material-background) 0%, rgba(255, 255, 255, 0) 100% );
 				}
 
 				.section {
