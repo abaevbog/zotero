@@ -45,15 +45,6 @@
 			this.refocusInput();
 		}
 
-		setHeightLock(isFixed) {
-			if (!isFixed) {
-				this.style.removeProperty("height");
-				return;
-			}
-			let { height } = this.getBoundingClientRect();
-			this.style.height = `${height}px`;
-		}
-
 		/**
 		 * Synchronize bubbles with the given citation data. Add bubbles for citation items that
 		 * are not present, remove bubbles whose citation items were removed, rearrange bubbles

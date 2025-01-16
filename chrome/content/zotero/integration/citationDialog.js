@@ -370,10 +370,6 @@ class LibraryLayout extends Layout {
 	}
 
 	async _initItemTree() {
-		// const ItemTree = require('zotero/itemTree');
-		// const { getCSSIcon } = require('components/icons');
-		// const { COLUMNS } = require('zotero/itemTreeColumns');
-
 		var itemsTree = _id('zotero-items-tree');
 		let itemColumns = COLUMNS.map((column) => {
 			column = Object.assign({}, column);
@@ -435,8 +431,6 @@ class LibraryLayout extends Layout {
 		// handle icon click to add/remove items
 		itemsTree.addEventListener("mousedown", event => this._handleItemsViewRowClick(event), true);
 		itemsTree.addEventListener("mouseup", event => this._handleItemsViewRowClick(event), true);
-		// when focus leaves the itemTree, remove fixed height from bubbleInput
-		itemsTree.addEventListener("focusout", event => this._handleFocusOut(event));
 		// manually handle hover effect on +/- icon, since css :hover applies to the entire row
 		itemsTree.addEventListener("mousemove", event => this._handleItemsViewMouseMove(event));
 		// handle backspace to remove an item from citation
@@ -501,14 +495,26 @@ class LibraryLayout extends Layout {
 		let hoveredOverIcon = row.querySelector(".icon-action.hover");
 		if (!hoveredOverIcon) return;
 		if (event.type == "mouseup") {
-			// fix height on bubble input  to make sure that a change in height
-			// does not shift itemTree rows as one is clicking
-			_id("bubble-input").setHeightLock(true);
-			// fetch index from the row's id (e.g. item-tree-citationDialog-row-0)
 			let rowIndex = row.id.split("-")[4];
 			let clickedItem = this.itemsView.getRow(rowIndex).ref;
 			hoveredOverIcon.classList.remove("active");
+			let rowTopBeforeRefresh = row.getBoundingClientRect().top;
 			IOManager.addItemsToCitation([clickedItem], { noInputRefocus: true });
+			// after an item is added, wait for the itemTree to refresh and if the bubble-input's
+			// height increased and pushed the itemTree down, scroll it up so that the mouse remains
+			// over the same row as before click
+			// do not do it after click on the first row, since then the mouse will be out of the
+			// scrollable area, over the headers
+			if (rowIndex === 0) return;
+			(async () => {
+				await this.itemsView._refreshPromise;
+				let rowAfterRefresh = doc.querySelector(`#zotero-items-tree #${row.id}`);
+				let rowTopAfterRefresh = rowAfterRefresh.getBoundingClientRect().top;
+				let delta = rowTopAfterRefresh - rowTopBeforeRefresh;
+				if (delta > 0.1) {
+					rowAfterRefresh.closest(".virtualized-table-body").scrollTop += delta;
+				}
+			})();
 		}
 		else if (event.type == "mousedown") {
 			hoveredOverIcon.classList.add("active");
@@ -558,20 +564,6 @@ class LibraryLayout extends Layout {
 	_refreshItemsViewHighlightedRows() {
 		let selectedIDs = CitationDataManager.items.map(({ zoteroItem }) => zoteroItem.id).filter(id => !!id);
 		this.itemsView.setHighlightedRows(selectedIDs);
-	}
-
-	// remove fixed height from bubble-input when focus leaves the itemTree
-	async _handleFocusOut() {
-		await Zotero.Promise.delay();
-		if (!_id("zotero-items-tree").contains(doc.activeElement)) {
-			_id("bubble-input").setHeightLock(false);
-			// wait a moment for bubbles to resize
-			await Zotero.Promise.delay(10);
-			// update window sizing unless the layout was switched
-			if (currentLayout.type == "library") {
-				this.resizeWindow();
-			}
-		}
 	}
 
 	_scrollHorizontallyOnWheel(event) {
