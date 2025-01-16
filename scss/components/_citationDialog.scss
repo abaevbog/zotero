@@ -311,6 +311,8 @@
 				border-inline-end: var(--material-panedivider);
 				& > #zotero-collections-tree {
 					background: var(--material-sidepane) !important;
+				}
+				.virtualized-table-body {
 					padding-top: 8px;
 				}
 			}
