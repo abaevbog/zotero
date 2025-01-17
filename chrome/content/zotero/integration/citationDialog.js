@@ -180,6 +180,7 @@ class Layout {
 				}
 			}
 		}
+		let selectedNow = doc.activeElement;
 		_id(`${this.type}-layout`).querySelector(".search-items").replaceChildren(...sections);
 		// Update which bubbles need to be highlighted
 		this.updateSelectedItems();
@@ -187,6 +188,10 @@ class Layout {
 		_id("bubble-input").ariaSetCurrentItem(null);
 		// Pre-select the item to be added on Enter of an input
 		IOManager.markPreSelected();
+		// If the previously focused node is no longer a part of the DOM, try to restore focus
+		if (!doc.contains(selectedNow) || doc.activeElement.tagName == "body") {
+			IOManager._restorePreClickFocus();
+		}
 	}
 
 	// Create the node for selected/cited/opened item groups.
@@ -498,7 +503,7 @@ class LibraryLayout extends Layout {
 			let clickedItem = this.itemsView.getRow(rowIndex).ref;
 			hoveredOverIcon.classList.remove("active");
 			let rowTopBeforeRefresh = row.getBoundingClientRect().top;
-			IOManager.addItemsToCitation([clickedItem], { noInputRefocus: true }).then(() => {
+			IOManager.addItemsToCitation([clickedItem], { noInputRefocus: false }).then(() => {
 				// after an item is added, bubble-input's height may increase and push the itemTree down
 				// scroll it back up so that the mouse remains over the same row as before click
 				// do not do it on click of the first row, since then the mouse will be on a header
@@ -516,6 +521,8 @@ class LibraryLayout extends Layout {
 		}
 		// stop propagation to not select the row
 		event.stopPropagation();
+		// do not move focus into the table
+		event.preventDefault();
 	}
 
 	// Add .hover effect to +/- button when the mouse is above it
@@ -734,6 +741,7 @@ const IOManager = {
 
 		// some additional logic to keep focus on relevant nodes during mouse interactions
 		this._initFocusRetention();
+		doc.addEventListener("focusin", this.resetSelectedAfterFocus);
 	},
 
 	// switch between list and library modes
@@ -891,15 +899,13 @@ const IOManager = {
 
 	handleItemClick(event) {
 		let targetItem = event.target.closest(".item");
-		let isMultiselectable = !!targetItem.closest("[data-multiselectable]");
 		// Cmd/Ctrl + mouseclick toggles selected item node
-		if (isMultiselectable && (Zotero.isMac && event.metaKey) || (!Zotero.isMac && event.ctrlKey)) {
-			targetItem.focus();
+		if ((Zotero.isMac && event.metaKey) || (!Zotero.isMac && event.ctrlKey)) {
 			IOManager.toggleItemNodeSelect(targetItem);
 			return;
 		}
 		// Shift + click selects a range
-		if (isMultiselectable && event.shiftKey) {
+		if (event.shiftKey) {
 			let itemNodes = [..._id(`${currentLayout.type}-layout`).querySelectorAll(".item")];
 			let firstNode = _id(`${currentLayout.type}-layout`).querySelector(".item.selected") || itemNodes[0];
 			IOManager.selectItemNodesRange(firstNode, targetItem);
@@ -915,7 +921,10 @@ const IOManager = {
 			}
 		}
 		let itemsToAdd = Array.from(itemIDs).map(itemID => SearchHandler.getItem(itemID));
-		IOManager.addItemsToCitation(itemsToAdd);
+		// after mouse click, return focus to where it was previously (e.g. itemTree)
+		// but on click via keyboard, always refocus input
+		let isMouseClick = event.clickX !== 0 && event.clickY !== 0;
+		IOManager.addItemsToCitation(itemsToAdd, { noInputRefocus: (isMouseClick && currentLayout.type == "library") });
 	},
 
 	handleCollapsibleSectionHeaderClick(section, event) {
@@ -962,6 +971,27 @@ const IOManager = {
 				container.removeAttribute("tabindex");
 				container.classList.remove("selected", "current");
 			}
+		}
+	},
+
+
+	// when focus leaves the input or suggested items area in library mode, un-select all items
+	// so they do not apear highlighted, since Enter would not add them anymore
+	// it does not apply to list mode
+	resetSelectedAfterFocus(event) {
+		if (currentLayout.type == "list") return;
+		let focused = event.target;
+		let itemsShouldRemainSelected = focused.classList.contains("input") || _id("library-other-items").contains(focused);
+		if (itemsShouldRemainSelected) {
+			if (!doc.querySelector(".item.selected")) {
+				IOManager.markPreSelected();
+			}
+			return;
+		}
+		KeyboardHandler._multiselectStart = null;
+		for (let item of doc.querySelectorAll(".item")) {
+			item.classList.remove("selected");
+			item.classList.remove("current");
 		}
 	},
 
@@ -1102,6 +1132,8 @@ const IOManager = {
 				// so don't move focus from them
 				if (_id("bubble-input").contains(doc.activeElement)) return;
 				if (_id("library-trees").contains(doc.activeElement)) return;
+				// cmd-click on suggester items in library mode should focus them
+				if (currentLayout.type == "library" && doc.activeElement.closest(".itemsContainer")) return;
 				if (IOManager._noRefocusing) return;
 				let focused = doc.activeElement;
 				if (focused.contains(IOManager._clicked) && !focused.closest("panel")) {

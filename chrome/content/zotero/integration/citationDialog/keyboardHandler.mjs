@@ -230,7 +230,7 @@ export class CitationDialogKeyboardHandler {
 		
 		if (multiSelect) {
 			// on arrow keypressees while holding shift, move focus and also perform multiselect
-			if (this._multiselectStart === null) {
+			if (this._multiselectStart === null || !this.doc.contains(this._multiselectStart)) {
 				this._multiselectStart = current || nextNode;
 			}
 			this.selectItems(this._multiselectStart, nextNode);
