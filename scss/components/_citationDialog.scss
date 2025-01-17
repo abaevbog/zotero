@@ -204,13 +204,13 @@
 							}
 	
 							&.selected {
-								&::after {
-									background: var(--accent-blue10);
-									content: "";
-									width: var(--item-horizontal-size);
-									height: 100%;
-									position: absolute;
-									left: 0;
+								// alternative to var(--accent-blue10) without opacity
+								// which causes issues with stacked item cards
+								@media (prefers-color-scheme: light) {
+									background-color: #eff5ff;
+								}
+								@media (prefers-color-scheme: dark) {
+									background-color: #202b46;
 								}
 							}
 						}
