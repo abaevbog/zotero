@@ -88,7 +88,7 @@
 	.secondary-divider {
 		border-bottom: 1px solid var(--fill-quinary);
 		margin-left: 36px;
-		margin-right: 10px;
+		margin-right: 8px;
 	}
 
 	.add-all {
@@ -104,7 +104,7 @@
 	#library-layout {
 		#library-other-items {
 
-			margin-left: 16px;
+			margin-left: 17px;
 			padding-top: 8px;
 			margin-inline-end: 16px;
 			flex-shrink: 0; // make sure suggested items do not get shrunk when window is resized
@@ -232,6 +232,8 @@
 							.header-label {
 								@include focus-ring;
 								border-radius: 5px;
+								// align icon of the label with bubbles' left edges
+								margin-inline-start: -1px;
 								&:hover {
 									cursor: pointer;
 									text-decoration: underline;
@@ -390,6 +392,7 @@
 				// show dividers except for on the last section
 				.divider {
 					margin: 4px 16px;
+					border-bottom: 1px solid var(--fill-quinary);
 				}
 				&:last-child {
 					.divider {
@@ -504,7 +507,7 @@
 		-moz-window-dragging: drag;
 
 		#bottom-btn-group {
-			gap: 10px;
+			gap: 8px;
 			-moz-window-dragging: no-drag;
 			#mode-button {
 				&[mode="library"] {
@@ -557,11 +560,11 @@
 					}
 				}
 				.details {
-					height: 120px;
-					margin: 12px 0;
+					margin: 16px 0;
 					display: flex;
 					flex-direction: column;
 					justify-content: space-between;
+					gap: 8px;
 
 					.row {
 						display: flex;
@@ -576,7 +579,7 @@
 						border-radius: 5px;
 						border: none;
 						box-shadow: 0px 0.5px 2.5px 0px rgba(0, 0, 0, 0.3);
-						width: 260px;
+						width: 250px;
 					}
 					#suppress-author-row {
 						justify-content: start;
