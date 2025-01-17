@@ -314,9 +314,13 @@
 			if (["ArrowUp", "ArrowDown"].includes(event.key)) {
 				let { x, y, width } = bubble.getBoundingClientRect();
 				let nextBubble = Utils.getLastBubbleBeforePoint(x + (width / 2), event.key == "ArrowUp" ? y - 25 : y + 30);
-				nextBubble?.focus();
-				event.preventDefault();
-				event.stopPropagation();
+				// Focus the next bubble if it exists. Otherwise, event will propagate to be handled
+				// by keyboardHandler.js of citationDialog.js
+				if (nextBubble) {
+					nextBubble.focus();
+					event.preventDefault();
+					event.stopPropagation();
+				}
 			}
 		}
 		

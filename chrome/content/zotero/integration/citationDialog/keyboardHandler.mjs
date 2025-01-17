@@ -110,7 +110,10 @@ export class CitationDialogKeyboardHandler {
 				group.scrollTo(0, 0);
 			}
 			else if (current || event.key == "ArrowDown") {
-				this.navigateGroup({ group, current, forward: event.key == "ArrowDown", shouldSelect: true, shouldFocus: false, multiSelect: event.shiftKey });
+				// Arrow down from input will just change the selected item without moving focus
+				// Arrow down from a bubble in the lowest row will move focus
+				let shouldFocus = event.target.classList.contains("bubble");
+				this.navigateGroup({ group, current, forward: event.key == "ArrowDown", shouldSelect: true, shouldFocus, multiSelect: event.shiftKey });
 			}
 			handled = true;
 		}
