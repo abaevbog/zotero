@@ -101,6 +101,13 @@
 		}
 	}
 
+	// alternative to var(--accent-blue10) without opacity
+	// which causes issues with stacked item cards in library mode
+	--selected-item-background: #EBF0FC;
+	@media (prefers-color-scheme: dark) {
+		--selected-item-background: #28375A;
+	}
+
 	#library-layout {
 		#library-other-items {
 
@@ -204,14 +211,7 @@
 							}
 	
 							&.selected {
-								// alternative to var(--accent-blue10) without opacity
-								// which causes issues with stacked item cards
-								@media (prefers-color-scheme: light) {
-									background-color: #eff5ff;
-								}
-								@media (prefers-color-scheme: dark) {
-									background-color: #202b46;
-								}
+								background-color: var(--selected-item-background) !important;
 							}
 						}
 					}
@@ -416,7 +416,7 @@
 						background-color: var(--fill-quinary);
 					}
 					&.selected {
-						background: var(--accent-blue30);
+						background-color: var(--selected-item-background);
 						border-radius: 0;
 						
 					}
@@ -493,9 +493,6 @@
 							height: 0 !important; // important to override inline height with items displayed
 						}
 					}
-				}
-				.selected {
-					background: var(--accent-blue10) !important;
 				}
 			}
 		}
