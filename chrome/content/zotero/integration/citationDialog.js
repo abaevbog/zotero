@@ -954,11 +954,16 @@ const IOManager = {
 			for (let item of [...section.querySelectorAll(".item")]) {
 				item.removeAttribute("tabindex");
 				item.classList.remove("current");
+				item.classList.remove("selected");
 			}
 			// in library, the items deck itself becomes focusable
 			if (currentLayout.type == "library") {
 				section.querySelector(".itemsContainer").setAttribute("tabindex", -1);
 				section.querySelector(".itemsContainer").dataset.arrowNavEnabled = true;
+				// if an item if focused, focus the collapsed container for smoother transition
+				if (doc.activeElement.classList.contains("item")) {
+					section.querySelector(".itemsContainer").focus();
+				}
 			}
 		}
 		// when expanded, make them focusable again
