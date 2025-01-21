@@ -514,7 +514,7 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 			libraryIncluded = this._includedInTree({ libraryID: Zotero.Libraries.userLibraryID });
 			if (libraryIncluded) {
 				newRows.splice(added++, 0,
-					new Zotero.CollectionTreeRow(this, 'library', { libraryID: Zotero.Libraries.userLibraryID }));
+					new Zotero.CollectionTreeRow(this, 'library', Zotero.Libraries.get(Zotero.Libraries.userLibraryID)));
 				newRows[0].isOpen = true;
 				added += await this._expandRow(newRows, 0);
 			}
