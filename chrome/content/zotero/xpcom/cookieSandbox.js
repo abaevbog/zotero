@@ -307,6 +307,7 @@ Zotero.CookieSandbox.Observer = new function() {
 	 * Implements nsIObserver to watch for new cookies and to add sandboxed cookies
 	 */
 	this.observe = function (channel, topic) {
+		return;
 		channel.QueryInterface(Components.interfaces.nsIHttpChannel);
 		var trackedBy, tested, browser,
 			channelURI = channel.URI.hostPort,
@@ -370,6 +371,7 @@ Zotero.CookieSandbox.Observer = new function() {
 			if(trackedBy) {
 				Zotero.debug("CookieSandbox: Managing cookies for "+channelURI, 5);
 			} else {
+				// sciencedirect logs this
 				Zotero.debug("CookieSandbox: Not touching channel for "+channelURI, 5);
 				return;
 			}

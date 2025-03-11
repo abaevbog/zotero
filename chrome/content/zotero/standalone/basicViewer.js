@@ -59,6 +59,10 @@ window.addEventListener("load", /*async */function () {
 	loadURI(Services.io.newURI(uri), options);
 }, false);
 
+window.addEventListener("unload", function () {
+	RequestObserver.unregister();
+});
+
 window.addEventListener("keypress", function (event) {
 	// Cmd-R/Ctrl-R (with or without Shift) to reload
 	if (((Zotero.isMac && event.metaKey && !event.ctrlKey)
@@ -85,10 +89,176 @@ function loadURI(uri, options = {}) {
 	if (options.cookieSandbox) {
 		options.cookieSandbox.attachToBrowser(browser);
 	}
+
+	RequestObserver.register();
+
 	browser.loadURI(
 		uri,
 		{
 			triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
 		}
 	);
+}
+
+
+// There is a POST request that fails with NS_BINDING_ABORTED status. Rerunning
+// that request gets the captcha to pass somehhow. Here, wait for that POST
+// request to fail and then try to rerun it manually with the same payload.
+var RequestObserver = {
+	requests: new Map(),
+  
+	register: function () {
+		Services.obs.addObserver(this, "http-on-opening-request", false);
+		Services.obs.addObserver(this, "http-on-examine-response", false);
+		Services.obs.addObserver(this, "http-on-examine-merged-response", false);
+		Services.obs.addObserver(this, "http-on-stop-request", false);
+	},
+  
+	unregister: function () {
+		Services.obs.removeObserver(this, "http-on-opening-request");
+		Services.obs.removeObserver(this, "http-on-examine-response");
+		Services.obs.removeObserver(this, "http-on-examine-merged-response");
+		Services.obs.removeObserver(this, "http-on-stop-request");
+	},
+  
+	// Get request body from upload stream
+	getRequestBody: function (uploadChannel) {
+		try {
+			if (!uploadChannel) return null;
+      
+			let uploadStream = uploadChannel.QueryInterface(Ci.nsIUploadChannel).uploadStream;
+			if (!uploadStream) return null;
+      
+			// Try to rewind the stream
+			if (uploadStream instanceof Ci.nsISeekableStream) {
+				uploadStream.seek(Ci.nsISeekableStream.NS_SEEK_SET, 0);
+			}
+			else {
+				return null;
+			}
+      
+			// Read the stream content
+			let stream = Cc["@mozilla.org/scriptableinputstream;1"]
+        		.createInstance(Ci.nsIScriptableInputStream);
+			stream.init(uploadStream);
+      
+			let body = stream.read(stream.available());
+      
+			// Rewind again
+			if (uploadStream instanceof Ci.nsISeekableStream) {
+				uploadStream.seek(Ci.nsISeekableStream.NS_SEEK_SET, 0);
+			}
+      
+			return body;
+		}
+		catch (e) {
+			console.log("RequestObserver: Error reading request body: " + e);
+			return null;
+		}
+	},
+  
+	observe: function (subject, topic, data) {
+		try {
+			let channel = subject.QueryInterface(Ci.nsIHttpChannel);
+			let requestId = channel.channelId;
+      
+			// Record when post request arrives
+			if (topic === "http-on-opening-request") {
+				if (channel.requestMethod !== "POST") return;
+        
+				// Store information about the request
+				let requestInfo = {
+					id: requestId,
+					url: channel.URI.spec,
+					method: channel.requestMethod,
+					startTime: Date.now(),
+					headers: {}
+				};
+        
+				// Get headers
+				channel.visitRequestHeaders({
+					visitHeader: function(name, value) {
+						requestInfo.headers[name] = value;
+					}
+				});
+        
+				// Get request body
+				if (channel instanceof Ci.nsIUploadChannel) {
+					requestInfo.body = this.getRequestBody(channel);
+				}
+        
+				this.requests.set(requestId, requestInfo);
+			}
+      
+			// Wait for the POST request to fail to retry
+			else if (topic === "http-on-stop-request") {
+				if (!this.requests.has(requestId)) return;
+        
+				let requestInfo = this.requests.get(requestId);
+				requestInfo.endTime = Date.now();
+				requestInfo.duration = requestInfo.endTime - requestInfo.startTime;
+				let status = subject.QueryInterface(Ci.nsIRequest).status;
+        
+				// NS_BINDING_ABORTED is 0x804b0002
+				const NS_BINDING_ABORTED = 0x804b0002;
+				if (status === NS_BINDING_ABORTED) {
+					requestInfo.error = "NS_BINDING_ABORTED";
+          
+					// Log detailed information about the aborted request
+					console.log("===================== ABORTED POST REQUEST DETAILS =====================");
+					console.log("URL: " + requestInfo.url);
+					console.log("Method: " + requestInfo.method);
+					console.log("Status: " + (requestInfo.statusCode || "N/A"));
+					console.log("Duration: " + requestInfo.duration + "ms");
+					console.log("Headers: " + JSON.stringify(requestInfo.headers, null, 2));
+					console.log("Body: " + requestInfo.body);
+					console.log("===================================================================");
+          
+					setTimeout(() => {
+						retryRequestWithFetch(requestInfo)
+							.then(result => {
+								console.log("Request retried successfully:", result);
+							})
+							.catch(error => {
+								console.error("Retry attempt failed:", error);
+							});
+					}, 3000);
+				}
+				// Clean up
+				this.requests.delete(requestId);
+			}
+		}
+		catch (e) {
+			console.log("RequestObserver: Error in observer: " + e);
+		}
+	}
+};
+
+window.addEventListener("unload", function() {
+	// Clean up on window close
+	RequestObserver.unregister();
+}, false);
+
+
+function retryRequestWithFetch(requestInfo) {
+	// Add headers from the original request
+	let headers = new Headers();
+	for (let name in requestInfo.headers) {
+	  headers.append(name, requestInfo.headers[name]);
+	}
+
+	let fetchOptions = {
+	  method: requestInfo.method,
+	  headers: headers,
+	  redirect: 'manual',
+	  credentials: 'include',
+	};
+	
+	// Add body for POST requests
+	if (requestInfo.method === 'POST' && requestInfo.body) {
+	  fetchOptions.body = requestInfo.body;
+	}
+	
+	// Perform the fetch request
+	return fetch(requestInfo.url, fetchOptions);
 }
