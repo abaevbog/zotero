@@ -212,6 +212,17 @@ Zotero.BrowserDownload = {
 		// make sure that you are using the browser you are claiming to be.
 		delete options.cookieSandbox?.userAgent;
 		
+		let sciencedirect = new URL("https://sciencedirect.com");
+		await new Promise((resolve) => {
+			console.log("Opened science direct");
+			win = Zotero.openInViewer(sciencedirect, { cookieSandbox: options.cookieSandbox });
+			// wait for the actual sciencedirect home page to load
+			setTimeout(() => {
+				resolve();
+			}, 7000);
+		});
+		win.close();
+		console.log("Closed science direct");
 		try {
 			wmListener = {
 				onOpenWindow(xulWindow) {
