@@ -172,20 +172,6 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 		else if (event.key == "F2" && !Zotero.isMac && treeRow.isCollection()) {
 			this.handleActivate(event, [this.selection.focused]);
 		}
-		else if (["ArrowDown", "ArrowUp"].includes(event.key)) {
-			// Specific logic for keypress navigation during collection filtering
-			// that skips context-rows
-			if (!this._isFilterEmpty()) {
-				this.focusNextMatchingRow(this.selection.focused, event.key == "ArrowUp", false);
-				return false;
-			}
-		}
-		else if (["ArrowRight", "ArrowLeft"].includes(event.key)) {
-			// No collapsing rows with arrows to avoid focusing on context rows
-			if (!this._isFilterEmpty()) {
-				return false;
-			}
-		}
 		else if (event.key == "End" && !this._isFilterEmpty()) {
 			this.focusLastMatchingRow();
 			return false;
@@ -209,20 +195,15 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 		// If the filter is on, the last row can be a previously focused
 		// row that does not match the filter. If the focus moves
 		// away to another row, we can delete it.
-		if (!this._isFilterEmpty() && this._hiddenFocusedRow && treeRow) {
-			if (this._hiddenFocusedRow.isCollection()
-				|| this._hiddenFocusedRow.isGroup()
-				|| this._hiddenFocusedRow.isSearch()
-				|| this._hiddenFocusedRow.isFeed()) {
-				if (!this._includedInTree(this._hiddenFocusedRow.ref) && treeRow.id !== this._hiddenFocusedRow.id) {
-					let indexToDelete = this.getRowIndexByID(this._hiddenFocusedRow.id);
-					if (indexToDelete) {
-						this._removeRow(indexToDelete);
-						this._hiddenFocusedRow = null;
-					}
-				}
-			}
-		}
+		console.log("Selection change ", this._hiddenFocusedRow, treeRow);
+		// if (this._hiddenFocusedRow && this._hiddenFocusedRow !== treeRow) {
+		// 	let indexToDelete = this._rows.findIndex(row => row.id == this._hiddenFocusedRow.id && row.level === -1);
+		// 	console.log("Remove hidden row?", indexToDelete);
+		// 	if (indexToDelete !== -1) {
+		// 		this._removeRow(indexToDelete);
+		// 		this._hiddenFocusedRow = null;
+		// 	}
+		// }
 		if (shouldDebounce) {
 			this._onSelectionChangeDebounced();
 		}
@@ -305,16 +286,11 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 		div.classList.toggle('highlighted', this._highlightedRows.has(treeRow.id));
 		div.classList.toggle('drop', this._dropRow == index);
 		div.classList.toggle('unread', treeRow.ref && treeRow.ref.unreadCount > 0);
-		let { matchesFilter, hasChildMatchingFilter } = this._matchesFilter(treeRow.ref);
-		div.classList.toggle('context-row', !matchesFilter && hasChildMatchingFilter);
+		let { matchesFilter } = this._matchesFilter(treeRow.ref);
+		div.classList.toggle('context-row', !matchesFilter);
 		// Hide currently focused but filtered out row to avoid confusing itemTree
-		if (this._hiddenFocusedRow && this._hiddenFocusedRow.id == treeRow.id) {
-			div.style.display = "none";
-		}
-		else if (div.style.display == "none") {
-			// Make sure we unhide the div if the row matches filter conditions
-			div.style.display = "";
-		}
+		let isHiddenFocusedRow = this._hiddenFocusedRow?.id == treeRow.id && treeRow.level == -1;
+		div.classList.toggle('hidden-focus-row', isHiddenFocusedRow);
 
 		// Depth indent
 		let depth = treeRow.level;
@@ -337,7 +313,7 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 		
 		// Twisty/spacer
 		let twisty;
-		if (this.isContainerEmpty(index) || !hasChildMatchingFilter) {
+		if (this.isContainerEmpty(index)) {
 			twisty = document.createElement('span');
 			if (Zotero.isMac && treeRow.isHeader()) {
 				twisty.classList.add("spacer-header");
@@ -514,7 +490,7 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 			//
 			// Add "My Library"
 			//
-			libraryIncluded = this._includedInTree({ libraryID: Zotero.Libraries.userLibraryID });
+			libraryIncluded = this._includedInTree(Zotero.Libraries.userLibrary);
 			if (libraryIncluded) {
 				newRows.splice(added++, 0,
 					new Zotero.CollectionTreeRow(this, 'library', Zotero.Libraries.userLibrary));
@@ -569,14 +545,6 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 			}
 			
 			this.selection.selectEventsSuppressed = true;
-			// If the focused row does not match the filter, create a hidden dummy row at the bottom
-			//  of the tree to focus on to prevent itemTree from changing selection
-			this._hiddenFocusedRow = this._createFocusedFilteredRow(newRows);
-			if (this._hiddenFocusedRow) {
-				newRows.splice(added++, 0,
-					this._hiddenFocusedRow
-				);
-			}
 			this._rows = newRows;
 			this._refreshRowMap();
 			if (this._editing) {
@@ -1241,6 +1209,11 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 		this.tree.invalidate(index);
 		this._lastToggleOpenStateIndex = null;
 	}
+
+	setOpenState = async (index, isOpen) => {
+		if (this.isContainerOpen(index) == isOpen) return;
+		await this.toggleOpenState(index);
+	};
 
 	/**
 	 * Toggle virtual collection (duplicates/unfiled) visibility
@@ -2391,6 +2364,12 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 	}
 	
 	isContainerOpen = (index) => {
+		try {
+			this.getRow(index).isOpen;
+		}
+		catch (e) {
+			console.trace("!!!", index);
+		}
 		return this.getRow(index).isOpen;
 	}
 
@@ -2548,101 +2527,103 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 	 */
 	async setFilter(filterText, focusTree = false) {
 		let collectionTable = document.getElementById("collection-tree").firstElementChild;
-		let isEmpty = this._isFilterEmpty();
+		let isInitiallyEmpty = this._isFilterEmpty();
 		let willBeEmpty = filterText.length == 0;
 		this._filter = filterText.toLowerCase();
-		let currentRow = this.getRow(this.selection.focused) || this._hiddenFocusedRow;
-		let currentRowDisplayed = currentRow && this._includedInTree(currentRow.ref);
-		let shouldRestoreScrollPosition = willBeEmpty && !isEmpty && !this._treeWasFocused;
+		let currentRow = this.getRow(this.selection.focused);
+		let filterBeingCleared = willBeEmpty && !isInitiallyEmpty;
 		// Save the initial scroll position, selected row and which rows were collapsed before the filtering starts
-		if (!willBeEmpty && isEmpty) {
+		if (!willBeEmpty && isInitiallyEmpty) {
 			this._filterInitialScrollPosition = collectionTable.scrollTop;
-			this._filterInitialCollapsedRows = this._rows.filter(r => !r.isOpen).map(r => r.id);
+			this._filterInitialCollapsedRows = new Set(this._rows.filter(r => !r.isOpen).map(r => r.id));
 			this._treeWasFocused = false;
 		}
-		// If current row does not match any filters, it'll be hidden, so clear selection
-		if (!currentRowDisplayed) {
-			this.selection.clearSelection();
-		}
+		
+		// Reload will filter out collections not matching the filter and without matching ancestors or children
 		await this.reload();
-		if (currentRow) {
-			// Special treatment for when there are no filter matches
-			// Otherwise, selection.focused does not get updated by selectByID, which breaks ZoteroPane.
-			if (this._rows.length == 1) {
-				this.selection.select(0);
-			}
-			// Re-select previously selected row
-			else {
-				await this.selectByID(currentRow.id, !shouldRestoreScrollPosition);
-			}
-		}
-
-		let promise = this.waitForSelect();
+		// Clear selectEventsSuppressed set in refresh();
 		this.selection.selectEventsSuppressed = false;
-		await promise;
 
-		// Expand all container rows to see all search results
-		if (!this._isFilterEmpty()) {
-			for (let i = 0; i < this._rows.length; i++) {
-				let row = this._rows[i];
-				if (this.isContainer(i) && this._matchesFilter(row.ref).hasChildMatchingFilter && !row.isOpen) {
-					await this.toggleOpenState(i);
-				}
+		// After reload, we should either re-select the current row if it is visible OR
+		// select the hidden placeholder, in case if the selected row's parent will be collapsed
+		// (handled at the bottom of this function).
+		let currentRowMatching = this._matchesFilter(currentRow.ref);
+		let currentRowDisplayed = currentRowMatching.hasChildMatchingFilter || currentRowMatching.matchesFilter;
+		console.log("Current row displayed ", currentRowDisplayed);
+		// Select the real row if it is currently visible OR if the filter has been cleared
+		if (this._isFilterEmpty() || currentRowDisplayed && currentRow.level !== -1) {
+			console.log('select real row');
+			this._hiddenFocusedRow = null;
+			await this.selectByID(currentRow.id);
+		}
+		// The current row does not exist in the tree or its parents are collapsed
+		else {
+			console.log('select hidden row');
+			this._hiddenFocusedRow = new Zotero.CollectionTreeRow(this, currentRow.type, currentRow.ref, -1, false);
+			this._rows.push(this._hiddenFocusedRow);
+			this._refreshRowMap();
+			await this.selectWait(this._rows.length - 1);
+		}
+		// Need to re-draw the tree to make sure the selected row is highlighted as such
+		this.tree.invalidate();
+
+		// If the filter has been cleared, restore original state of collection tree
+		// and set proper scroll position
+		if (filterBeingCleared) {
+			console.log("??");
+			// Find all ancestors of the selected row
+			let ancestors = new Set();
+			if (currentRow.ref.libraryID) {
+				ancestors.add("L" + currentRow.ref.libraryID);
+			}
+			let parent = currentRow.isCollection() ? Zotero.Collections.get(currentRow.ref.parentID) : null;
+			while (parent) {
+				ancestors.add(parent.treeViewID);
+				parent = Zotero.Collections.get(parent.parentID);
+			}
+			// Restore collapsed state of rows to what it was before filtering,
+			// except for the ancestors of the selected row. Otherwise selection will be lost.
+			for (let row of this._rows) {
+				let index = this.getRowIndexByID(row.id);
+				let shouldBeOpen = !this._filterInitialCollapsedRows.has(row.id) || ancestors.has(row.id);
+				await this.setOpenState(index, shouldBeOpen);
+			}
+			// If the focus/selection changed, scroll the selected row into the middle
+			if (this._treeWasFocused) {
+				let selectedRow = collectionTable.querySelector(".row.selected");
+				let rowRect = selectedRow.getBoundingClientRect();
+				let tableRect = collectionTable.getBoundingClientRect();
+				let rowMiddle = rowRect.top + rowRect.height / 2;
+				let tableMiddle = tableRect.top + tableRect.height / 2;
+				let scrollPosition = collectionTable.scrollTop + rowMiddle - tableMiddle;
+				collectionTable.scrollTop = scrollPosition;
+			}
+			// If the focus/selection was not changed, restore the scroll position
+			else {
+				this._filterInitialCollapsedRows = new Set([]);
+				collectionTable.scrollTop = this._filterInitialScrollPosition;
+				this._filterInitialScrollPosition = null;
 			}
 		}
-		// If the filter has been cleared and the selection has not changed, restore the initial scroll position
-		if (shouldRestoreScrollPosition) {
-			// For the initial scroll position to make sense, collapse rows that were initially collapsed
-			for (let rowID of this._filterInitialCollapsedRows) {
-				let index = this.getRowIndexByID(rowID);
-				if (index && this._rows[index].isOpen) {
-					this.toggleOpenState(index);
-				}
+		// If the filter is not being cleared and is not empty, expand all container rows that
+		// have matching children and collapse all container rows that do not
+		else {
+			for (let row of this._rows) {
+				if (!row.isCollection()) continue;
+				let index = this.getRowIndexByID(row.id);
+				let shouldBeOpen = this._matchesFilter(row.ref).hasChildMatchingFilter;
+				console.log("Open state: ", row.getName(), shouldBeOpen);
+				await this.setOpenState(index, shouldBeOpen);
 			}
-			this._filterInitialCollapsedRows = [];
-			collectionTable.scrollTop = this._filterInitialScrollPosition;
-			this._filterInitialScrollPosition = null;
 		}
 		// During filtering, scroll to the very top
-		else if (!willBeEmpty) {
+		if (!willBeEmpty) {
 			collectionTable.scrollTop = 0;
-		}
-		// If the filtering is cleared and the selection has changed, scroll to have the
-		// newly selected row in the middle
-		else if (willBeEmpty && !isEmpty) {
-			let selectedRow = collectionTable.querySelector(".row.selected");
-			let rowRect = selectedRow.getBoundingClientRect();
-			let tableRect = collectionTable.getBoundingClientRect();
-			let rowMiddle = rowRect.top + rowRect.height / 2;
-			let tableMiddle = tableRect.top + tableRect.height / 2;
-			let scrollPosition = collectionTable.scrollTop + rowMiddle - tableMiddle;
-			collectionTable.scrollTop = scrollPosition;
 		}
 		// Focus the collection tree
 		if (focusTree) {
 			collectionTable.parentNode.focus();
 		}
-	}
-
-
-	/**
-	 * Creates an extra hidden row to keep focus on it when a currently focused row does not match the filter.
-	 * Required to avoid changes in itemTree during collection search.
-	 * @param {CollectionTreeRow[]} rows - Rows of collectionTree.
-	 * @return {CollectionTreeRow|null}
-	 */
-	_createFocusedFilteredRow(rows) {
-		if (this._isFilterEmpty()) {
-			return null;
-		}
-		let focused = this.getRow(this.selection.focused);
-		// If row already exists - nothing to add
-		let focusedRowAlreadyExists = rows.some(row => row.id == focused?.id);
-		if (!focused || focusedRowAlreadyExists) {
-			return null;
-		}
-
-		return new Zotero.CollectionTreeRow(this, focused.type, focused.ref, 0, false);
 	}
 
 	focusedRowMatchesFilter() {
@@ -2727,46 +2708,6 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 	}
 
 	/**
-	 * Select and focus the next row after startIndex that matches the filter
-	 *
-	 * @param {Int} startIndex - Index of the row from which the search of the next matching row begins
-	 * @param {Bool} up - Move focus up the collection tree. Unless true, default direction is down.
-	 * @return {Bool} true if focus was shifted, false if selected row was not changed
-	 */
-	async focusNextMatchingRow(startIndex, up) {
-		if (this._isFilterEmpty()) {
-			return false;
-		}
-		// Increment or decrement the row index depending on direction
-		let moveInDirection = (rowIndex) => {
-			return up ? rowIndex - 1 : rowIndex + 1;
-		};
-
-		let rowIndex = startIndex;
-		while (rowIndex < this._rows.length && rowIndex >= 0) {
-			let nextIndex = moveInDirection(rowIndex);
-			let nextRow = this.getRow(nextIndex);
-
-			// If there is not next row or the next row is hidden (which should never happen), stop
-			if (!nextRow || nextRow.id == this._hiddenFocusedRow?.id) {
-				// If we stopped going up, make sure the library or group row is visible
-				if (up && !this.tree.rowIsVisible(0)) {
-					this.ensureRowIsVisible(0);
-				}
-				return false;
-			}
-			// Select the row if it's matching the filter unless it's a header or separator
-			if (this._matchesFilter(nextRow.ref).matchesFilter
-				&& !["separator", "header"].includes(nextRow.type)) {
-				this.tree.focus();
-				return this.selectByID(nextRow.id);
-			}
-			rowIndex = nextIndex;
-		}
-		return false;
-	}
-
-	/**
 	 * Check if a given object matches filter or has children that match the filter.
 	 *
 	 * @param {Collection|Search|Library|Group} object - Object to check
@@ -2774,6 +2715,7 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 	 * @return {Object} { matchesFilter: Bool, hasChildMatchingFilter: Bool }
 	 * 		matchesFilter = object itself matches the filter
 	 *		hasChildMatchingFilter = object has children that match the filter
+	 *		hasAncestorMatchingFilter = object has an ancestor that matches the filter
 	 */
 	_matchesFilter(object, resetCache = false) {
 		// When the filter is empty, everything matches
@@ -2809,9 +2751,11 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 		let filterValue = this._filter;
 
 		let childrenToSearch = [];
+		let collectionParent = null;
 		if (object._ObjectType == 'Collection') {
 			let collection = Zotero.Collections.get(object.id);
 			childrenToSearch = collection.getChildCollections();
+			collectionParent = object.parentID ? Zotero.Collections.get(object.parentID) : null;
 		}
 		else if (object.libraryID && !["Search", "Feeds"].includes(object._ObjectType)) {
 			childrenToSearch = Zotero.Collections.getByLibrary(object.libraryID);
@@ -2826,10 +2770,17 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 			let { matchesFilter, hasChildMatchingFilter } = this._matchesFilter(child);
 			return matchesFilter || hasChildMatchingFilter;
 		});
+		// Record if a collection's parent matches the filter
+		let hasAncestorMatchingFilter = collectionParent ? this._filterResultsCache[collectionParent.id]?.hasAncestorMatchingFilter : false;
+		while (collectionParent && !hasAncestorMatchingFilter) {
+			hasAncestorMatchingFilter = collectionParent.getName().toLowerCase().includes(filterValue);
+			collectionParent = collectionParent.parentID ? Zotero.Collections.get(collectionParent.parentID) : null;
+		}
 		// Save filter status to cache
 		this._filterResultsCache[objectID] = {
 			matchesFilter: matchesFilter,
-			hasChildMatchingFilter: hasChildMatchingFilter
+			hasChildMatchingFilter: hasChildMatchingFilter,
+			hasAncestorMatchingFilter: hasAncestorMatchingFilter
 		};
 		return this._filterResultsCache[objectID];
 	}
@@ -2837,7 +2788,7 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 	/**
 	 * Returns true if the object should be included in the tree because:
 	 * 	1. It matches the searchbox filter OR
-	 * 	2. Its children match the searchbox filter AND
+	 * 	2. Its children or ancestors match the searchbox filter AND
 	 * 	3. It is allowed by filter prop
 	 * @param {Collection|Search|Library|Group} object - Object to check
 	 * @param {Bool} resetCache - Ignore and reset existing cache value for that object
@@ -2847,13 +2798,12 @@ var CollectionTree = class CollectionTree extends LibraryTree {
 		const notACollection = (object.libraryID === undefined || object.libraryID === -1) && !object.updateFeed;
 		const treeHasFilterProp = Array.isArray(this.props.filterLibraryIDs) && this.props.filterLibraryIDs;
 		const isAllowedByPropFilter = notACollection || !treeHasFilterProp
-			|| this.props.filterLibraryIDs.includes(object.libraryID)
-		;
+			|| this.props.filterLibraryIDs.includes(object.libraryID);
 		
 		if (!isAllowedByPropFilter) return false;
 
-		const { matchesFilter, hasChildMatchingFilter } = this._matchesFilter(object, resetCache);
-		return matchesFilter || hasChildMatchingFilter;
+		let { matchesFilter, hasChildMatchingFilter, hasAncestorMatchingFilter } = this._matchesFilter(object, resetCache);
+		return matchesFilter || hasChildMatchingFilter || hasAncestorMatchingFilter;
 	}
 
 	async _expandRow(rows, row, forceOpen) {

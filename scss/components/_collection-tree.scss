@@ -53,6 +53,10 @@ $icons: (
 					}
 				}
 			}
+
+			&.hidden-focus-row {
+				display: none;
+			}
 		}
 	}
 
