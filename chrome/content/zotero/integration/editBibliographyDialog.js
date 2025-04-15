@@ -248,6 +248,24 @@ var initReferenceItemsTree = async function () {
 		actionHandler: (item, _) => {
 			ReferenceItems.toggleItemInBibliography([item.id]);
 		}
+	},
+	{
+		dataKey: 'isCited',
+		label: "Cited",
+		showInColumnPicker: true,
+		renderer: (index, isCited, column) => {
+			let cell = document.createElement("span");
+			cell.className = `cell ${column.className}`;
+			let iconWrapper = document.createElement("span");
+			iconWrapper.className = "icon";
+			cell.append(iconWrapper);
+			let icon = isCited ? "yes" : "no";
+			iconWrapper.append(icon);
+			return cell;
+		},
+		actionHandler: (item, _) => {
+			ReferenceItems.toggleItemInBibliography([item.id]);
+		}
 	});
 
 	referenceItemsView = await ItemTree.init(document.getElementById('zotero-reference-items-tree'), {
@@ -276,6 +294,9 @@ var initReferenceItemsTree = async function () {
 			}
 			if (key == "isEdited") {
 				return bibEditInterface.isEdited(item.id);
+			}
+			if (key == "isCited") {
+				return citedItemIDs.includes(item.id);
 			}
 			return undefined;
 		}
