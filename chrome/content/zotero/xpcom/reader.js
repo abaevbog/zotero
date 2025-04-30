@@ -322,7 +322,8 @@ class ReaderInstance {
 				let libraryID = attachment.libraryID;
 				let annotation = Zotero.Items.getByLibraryAndKey(libraryID, key);
 				if (annotation) {
-					this._openTagsPopup(annotation, x, y);
+					let { left, top } = this._iframe.getBoundingClientRect();
+					Zotero.Annotations.insertAnnotationsTagsPopup(this._popupset, annotation, x + left, y + top);
 				}
 			},
 			onClosePopup: () => {
@@ -1074,61 +1075,6 @@ class ReaderInstance {
 		return `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><rect shape-rendering="geometricPrecision" fill="${fill}" stroke-width="2" x="2" y="2" stroke="${stroke}" width="12" height="12" rx="3"/></svg>`;
 	}
 
-	_openTagsPopup(item, x, y) {
-		let tagsPopup = this._window.document.createXULElement('panel');
-		// <panel> completely takes over Escape keydown event, by attaching a capturing keydown
-		// listener to document which just closes the popup. It leads to unwanted edits being saved.
-		// Attach our own listener to this._window.document to properly handle Escape on edited tags
-		let handleKeyDown = (event) => {
-			if (event.key !== "Escape") return;
-			let focusedTag = tagsPopup.querySelector("editable-text.focused");
-			if (focusedTag) {
-				if (focusedTag.closest("[isNew]")) {
-					// remove newly added tag
-					focusedTag.closest(".row").remove();
-				}
-				else {
-					// or reset to initial value if the tag is not new
-					focusedTag.value = focusedTag.initialValue;
-				}
-			}
-			// now that all tags values are reset, close the popup
-			tagsPopup.hidePopup();
-		};
-		tagsPopup.addEventListener('popuphidden', (event) => {
-			if (event.target === tagsPopup) {
-				tagsPopup.remove();
-			}
-			this._window.document.removeEventListener("keydown", handleKeyDown, true);
-		});
-		this._window.document.addEventListener("keydown", handleKeyDown, true);
-		tagsPopup.className = 'tags-popup';
-		let tagsbox = this._window.document.createXULElement('tags-box');
-		tagsPopup.appendChild(tagsbox);
-		tagsbox.setAttribute('flex', '1');
-		this._popupset.appendChild(tagsPopup);
-		let rect = this._iframe.getBoundingClientRect();
-		x += rect.left;
-		y += rect.top;
-		tagsbox.editable = true;
-		tagsbox.item = item;
-		tagsbox.render();
-		// remove unnecessary tabstop from the section header
-		tagsbox.querySelector(".head").removeAttribute("tabindex");
-		tagsPopup.addEventListener("popupshown", (_) => {
-			// Ensure tagsbox is open
-			tagsbox.open = true;
-			if (tagsbox.count == 0) {
-				tagsbox.newTag();
-			}
-			else {
-				// Focus + button
-				Services.focus.setFocus(tagsbox.querySelector("toolbarbutton"), Services.focus.FLAG_NOSHOWRING);
-			}
-			tagsbox.collapsible = false;
-		});
-		tagsPopup.openPopup(null, 'before_start', x, y, true);
-	}
 
 	async _openContextMenu({ x, y, itemGroups }) {
 		let popup = this._window.document.createXULElement('menupopup');

@@ -65,6 +65,10 @@
 			this._title = this.querySelector('.title');
 			this._body = this.querySelector('.body');
 			this._tags = this.querySelector('.tags');
+			this._tags.addEventListener('click', (_) => {
+				let { x, y, height } = this.getBoundingClientRect();
+				Zotero.Annotations.insertAnnotationsTagsPopup(this, this._annotation, x, y + height);
+			});
 			this.render();
 		}
 
@@ -120,8 +124,13 @@
 			}
 			
 			let tags = this._annotation.getTags();
-			this._tags.hidden = !tags.length;
-			this._tags.textContent = tags.map(tag => tag.tag).sort(Zotero.localeCompare).join(Zotero.getString('punctuation.comma') + ' ');
+			if (tags.length) {
+				this._tags.textContent = tags.map(tag => tag.tag).sort(Zotero.localeCompare).join(Zotero.getString('punctuation.comma') + ' ');
+			}
+			else {
+				this._tags.textContent = Zotero.getString('pdfReader.addTags');
+			}
+			
 			
 			this.style.setProperty('--annotation-color', this._annotation.annotationColor);
 			// A11y - make focusable + add screen reader's labels
