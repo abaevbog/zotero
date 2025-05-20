@@ -54,6 +54,10 @@ async function onLoad() {
 	isCitingNotes = !!io.isCitingNotes;
 	window.isPristine = true;
 
+	Zotero.debug("Citation Dialog: initializing");
+	let timer = new Zotero.Integration.Timer();
+	timer.start();
+
 	Helpers = new CitationDialogHelpers({ doc, io });
 	SearchHandler = new CitationDialogSearchHandler({ isCitingNotes, io });
 	PopupsHandler = new CitationDialogPopupsHandler({ doc });
@@ -80,9 +84,7 @@ async function onLoad() {
 	// keypress from the top-most row in the items table
 	doc.addEventListener("keydown", event => KeyboardHandler.captureKeydown(event), true);
 
-	// citation has to be built before libraryLayout.init to so itemTree knows which items to highlight
-	await CitationDataManager.buildCitation();
-	IOManager.updateBubbleInput();
+	IOManager.initializeCitation();
 	// init library layout after bubble input is built since bubble-input's height is a factor
 	// determining initial library layout height
 	await libraryLayout.init();
@@ -96,10 +98,10 @@ async function onLoad() {
 	IOManager.init();
 	// explicitly focus bubble input so one can begin typing right away
 	_id("bubble-input").refocusInput();
-	// loading cited items can take a long time - start loading them now
-	// and add new nodes when cited items are ready
-	SearchHandler.loadCitedItemsPromise.then(() => {
-		SearchHandler.refreshCitedItems();
+	// io.getItems() will not return until allCitedDataLoadedDeferred resolves.
+	// refresh cited items as soon as io.getItems is ready
+	io.allCitedDataLoadedDeferred.promise.then(async () => {
+		await SearchHandler.refreshCitedItems();
 		currentLayout.refreshItemsList({ retainItemsState: true });
 	});
 
@@ -110,13 +112,15 @@ async function onLoad() {
 		}
 	}
 	loaded = true;
+	let initTime = timer.stop();
+	Zotero.debug(`Citation Dialog: initialized in ${initTime} s`);
 }
 
 
-function accept() {
+async function accept() {
 	if (accepted || SearchHandler.searching || !CitationDataManager.items.length) return;
 	accepted = true;
-	CitationDataManager.updateCitationObject(true);
+	Zotero.debug("Citation Dialog: accepted");
 	_id("library-layout").hidden = true;
 	_id("list-layout").hidden = true;
 	_id("bubble-input").hidden = true;
@@ -128,6 +132,11 @@ function accept() {
 	setTimeout(() => {
 		window.resizeTo(window.innerWidth, progressHeight);
 	});
+	// If items were added before sorting was ready, we must wait to sort them here.
+	// Otherwise, if the dialog is opened again, bubbles will not be in the correct
+	// order, even though the citation itself will look right.
+	await CitationDataManager.sort({ waitForCitedData: true });
+	CitationDataManager.updateCitationObject(true);
 	cleanupBeforeDialogClosing();
 	io.accept((percent) => {
 		_id("progress").value = Math.round(percent);
@@ -178,6 +187,7 @@ class Layout {
 	// Re-render the items based on search results
 	// @param {Boolean} options.retainItemsState: try to restore focused and selected status of item nodes.
 	async refreshItemsList({ retainItemsState } = {}) {
+		Zotero.debug("Citation Dialog: refreshing items list");
 		let sections = [];
 
 		// Tell SearchHandler which currently cited items are so they are not included in results
@@ -247,7 +257,6 @@ class Layout {
 		this.updateSelectedItems();
 
 		// Keep focus and selection on the same item nodes if specified.
-		// This should only be applicable to refresh after SearchHandler.loadCitedItemsPromise.
 		if (retainItemsState) {
 			doc.getElementById(previouslyFocused.id)?.focus();
 			// Try to retain selected status of items, in case if multiselection was in progress
@@ -276,6 +285,9 @@ class Layout {
 	// Run search and refresh items list
 	async search(value, { skipDebounce = false } = {}) {
 		if (accepted) return;
+		let timer = new Zotero.Integration.Timer();
+		timer.start();
+		Zotero.debug("Citation Dialog: searching");
 		_id("loading-spinner").setAttribute("status", "animate");
 		_id("accept-button").hidden = true;
 		SearchHandler.searching = true;
@@ -318,6 +330,8 @@ class Layout {
 		SearchHandler.searching = false;
 		_id("loading-spinner").removeAttribute("status");
 		_id("accept-button").hidden = false;
+		let searchTime = timer.stop();
+		Zotero.debug(`Citation Dialog: searching done in ${searchTime}`);
 		if (this.forceUpdateTablesAfterRefresh && this.type == "library") {
 			this.forceUpdateTablesAfterRefresh = false;
 			setTimeout(() => {
@@ -921,7 +935,7 @@ const IOManager = {
 		doc.addEventListener("DOMMenuBarActive", () => this._handleMenuBarAppearance());
 
 		// if keep sorted was unchecked and then checked, resort items and update bubbles
-		_id("keepSorted").addEventListener("change", () => this._resortItems());
+		_id("keepSorted").addEventListener("change", () => this.sortItemsWhenReady());
 
 		_id("mode-button").addEventListener("click", () => this.toggleDialogMode());
 
@@ -995,7 +1009,17 @@ const IOManager = {
 		_id("accept-button").disabled = !CitationDataManager.items.length;
 	},
 
+	// Construct citation upon initial load
+	async initializeCitation() {
+		let bubbleItems = io.citation.citationItems.map(item => BubbleItem.fromCitationItem(item));
+		await CitationDataManager.addItems({ bubbleItems });
+		this.updateBubbleInput();
+		// If needed, items will be sorted as soon as io.sort() is ready
+		this.sortItemsWhenReady();
+	},
+
 	async addItemsToCitation(items, { noInputRefocus, index } = { index: null }) {
+		Zotero.debug(`Citation Dialog: adding ${items.length} items to the citation`);
 		if (accepted || SearchHandler.searching) return;
 		if (!Array.isArray(items)) {
 			items = [items];
@@ -1344,11 +1368,10 @@ const IOManager = {
 	},
 
 	// Resort items and update the bubbles
-	_resortItems() {
-		if (!_id("keepSorted").checked) return;
-		CitationDataManager.sort().then(() => {
-			this.updateBubbleInput();
-		});
+	async sortItemsWhenReady() {
+		if (!_id("keepSorted").checked || accepted) return;
+		await CitationDataManager.sort({ waitForCitedData: true });
+		this.updateBubbleInput();
 	},
 
 	// Return focus to where it was before click moved focus.
@@ -1564,7 +1587,8 @@ const CitationDataManager = {
 		}
 		// No sorting happens when citing notes, since the dialog is accepted right after
 		if (isCitingNotes) return;
-		await this.sort();
+		// Sort only if io.sort() is ready to run
+		await this.sort({ waitForCitedData: false });
 		this.updateItemAddedCache();
 	},
 
@@ -1588,14 +1612,32 @@ const CitationDataManager = {
 	// Update io citation object based on Citation.items array
 	updateCitationObject(final = false) {
 		io.citation.citationItems = this.items.map(item => item.getCitationItem({ includeDialogReferenceID: !final }));
-		if (final && io.sortable) {
+		if (io.sortable) {
 			io.citation.properties.unsorted = !_id("keepSorted").checked;
 		}
 	},
 
 	// Resorts the items in the citation
-	async sort() {
+	async sort({ waitForCitedData } = {}) {
 		if (!_id("keepSorted").checked) return;
+		// If there was an earlier not-finished call to sort while cited items were being loaded, do nothing
+		if (this._waitingToSortWhenReady) return;
+		// It can take arbitrarily long time for documents with many cited items to load
+		// all data necessary to run io.sort(). So unless it is specified otherwise,
+		// do nothing if io.sort() is not yet ready to run.
+		if (!io.allCitedDataLoadedDeferred.promise.isResolved()) {
+			if (!waitForCitedData) return;
+			Zotero.debug("Citation Dialog: waiting for io.sort() to be ready");
+			this._waitingToSortWhenReady = true;
+			// Wait for io.sort() to be ready before calling updateCitationObject, so that
+			// io.citation has the most up-to-date data before io.sort() is called.
+			await io.allCitedDataLoadedDeferred.promise;
+			this._waitingToSortWhenReady = false;
+			// Theoretically, sort() could be called and then keepSorted could be unchecked
+			// while we are waiting for cited items. In that case, no sorting.
+			if (!_id("keepSorted").checked) return;
+		}
+		Zotero.debug("Citation Dialog: sorting items");
 		this.updateCitationObject();
 		await io.sort();
 		// sync the order of this.items with io.citation.sortedItems
@@ -1604,21 +1646,6 @@ const CitationDataManager = {
 			return this.items.find(item => item.dialogReferenceID === sortedItem.dialogReferenceID);
 		});
 		this.items = sortedItems;
-	},
-	
-	// Construct citation upon initial load
-	async buildCitation() {
-		let citationItems = [];
-		if (!io.citation.properties.unsorted
-				&& _id("keepSorted").checked
-				&& io.citation.sortedItems?.length) {
-			citationItems = io.citation.sortedItems.map(entry => entry[1]);
-		}
-		else {
-			citationItems = io.citation.citationItems;
-		}
-		let bubbleItems = citationItems.map(item => BubbleItem.fromCitationItem(item));
-		await this.addItems({ bubbleItems });
 	},
 };
 

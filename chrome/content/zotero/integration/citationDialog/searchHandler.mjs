@@ -50,10 +50,6 @@ export class CitationDialogSearchHandler {
 		this.selectedItems = null;
 		this.openItems = null;
 		this.citedItems = null;
-
-		this.loadCitedItemsPromise = this._getCitedItems().then((citedItems) => {
-			this.citedItems = citedItems;
-		});
 	}
 
 	setSearchValue(str, enforceMinQueryLength) {
@@ -173,8 +169,14 @@ export class CitationDialogSearchHandler {
 	}
 
 	async refreshCitedItems() {
-		if (this.citedItems === null) {
+		// io.getItems will not resolve until all cited data is loaded,
+		// which can take a long time. Until then, it's a noop so that other components
+		// can await for refreshCitedItems() without risking a delay.
+		if (!this.io.allCitedDataLoadedDeferred.promise.isResolved()) {
 			return;
+		}
+		if (this.citedItems === null) {
+			this.citedItems = await this._getCitedItems();
 		}
 		// if "ibid" is typed, return all cited items
 		if (this.searchValue.toLowerCase() === Zotero.getString("integration.ibid").toLowerCase()) {

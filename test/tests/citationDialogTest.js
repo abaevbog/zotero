@@ -12,7 +12,8 @@ describe("Citation Dialog", function () {
 		},
 		getItems() {
 			return [];
-		}
+		},
+		allCitedDataLoadedDeferred: Zotero.Promise.defer(),
 	};
 	let dialog, win, IOManager, CitationDataManager, SearchHandler;
 
@@ -25,6 +26,7 @@ describe("Citation Dialog", function () {
 		IOManager = dialog.IOManager;
 		CitationDataManager = dialog.CitationDataManager;
 		SearchHandler = dialog.SearchHandler;
+		io.allCitedDataLoadedDeferred.resolve();
 		// wait for everything (e.g. itemTree/collectionTree) inside of the dialog to be loaded.
 		while (!dialog.loaded) {
 			await Zotero.Promise.delay(10);
@@ -188,8 +190,7 @@ describe("Citation Dialog", function () {
 		it("should build citation with a cited item in library", async function () {
 			io.citation.citationItems = [citedItemOne];
 	
-			await CitationDataManager.buildCitation();
-			IOManager.updateBubbleInput();
+			await IOManager.initializeCitation();
 			
 			let bubbles = bubbleInput.getAllBubbles();
 			assert.equal(CitationDataManager.items.length, 1);
@@ -200,8 +201,7 @@ describe("Citation Dialog", function () {
 		it("should build citation with a cited item not in library", async function () {
 			io.citation.citationItems = [citedItemNotInLibrary];
 	
-			await CitationDataManager.buildCitation();
-			IOManager.updateBubbleInput();
+			await IOManager.initializeCitation();
 	
 			let bubbles = bubbleInput.getAllBubbles();
 			assert.equal(CitationDataManager.items.length, 1);
@@ -300,7 +300,7 @@ describe("Citation Dialog", function () {
 			let bubbleItems = CitationDataManager.items;
 			// Build citation with several cited items
 			io.citation.citationItems = [citedItemOne, citedItemNotInLibrary];
-			await CitationDataManager.buildCitation();
+			await IOManager.initializeCitation();
 	
 			// Add another item
 			await IOManager.addItemsToCitation([itemTwo], { index: 2 });
@@ -460,6 +460,47 @@ describe("Citation Dialog", function () {
 				let node = dialog.document.querySelector(`.item[id="${itemID}"]`);
 				assert.isOk(node);
 			}
+		});
+	});
+
+	describe("Dialog loading", function () {
+		let newDialog;
+
+		after(() => {
+			newDialog.close();
+		});
+
+		it("the dialog should be interactable even if io functions are not loaded", async function () {
+			let io = {
+				accept() {},
+				cancel() {},
+				sortable: true,
+				citation: {
+					citationItems: [],
+					properties: {
+						unsorted: false,
+					}
+				},
+				sort() {
+					return Zotero.Promise.defer().promise;
+				},
+				getItems() {
+					return Zotero.Promise.defer().promise;
+				},
+				allCitedDataLoadedDeferred: Zotero.Promise.defer(),
+			};
+
+			let newDialogPromise = waitForWindow("chrome://zotero/content/integration/citationDialog.xhtml");
+			Services.ww.openWindow(null, "chrome://zotero/content/integration/citationDialog.xhtml", "", "", io);
+			newDialog = await newDialogPromise;
+
+			while (!newDialog.loaded || newDialog.SearchHandler.searching) {
+				await Zotero.Promise.delay(10);
+			}
+			let item = await createDataObject('item', { title: "test" });
+			await newDialog.IOManager.addItemsToCitation([item]);
+			let addedBubble = newDialog.document.querySelector(".bubble");
+			assert.isOk(addedBubble);
 		});
 	});
 

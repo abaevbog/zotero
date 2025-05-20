@@ -1112,7 +1112,9 @@ Zotero.Integration.Session.prototype.getFields = new function() {
 		timer.start();
 		this.progressBar.start();
 		try {
+			await Zotero.Promise.delay(10000);;
 			var fields = this._fields = Array.from(await this._doc.getFields(this.data.prefs['fieldType']));
+			console.trace("FIELDS LOADED");
 			
 			var retrieveTime = timer.stop();
 			this.progressBar.finishSegment();
@@ -1734,6 +1736,12 @@ Zotero.Integration.CitationEditInterface = function(items, sortable, fieldIndexP
 
 	this._acceptDeferred = Zotero.Promise.defer();
 	this.promise = this._acceptDeferred.promise;
+
+	// Resolve when all data needed to run getItems() or sort() is loaded
+	this.allCitedDataLoadedDeferred = Zotero.Promise.defer();
+	Promise.all([fieldIndexPromise, citationsByItemIDPromise]).then(() => {
+		this.allCitedDataLoadedDeferred.resolve();
+	});
 }
 
 Zotero.Integration.CitationEditInterface.prototype = {
