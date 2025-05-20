@@ -101,8 +101,12 @@ async function onLoad() {
 	// io.getItems() will not return until allCitedDataLoadedDeferred resolves.
 	// refresh cited items as soon as io.getItems is ready
 	io.allCitedDataLoadedDeferred.promise.then(async () => {
+		if (accepted) return;
 		await SearchHandler.refreshCitedItems();
 		currentLayout.refreshItemsList({ retainItemsState: true });
+		if (_id("keepSorted").checked) {
+			IOManager.sortItemsWhenReady();
+		}
 	});
 
 	// Disabled all multiselect when citing notes
@@ -1014,8 +1018,6 @@ const IOManager = {
 		let bubbleItems = io.citation.citationItems.map(item => BubbleItem.fromCitationItem(item));
 		await CitationDataManager.addItems({ bubbleItems });
 		this.updateBubbleInput();
-		// If needed, items will be sorted as soon as io.sort() is ready
-		this.sortItemsWhenReady();
 	},
 
 	async addItemsToCitation(items, { noInputRefocus, index } = { index: null }) {
@@ -1370,7 +1372,7 @@ const IOManager = {
 	// Resort items and update the bubbles
 	async sortItemsWhenReady() {
 		if (!_id("keepSorted").checked || accepted) return;
-		await CitationDataManager.sort({ waitForCitedData: true });
+		await CitationDataManager.sort();
 		this.updateBubbleInput();
 	},
 
@@ -1588,7 +1590,7 @@ const CitationDataManager = {
 		// No sorting happens when citing notes, since the dialog is accepted right after
 		if (isCitingNotes) return;
 		// Sort only if io.sort() is ready to run
-		await this.sort({ waitForCitedData: false });
+		await this.sort();
 		this.updateItemAddedCache();
 	},
 
@@ -1618,25 +1620,12 @@ const CitationDataManager = {
 	},
 
 	// Resorts the items in the citation
-	async sort({ waitForCitedData } = {}) {
+	async sort() {
 		if (!_id("keepSorted").checked) return;
-		// If there was an earlier not-finished call to sort while cited items were being loaded, do nothing
-		if (this._waitingToSortWhenReady) return;
 		// It can take arbitrarily long time for documents with many cited items to load
-		// all data necessary to run io.sort(). So unless it is specified otherwise,
-		// do nothing if io.sort() is not yet ready to run.
-		if (!io.allCitedDataLoadedDeferred.promise.isResolved()) {
-			if (!waitForCitedData) return;
-			Zotero.debug("Citation Dialog: waiting for io.sort() to be ready");
-			this._waitingToSortWhenReady = true;
-			// Wait for io.sort() to be ready before calling updateCitationObject, so that
-			// io.citation has the most up-to-date data before io.sort() is called.
-			await io.allCitedDataLoadedDeferred.promise;
-			this._waitingToSortWhenReady = false;
-			// Theoretically, sort() could be called and then keepSorted could be unchecked
-			// while we are waiting for cited items. In that case, no sorting.
-			if (!_id("keepSorted").checked) return;
-		}
+		// all data necessary to run io.sort().
+		// Do nothing if io.sort() is not yet ready to run.
+		if (!io.allCitedDataLoadedDeferred.promise.isResolved()) return;
 		Zotero.debug("Citation Dialog: sorting items");
 		this.updateCitationObject();
 		await io.sort();
