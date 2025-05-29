@@ -1614,6 +1614,9 @@ var ItemTree = class ItemTree extends LibraryTree {
 			case 'tags':
 				this.collectionTreeRow.setTags(data);
 				break;
+			case 'annotations':
+				this.collectionTreeRow.setAnnotationsFilter(data);
+				break;
 			default:
 				throw ('Invalid filter type in setFilter');
 		}

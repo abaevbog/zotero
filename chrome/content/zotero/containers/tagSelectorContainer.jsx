@@ -35,6 +35,8 @@ const TagSelector = require('components/tagSelector.js');
 const defaults = {
 	tagColors: new Map(),
 	tags: [],
+	annotationColors: new Set(),
+	annotationAuthors: [],
 	scope: null,
 	showAutomatic: Zotero.Prefs.get('tagSelector.showAutomatic'),
 	searchString: '',
@@ -66,6 +68,8 @@ Zotero.TagSelector = class TagSelectorContainer extends React.PureComponent {
 		// trigger the selection handler, which updates the visible items, which triggers
 		// onItemViewChanged(), which triggers a refresh with the new tags.
 		this.selectedTags = new Set();
+		this.selectedAnnotationColors = new Set();
+		this.selectedAnnotationAuthors = new Set();
 		this.widths = new Map();
 		this.widthsBold = new Map();
 		
@@ -137,6 +141,11 @@ Zotero.TagSelector = class TagSelectorContainer extends React.PureComponent {
 		var { tags, scope } = await this.getTagsAndScope();
 		newState.tags = tags;
 		newState.scope = scope;
+	
+		var { annotationColors, annotationAuthors } = await this.getAnnotationData();
+		newState.annotationColors = new Set(annotationColors.map(c => c.color));
+		newState.annotationAuthors = annotationAuthors;
+		
 		this.setState(newState);
 	}
 	
@@ -346,6 +355,34 @@ Zotero.TagSelector = class TagSelectorContainer extends React.PureComponent {
 		return { tags, scope };
 	}
 	
+	async getAnnotationData() {
+		var annotations = await this.collectionTreeRow.getAnnotations();
+		let usedColors = new Set();
+		let usedAuthors = new Set();
+		let uniqueAuthors = [];
+		
+		for (let annotation of annotations) {
+			usedColors.add(annotation.color);
+			if (annotation.userID && !usedAuthors.has(annotation.userID)) {
+				uniqueAuthors.push({ name: annotation.name, userID: annotation.userID });
+			}
+			usedAuthors.add(annotation.userID);
+		}
+		let colors = Zotero.Annotations.COLORS.filter(c => usedColors.has(c.color));
+
+		// temp
+		for (let i = 0; i < 10000; i++) {
+			uniqueAuthors.push({
+				userID: 999999, name: `Test ${i}`
+			});
+		}
+		
+		return {
+			annotationColors: colors,
+			annotationAuthors: uniqueAuthors
+		};
+	}
+
 	sortTags(tags) {
 		var d = new Date();
 		var collation = Zotero.Intl.collation;
@@ -455,7 +492,7 @@ Zotero.TagSelector = class TagSelectorContainer extends React.PureComponent {
 		}
 		return width;
 	}
-	
+
 	render() {
 		Zotero.debug("Rendering tag selector");
 		var tags = this.state.tags;
@@ -531,6 +568,15 @@ Zotero.TagSelector = class TagSelectorContainer extends React.PureComponent {
 			tag.width = this.getWidth(name, forceUseDOM);
 			return tag;
 		});
+		let annotationAuthors = this.state.annotationAuthors.map(author => ({
+			...author,
+			selected: this.selectedAnnotationAuthors.has(author.userID)
+		}));
+		let annotationColors = Zotero.Annotations.COLORS.map(color => ({
+			...color,
+			enabled: this.state.annotationColors.has(color.color),
+			selected: this.selectedAnnotationColors.has(color.color)
+		}));
 		// clean up divMeasure, which might have been used for measuring emoji tags
 		this.divMeasure?.parentNode?.removeChild?.(this.divMeasure);
 		this.divMeasure = null;
@@ -551,6 +597,10 @@ Zotero.TagSelector = class TagSelectorContainer extends React.PureComponent {
 			fontSize={parseInt(this.state.fontSize.replace('px', ''))}
 			lineHeight={parseInt(this.state.lineHeight.replace('px', ''))}
 			uiDensity={Zotero.Prefs.get('uiDensity')}
+			annotationColors={annotationColors}
+			annotationAuthors={annotationAuthors}
+			onAnnotationColorSelected={this.handleAnnotationColorSelected}
+			onAnnotationAuthorSelected={this.handleAnnotationAuthorSelected}
 		/>;
 	}
 
@@ -592,6 +642,28 @@ Zotero.TagSelector = class TagSelectorContainer extends React.PureComponent {
 			this.props.onSelection(selectedTags);
 		}
 	}
+
+	handleAnnotationColorSelected = (annotationPayload) => {
+		let { color } = annotationPayload;
+		if (this.selectedAnnotationColors.has(color)) {
+			this.selectedAnnotationColors.delete(color);
+		}
+		else {
+			this.selectedAnnotationColors.add(color);
+		}
+		this.props.onAnnotationsSelection();
+	};
+
+	handleAnnotationAuthorSelected = (annotationPayload) => {
+		let { userID } = annotationPayload;
+		if (this.selectedAnnotationAuthors.has(userID)) {
+			this.selectedAnnotationAuthors.delete(userID);
+		}
+		else {
+			this.selectedAnnotationAuthors.add(userID);
+		}
+		this.props.onAnnotationsSelection();
+	};
 
 	handleSearch = (searchString) => {
 		this.setState({searchString});
@@ -662,6 +734,13 @@ Zotero.TagSelector = class TagSelectorContainer extends React.PureComponent {
 
 	getTagSelection() {
 		return this.selectedTags;
+	}
+
+	getAnnotationsSelection() {
+		return {
+			annotationAuthors: [...this.selectedAnnotationAuthors],
+			annotationColors: [...this.selectedAnnotationColors]
+		};
 	}
 
 	clearTagSelection() {
@@ -883,6 +962,7 @@ Zotero.TagSelector = class TagSelectorContainer extends React.PureComponent {
 	static propTypes = {
 		container: PropTypes.string.isRequired,
 		onSelection: PropTypes.func.isRequired,
+		onAnnotationsSelection: PropTypes.func.isRequired,
 		root: PropTypes.object,
 	};
 };

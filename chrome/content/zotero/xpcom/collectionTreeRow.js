@@ -439,6 +439,18 @@ Zotero.CollectionTreeRow.prototype.getSearchObject = Zotero.Promise.coroutine(fu
 		}
 	}
 	
+	if (this.annotationAuthors) {
+		for (let annotationAuthor of this.annotationAuthors) {
+			s2.addCondition('createdBy', 'is', annotationAuthor);
+		}
+	}
+
+	if (this.annotationColors) {
+		for (let annotationColor of this.annotationColors) {
+			s2.addCondition('annotationColor', 'is', annotationColor);
+		}
+	}
+	
 	Zotero.CollectionTreeCache.lastTreeRow = this;
 	Zotero.CollectionTreeCache.lastSearch = s2;
 	return s2;
@@ -470,6 +482,16 @@ Zotero.CollectionTreeRow.prototype.getTags = async function (types, tagIDs) {
 	return Zotero.Tags.getAllWithin({ tmpTable: results, types, tagIDs });
 };
 
+Zotero.CollectionTreeRow.prototype.getAnnotations = async function () {
+	var results = await this.getSearchResults(true);
+	return Zotero.Annotations.getAllWithin(results);
+};
+
+Zotero.CollectionTreeRow.prototype.setAnnotationsFilter = async function ({ annotationAuthors, annotationColors }) {
+	Zotero.CollectionTreeCache.clear();
+	this.annotationAuthors = annotationAuthors;
+	this.annotationColors = annotationColors;
+};
 
 Zotero.CollectionTreeRow.prototype.setSearch = function (searchText, mode = null) {
 	Zotero.CollectionTreeCache.clear();
@@ -500,6 +522,13 @@ Zotero.CollectionTreeRow.prototype.isSearchMode = function() {
 	
 	// Tag filter
 	if (this.tags && this.tags.size) {
+		return true;
+	}
+
+	if (this.annotationAuthors && this.annotationAuthors.length) {
+		return true;
+	}
+	if (this.annotationColors && this.annotationColors.length) {
 		return true;
 	}
 }

@@ -41,6 +41,20 @@ Zotero.Annotations = new function () {
 		value: ['type', 'authorName', 'text', 'comment', 'color', 'pageLabel', 'sortIndex', 'position'],
 		writable: false
 	});
+
+	Zotero.defineProperty(this, 'COLORS', {
+		value: [
+			{ name: 'yellow', color: '#ffd400' },
+			{ name: 'red', color: '#ff6666' },
+			{ name: 'green', color: '#5fb236' },
+			{ name: 'blue', color: '#2ea8e5' },
+			{ name: 'purple', color: '#a28ae5' },
+			{ name: 'magenta', color: '#e56eee' },
+			{ name: 'orange', color: '#f19837' },
+			{ name: 'gray', color: '#aaaaaa' }
+		],
+		writable: false
+	});
 	
 	
 	this.getCacheImagePath = function ({ libraryID, key }) {
@@ -113,6 +127,30 @@ Zotero.Annotations = new function () {
 			throw new Error(`Unexpected library type '${library.libraryType}'`);
 		}
 		return OS.Path.join(...parts);
+	};
+
+	this.getAllWithin = async function (tmpTable) {
+		if (!tmpTable) {
+			throw new Error("tmpTable parameter is required");
+		}
+		
+		// mozStorage/Proxy are slow, so get in a single column
+		var sql = "SELECT itemID || ':' || color || ':' || IFNULL(createdByUserID, '') || ':' || IFNULL(users.name, '') FROM itemAnnotations "
+			+ "LEFT JOIN groupItems USING (itemID) "
+			+ "LEFT JOIN users ON groupItems.createdByUserID = users.userID "
+			+ "WHERE itemID IN (SELECT itemID FROM " + tmpTable + ") "
+			+ "ORDER BY sortIndex";
+		
+		var rows = await Zotero.DB.columnQueryAsync(sql, [], { noCache: true });
+		return rows.map((row) => {
+			var [itemID, color, createdByUserID, userName] = row.split(':');
+			return {
+				annotationID: parseInt(itemID),
+				color: color || null,
+				userID: createdByUserID ? parseInt(createdByUserID) : null,
+				name: userName || null
+			};
+		});
 	};
 	
 	

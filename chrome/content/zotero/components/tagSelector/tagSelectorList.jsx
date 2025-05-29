@@ -327,6 +327,40 @@ class TagList extends React.PureComponent {
 		}
 	}
 	
+	// Render annotation colors with click handlers
+	renderAnnotationColors() {
+		if (!this.props.annotationColors || this.props.annotationColors.length === 0) {
+			return null;
+		}
+		console.log(this.props.annotationColors);
+		return (
+			<div className="annotation-colors-section">
+				{this.props.annotationColors.map((colorObj, index) => (
+					<div key={index}
+						className={`color ${colorObj.selected ? 'selected' : ''} ${colorObj.enabled ? '' : ' disabled'}`}
+						style={{ backgroundColor: colorObj.color }}
+						title={Zotero.getString(`general.${colorObj.name}`)}
+						onClick={() => this.props.onAnnotationColorSelected(colorObj)}
+					/>
+				))}
+			</div>
+		);
+	}
+
+	// Render annotation authors with click handlers
+	renderAnnotationAuthors() {
+		if (!this.props.annotationAuthors || this.props.annotationAuthors.length === 0) {
+			return null;
+		}
+		return (
+			<div className="annotation-authors-section">
+				{this.props.annotationAuthors.map((author, index) => (
+					<span key={author.userID || index} onClick={() => this.props.onAnnotationAuthorSelected(author)}>{author.name}</span>
+				))}
+			</div>
+		);
+	}
+	
 	render() {
 		Zotero.debug("Rendering tag list");
 		const tagCount = this.props.tags.length;
@@ -339,7 +373,7 @@ class TagList extends React.PureComponent {
 				</div>
 			);
 		}
-		else if (tagCount == 0) {
+		else if (tagCount == 0 && (!this.props.annotationColors || this.props.annotationColors.length === 0) && (!this.props.annotationAuthors || this.props.annotationAuthors.length === 0)) {
 			tagList = (
 				<div className="tag-selector-message">
 					{Zotero.getString('zotero.tagSelector.noTagsToDisplay')}
@@ -354,19 +388,36 @@ class TagList extends React.PureComponent {
 			this.prevTagCount = tagCount;
 			this.updatePositions();
 			tagList = (
-				<Collection
-					ref={this.collectionRef}
-					className="tag-selector-list"
-					cellCount={tagCount}
-					cellRenderer={this.renderTag}
-					cellSizeAndPositionGetter={this.cellSizeAndPositionGetter}
-					verticalOverscanSize={300}
-					width={this.props.width}
-					height={this.props.height - filterBarHeight}
-					aria-label={document.querySelector("#zotero-tag-selector").getAttribute("label") || ""}
-					onSectionRendered={this.handleSectionRendered}
-					scrollToCell={Number.isInteger(this.state.scrollToCell) ? this.state.scrollToCell : undefined}
-				/>
+				<div>
+					{/* Annotation Data Container */}
+					{(this.props.annotationColors?.length > 0 || this.props.annotationAuthors?.length > 0) && (
+						<div className="annotation-data">
+							<div className="annotation-header">
+								Annotations colors and authors
+							</div>
+							{this.renderAnnotationColors()}
+							
+							{this.renderAnnotationAuthors()}
+						</div>
+					)}
+					
+					{/* Existing Tags Collection */}
+					{tagCount > 0 && (
+						<Collection
+							ref={this.collectionRef}
+							className="tag-selector-list"
+							cellCount={tagCount}
+							cellRenderer={this.renderTag}
+							cellSizeAndPositionGetter={this.cellSizeAndPositionGetter}
+							verticalOverscanSize={300}
+							width={this.props.width}
+							height={this.props.height - filterBarHeight}
+							aria-label={document.querySelector("#zotero-tag-selector").getAttribute("label") || ""}
+							onSectionRendered={this.handleSectionRendered}
+							scrollToCell={Number.isInteger(this.state.scrollToCell) ? this.state.scrollToCell : undefined}
+						/>
+					)}
+				</div>
 			);
 		}
 		
@@ -385,12 +436,21 @@ class TagList extends React.PureComponent {
 			disabled: PropTypes.bool,
 			width: PropTypes.number
 		})),
+		annotationColors: PropTypes.arrayOf(PropTypes.shape({
+			color: PropTypes.string
+		})),
+		annotationAuthors: PropTypes.arrayOf(PropTypes.shape({
+			name: PropTypes.string,
+			userID: PropTypes.string
+		})),
 		dragObserver: PropTypes.shape({
 			onDragOver: PropTypes.func,
 			onDragExit: PropTypes.func,
 			onDrop: PropTypes.func
 		}),
 		onSelect: PropTypes.func,
+		onAnnotationColorSelected: PropTypes.func,
+		onAnnotationAuthorSelected: PropTypes.func,
 		onKeyDown: PropTypes.func,
 		onTagContext: PropTypes.func,
 		loaded: PropTypes.bool,

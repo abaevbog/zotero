@@ -545,6 +545,8 @@ Zotero.Search.prototype.search = Zotero.Promise.coroutine(function* (asTempTable
 	try {
 		if (!this._sql){
 			yield this._buildQuery();
+			console.log(this._sql);
+			console.log(this._sqlParams);
 		}
 		
 		// Set some variables for conditions to avoid further lookups
@@ -1219,11 +1221,6 @@ Zotero.Search.prototype._buildQuery = Zotero.Promise.coroutine(function* () {
 						case 'tag':
 							condSQL += "SELECT itemID FROM itemTags "
 								+ "LEFT JOIN itemAnnotations IAnT USING (itemID) WHERE (";
-							break;
-						
-						case 'annotationText':
-						case 'annotationComment':
-							condSQL += `SELECT itemID FROM ${condition.table} WHERE (`
 							break;
 							
 						default:

@@ -1696,6 +1696,7 @@ var ZoteroPane = new function()
 					{
 						container: 'zotero-tag-selector-container',
 						onSelection: this.updateTagFilter.bind(this),
+						onAnnotationsSelection: this.updateAnnotationsFilter.bind(this),
 					}
 				);
 				// Occasionally, when the app is first opened, the scrollable tag list doesn't
@@ -1734,6 +1735,13 @@ var ZoteroPane = new function()
 	this.updateTagFilter = Zotero.Promise.coroutine(function* () {
 		if (this.itemsView) {
 			yield this.itemsView.setFilter('tags', ZoteroPane_Local.tagSelector.getTagSelection());
+		}
+	});
+
+	this.updateAnnotationsFilter = Zotero.Promise.coroutine(function* () {
+		if (this.itemsView) {
+			console.log('Updating annotations filter');
+			yield this.itemsView.setFilter('annotations', ZoteroPane_Local.tagSelector.getAnnotationsSelection());
 		}
 	});
 	

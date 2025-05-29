@@ -39,8 +39,12 @@ class TagSelector extends React.PureComponent {
 				<TagList
 					ref={this.props.tagListRef}
 					tags={this.props.tags}
+					annotationColors={this.props.annotationColors}
+					annotationAuthors={this.props.annotationAuthors}
 					dragObserver={this.props.dragObserver}
 					onSelect={this.props.onSelect}
+					onAnnotationColorSelected={this.props.onAnnotationColorSelected}
+					onAnnotationAuthorSelected={this.props.onAnnotationAuthorSelected}
 					onKeyDown={this.props.onKeyDown}
 					onTagContext={this.props.onTagContext}
 					loaded={this.props.loaded}
@@ -83,6 +87,14 @@ TagSelector.propTypes = {
 		disabled: PropTypes.bool,
 		width: PropTypes.number
 	})),
+	annotationColors: PropTypes.arrayOf(PropTypes.shape({
+		color: PropTypes.string,
+		name: PropTypes.string,
+	})),
+	annotationAuthors: PropTypes.arrayOf(PropTypes.shape({
+		label: PropTypes.string,
+		userID: PropTypes.string
+	})),
 	dragObserver: PropTypes.shape({
 		onDragOver: PropTypes.func,
 		onDragExit: PropTypes.func,
@@ -105,15 +117,23 @@ TagSelector.propTypes = {
 	
 	// Button
 	onSettings: PropTypes.func,
+
+	// Annotation Filters
+	onAnnotationColorSelected: PropTypes.func,
+	onAnnotationAuthorSelected: PropTypes.func,
 };
 
 TagSelector.defaultProps = {
 	tags: [],
+	annotationColors: [],
+	annotationAuthors: [],
 	searchString: '',
 	onSelect: () => Promise.resolve(),
 	onTagContext: () => Promise.resolve(),
 	onSearch: () => Promise.resolve(),
-	onSettings: () => Promise.resolve()
+	onSettings: () => Promise.resolve(),
+	onAnnotationColorSelected: () => Promise.resolve(),
+	onAnnotationAuthorSelected: () => Promise.resolve(),
 };
 
 module.exports = TagSelector;

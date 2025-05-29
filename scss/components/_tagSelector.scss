@@ -181,3 +181,55 @@
 		background-color: var(--fill-secondary);
 	}
 }
+
+
+.annotation-data {
+	margin: 0px 10px;
+	border-bottom: var(--material-border);
+	padding: 7px 0 3px 0;
+	font-size: $font-size-small;
+}
+
+.annotation-colors-section {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-left: 5px;
+}
+
+.annotation-colors-section .color {
+	width: 14px;
+	height: 14px;
+	border-radius: 2px;
+	cursor: pointer;
+
+	&.selected {
+		outline: 3px solid var(--fill-secondary);
+	}
+
+	&.disabled {
+		opacity: 0.3;
+		cursor: default;
+	}
+}
+
+
+.annotation-authors-section {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1px;
+	border-bottom: 1px solid var(--material-border);
+	margin-top: 4px;
+	cursor: pointer;
+}
+
+.annotation-authors-section span {
+	border-radius: 5px;
+	padding: 2px 4px;
+	border: 1px solid transparent;
+}
+
+.annotation-authors-section span:hover {
+	border: 1px solid var(--accent-blue);
+	background-color: var(--accent-azure);
+}
