@@ -31,8 +31,9 @@ const MIN_QUERY_LENGTH = 2;
 // as the following object: { found: [], cited: [], open: [], selected: []}.
 // Can be refreshed via SearchHandler.refresh or refreshDebounced.
 export class CitationDialogSearchHandler {
-	constructor({ isCitingNotes, io }) {
-		this.isCitingNotes = isCitingNotes;
+	constructor({ io }) {
+		this.isCitingNotes = !!io.isCitingNotes;
+		this.isAddingAnnotations = !!io.isAddingAnnotations;
 		this.io = io;
 
 		this.searchValue = "";
@@ -303,10 +304,14 @@ export class CitationDialogSearchHandler {
 	}
 
 	_getSelectedLibraryItems() {
+		let selected = Zotero.getActiveZoteroPane()?.getSelectedItems() || [];
 		if (this.isCitingNotes) {
-			return Zotero.getActiveZoteroPane()?.getSelectedItems().filter(i => i.isNote()) || [];
+			return selected.filter(i => i.isNote());
 		}
-		return Zotero.getActiveZoteroPane()?.getSelectedItems().filter(i => i.isRegularItem()) || [];
+		if (this.isAddingAnnotations) {
+			return Zotero.Items.keepWithAnnotations(selected);
+		}
+		return selected.filter(i => i.isRegularItem());
 	}
 	
 

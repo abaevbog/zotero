@@ -1770,6 +1770,19 @@ Zotero.Items = function() {
 		return this.keepTopLevel(items);
 	};
 	
+	// Return items that are either annotations or are ancestors of annotations
+	this.keepWithAnnotations = function (items) {
+		return items.filter((item) => {
+			if (item.isAnnotation()) return true;
+			if (item.isFileAttachment() && item.getAnnotations().length) return true;
+			if (item.isRegularItem()) {
+				let attachments = Zotero.Items.get(item.getAttachments());
+				return attachments.some(att => att.isFileAttachment() && att.getAnnotations().length);
+			}
+			return false;
+		});
+	};
+	
 	
 	/**
 	 * Returns a rough count (0, 1, or 2) of the number of file attachments implied by the passed

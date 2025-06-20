@@ -28,7 +28,7 @@ const ItemTree = require('zotero/itemTree');
 const { getCSSIcon } = require('components/icons');
 const { COLUMNS } = require('zotero/itemTreeColumns');
 
-var doc, io, ioReadyPromise, isCitingNotes, accepted;
+var doc, io, ioReadyPromise, isCitingNotes, isAddingAnnotations, accepted;
 
 // used for tests
 var loaded = false;
@@ -58,6 +58,7 @@ async function onLoad() {
 		ioReadyPromise = Zotero.Promise.resolve();
 	}
 	isCitingNotes = !!io.isCitingNotes;
+	isAddingAnnotations = !!io.isAddingAnnotations;
 	window.isPristine = true;
 
 	Zotero.debug("Citation Dialog: initializing");
@@ -65,15 +66,15 @@ async function onLoad() {
 	timer.start();
 
 	Helpers = new CitationDialogHelpers({ doc, io });
-	SearchHandler = new CitationDialogSearchHandler({ isCitingNotes, io });
+	SearchHandler = new CitationDialogSearchHandler({ io });
 	PopupsHandler = new CitationDialogPopupsHandler({ doc });
 	KeyboardHandler = new CitationDialogKeyboardHandler({ doc });
 
 	// Initial height for the dialog (search row with no bubbles)
 	window.resizeTo(window.innerWidth, Helpers.getSearchRowHeight());
 
-	_id("keepSorted").disabled = !io.sortable || isCitingNotes;
-	_id("keepSorted").checked = io.sortable && !io.citation.properties.unsorted;
+	_id("keepSorted").disabled = !io.sortable || isCitingNotes || isAddingAnnotations;
+	_id("keepSorted").checked = !_id("keepSorted").disabled && !io.citation.properties.unsorted;
 	let visibleSettings = !!_id("settings-popup").querySelector("input:not([disabled])");
 	_id("settings-button").hidden = !visibleSettings;
 
@@ -414,9 +415,8 @@ class LibraryLayout extends Layout {
 		itemNode.setAttribute("itemID", id);
 		itemNode.setAttribute("role", "option");
 		itemNode.id = id;
-		let title = Helpers.createNode("div", {}, "title");
+		let title = Helpers.buildItemTitle(item);
 		let description = Helpers.buildItemDescription(item);
-		Zotero.Utilities.Internal.renderItemTitle(item.getDisplayTitle(), title);
 
 		itemNode.append(title, description);
 
@@ -522,44 +522,46 @@ class LibraryLayout extends Layout {
 		});
 		let columnLabel = Zotero.getString('integration-citationDialog-add-to-citation');
 		// Add + column to add an item to the citation on click
-		itemColumns.push({
-			dataKey: 'addToCitation',
-			label: columnLabel,
-			htmlLabel: ' ', // space for column label to appear empty
-			width: 26,
-			staticWidth: true,
-			fixedWidth: true,
-			showInColumnPicker: false,
-			renderer: (index, inCitation, column) => {
-				let cell = Helpers.createNode("span", {}, `cell ${column.className} clickable`);
-				let iconWrapper = Helpers.createNode("span", {}, `icon-action`);
-				cell.append(iconWrapper);
-				let icon = getCSSIcon('plus-circle');
-				if (inCitation === null) {
-					// no icon should be shown when an item cannot be added
-					// (e.g. when citing notes, parent items are displayed but not included)
-					icon = getCSSIcon("");
+		if (!isAddingAnnotations) {
+			itemColumns.push({
+				dataKey: 'addToCitation',
+				label: columnLabel,
+				htmlLabel: ' ', // space for column label to appear empty
+				width: 26,
+				staticWidth: true,
+				fixedWidth: true,
+				showInColumnPicker: false,
+				renderer: (index, inCitation, column) => {
+					let cell = Helpers.createNode("span", {}, `cell ${column.className} clickable`);
+					let iconWrapper = Helpers.createNode("span", {}, `icon-action`);
+					cell.append(iconWrapper);
+					let icon = getCSSIcon('plus-circle');
+					if (inCitation === null) {
+						// no icon should be shown when an item cannot be added
+						// (e.g. when citing notes, parent items are displayed but not included)
+						icon = getCSSIcon("");
+					}
+					// add aria-label for screen readers to announce if this item is added
+					else if (inCitation) {
+						doc.l10n.setAttributes(cell, "integration-citationDialog-items-table-added")
+					}
+					else {
+						doc.l10n.setAttributes(cell, "integration-citationDialog-items-table");
+					}
+					iconWrapper.append(icon);
+					return cell;
 				}
-				// add aria-label for screen readers to announce if this item is added
-				else if (inCitation) {
-					doc.l10n.setAttributes(cell, "integration-citationDialog-items-table-added")
-				}
-				else {
-					doc.l10n.setAttributes(cell, "integration-citationDialog-items-table");
-				}
-				iconWrapper.append(icon);
-				return cell;
-			}
-		});
+			});
+		}
 		this.itemsView = await ItemTree.init(itemsTree, {
 			id: "citationDialog",
-			dragAndDrop: !isCitingNotes,
+			dragAndDrop: !(isCitingNotes || isAddingAnnotations),
 			persistColumns: true,
 			columnPicker: true,
 			onSelectionChange: () => {
 				libraryLayout.updateSelectedItems();
 			},
-			regularOnly: !isCitingNotes,
+			regularOnly: !(isCitingNotes || isAddingAnnotations),
 			multiSelect: !isCitingNotes,
 			onActivate: (event, items) => {
 				// Prevent Enter event from reaching KeyboardHandler which would accept the dialog
@@ -664,6 +666,10 @@ class LibraryLayout extends Layout {
 				// when citing notes, only keep notes or note parents
 				if (isCitingNotes) {
 					items = items.filter(item => item.isNote() || item.getNotes().length);
+				}
+				// when adding annotations, only keep annotations, their attachments, and their top-level items
+				if (isAddingAnnotations) {
+					return Zotero.Items.keepWithAnnotations(items);
 				}
 				return items;
 			},
@@ -1029,6 +1035,43 @@ const IOManager = {
 		if (accepted || SearchHandler.searching) return;
 		if (!Array.isArray(items)) {
 			items = [items];
+		}
+		// one can select the annotations themselves or their ancestors,
+		// in which case all of their child annotations are added
+		if (isAddingAnnotations) {
+			CitationDataManager.items = [];
+			let annotations = [];
+			for (let item of items) {
+				if (item.isAnnotation()) {
+					annotations.push(BubbleItem.fromItem(item));
+				}
+				else if (item.isFileAttachment()) {
+					let attachmentAnnotations = item.getAnnotations();
+					for (let attachmentAnnotation of attachmentAnnotations) {
+						// if one selects an annotation and its attachment, make sure the selected
+						// annotation row is ignored and the annotation appears only once
+						// in the correct order relative to other annotations of the attachment
+						let addedEarlierIndex = annotations.findIndex(a => a.id == attachmentAnnotation.id);
+						if (addedEarlierIndex > -1) {
+							annotations.splice(addedEarlierIndex, 1);
+						}
+						annotations.push(BubbleItem.fromItem(attachmentAnnotation));
+					}
+				}
+				else if (item.isRegularItem()) {
+					items.push(...Zotero.Items.get(item.getAttachments()));
+				}
+			}
+			// Sort annotations but only within the same attachment
+			annotations.sort((a, b) => {
+				if (a.item.parentItemID !== b.item.parentItemID) return 0;
+				return (a.item.annotationSortIndex > b.item.annotationSortIndex) - (a.item.annotationSortIndex < b.item.annotationSortIndex);
+			});
+			// if no annotations are selected, do nothing
+			if (annotations.length == 0) return;
+			await CitationDataManager.addItems({ bubbleItems: annotations });
+			accept();
+			return;
 		}
 		// if selecting a note, add it and immediately accept the dialog
 		if (isCitingNotes) {
@@ -1593,7 +1636,7 @@ const CitationDataManager = {
 			}
 		}
 		// No sorting happens when citing notes, since the dialog is accepted right after
-		if (isCitingNotes) return;
+		if (isCitingNotes || isAddingAnnotations) return;
 		await this.sort();
 		this.updateItemAddedCache();
 	},

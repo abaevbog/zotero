@@ -41,6 +41,28 @@ export class CitationDialogHelpers {
 		return node;
 	}
 
+	buildItemTitle(item) {
+		let titleWrapper = this.createNode("div", {}, "title");
+		let titleNode = this.createNode("span", {}, "title-text");
+		titleWrapper.appendChild(titleNode);
+		let title = "";
+		if (!item.isAnnotation()) {
+			title = item.getDisplayTitle();
+		}
+		else if (item.annotationText) {
+			title = Zotero.Utilities.unescapeHTML(item.annotationText.trim().slice(0, 500));
+			titleWrapper.classList.add("annotation-quote");
+			// Add quotation marks around the quoted text
+			titleNode.setAttribute("q-mark-open", Zotero.getString("punctuation.openingQMark"));
+			titleWrapper.setAttribute("q-mark-close", Zotero.getString("punctuation.closingQMark"));
+		}
+		else {
+			title = Zotero.getString(`pdfReader.${item.annotationType}Annotation`);
+		}
+		Zotero.Utilities.Internal.renderItemTitle(title, titleNode);
+		return titleWrapper;
+	}
+
 	// build and return a node with the description (e.g. creator/published/date/etc) of an item
 	buildItemDescription(item) {
 		let descriptionWrapper = this.doc.createElement("div");
@@ -76,6 +98,15 @@ export class CitationDialogHelpers {
 			}
 			descriptionWrapper.appendChild(dateLabel);
 			addPeriodIfNeeded(descriptionWrapper);
+			return descriptionWrapper;
+		}
+
+		if (item.isAnnotation()) {
+			if (!item.annotationComment) return descriptionWrapper;
+			let comment = Zotero.Utilities.unescapeHTML(item.annotationComment.trim());
+			comment = comment.slice(0, 500);
+			let commentSpan = wrapTextInSpan(comment);
+			descriptionWrapper.appendChild(commentSpan);
 			return descriptionWrapper;
 		}
 

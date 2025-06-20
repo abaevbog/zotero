@@ -215,6 +215,24 @@
 							.title {
 								overflow: hidden;
 								text-overflow: ellipsis;
+
+								&.annotation-quote {
+									width: min-content;
+									max-width: 100%;
+									position: relative;
+									.title-text {
+										font-style: italic;
+										padding-inline-end: 6px;
+										&::before {
+											content: attr(q-mark-open);
+										}
+									}
+									&::after {
+										content: attr(q-mark-close);
+										position: absolute;
+										right: 0px;
+									}
+								}
 							}
 			
 							.description {
