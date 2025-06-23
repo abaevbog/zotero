@@ -1726,16 +1726,31 @@ Zotero.Search.prototype._buildQuery = Zotero.Promise.coroutine(function* () {
 							+ "itemID IN (SELECT parentItemID FROM itemAttachments "
 								+ "WHERE itemID IN (" + condSQL + ")) "
 							+ "OR itemID IN (SELECT parentItemID FROM itemNotes "
-								+ "WHERE itemID IN (" + condSQL + ")) ";
-						var parentSQLParams = condSQLParams.concat(condSQLParams);
+								+ "WHERE itemID IN (" + condSQL + ")) "
+							// include attachment of matching annotations
+							+ "OR itemID IN (SELECT itemID  FROM itemAttachments "
+								+ "WHERE itemID IN (SELECT parentItemID FROM itemAnnotations "
+									+ "WHERE itemID IN (" + condSQL + "))) "
+							// include top-level item of matching annotations
+							+ "OR itemID IN (SELECT parentItemID FROM itemAttachments "
+								+ "WHERE itemID IN (SELECT parentItemID FROM itemAnnotations "
+									+ "WHERE itemID IN (" + condSQL + ")))";
+						var parentSQLParams = condSQLParams.concat(condSQLParams).concat(condSQLParams).concat(condSQLParams);
 					}
 					
 					if (includeParentsAndChildren || includeChildren) {
 						var childrenSQL = "SELECT itemID FROM itemAttachments WHERE "
 							+ "parentItemID IN (" + condSQL + ") UNION "
 							+ "SELECT itemID FROM itemNotes "
-							+ "WHERE parentItemID IN (" + condSQL + ")";
-						var childSQLParams = condSQLParams.concat(condSQLParams);
+							+ "WHERE parentItemID IN (" + condSQL + ") UNION "
+							// include annotations of matching top-level items
+							+ "SELECT itemID FROM itemAnnotations "
+								+ "WHERE parentItemID IN (SELECT itemID FROM itemAttachments "
+								+ "WHERE parentItemID IN (" + condSQL + ")) UNION "
+							// include annotations of matching attachments
+							+ "SELECT itemID FROM itemAnnotations "
+								+ "WHERE parentItemID IN (" + condSQL + ")";
+						var childSQLParams = condSQLParams.concat(condSQLParams).concat(condSQLParams).concat(condSQLParams);
 					}
 					
 					if (includeParentsAndChildren || includeParents) {
