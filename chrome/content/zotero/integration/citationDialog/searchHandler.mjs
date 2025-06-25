@@ -472,19 +472,28 @@ export class CitationDialogSearchHandler {
 			parentIDs = parentItems.map(item => item.parentItemID).filter(id => id);
 		}
 		topLevelItems = [...topLevelItems, ...parentItems];
-		// load all data of top-level items and their attachments
+		// load all data of top-level items
 		await Zotero.Items.loadDataTypes(topLevelItems);
-		let attachmentIDs = topLevelItems.flatMap(item => item.getAttachments());
-		let attachments = await Zotero.Items.getAsync(attachmentIDs);
-		await Zotero.Items.loadDataTypes(attachments);
 
-		// Load annotations.
-		// Zotero.Items.loadDataTypes on parent items will set the
-		// _annotations cache on attachments but not load the annotations themselves.
-		// So fetch annotationIDs from the cache and load annotations separately.
-		attachments = attachments.filter(attachment => attachment.isFileAttachment());
-		let annotationIDs = attachments.flatMap(attachment => attachment.getAnnotations(false, true));
-		let annotations = await Zotero.Items.getAsync(annotationIDs);
-		await Zotero.Items.loadDataTypes(annotations);
+		// Load all relevant descendants
+		if (this.isCitingNotes) {
+			let noteIDs = topLevelItems.filter(i => i.isRegularItem()).flatMap(item => item.getNotes());
+			let notes = await Zotero.Items.getAsync(noteIDs);
+			await Zotero.Items.loadDataTypes(notes);
+		}
+		else if (this.isAddingAnnotations) {
+			let attachmentIDs = topLevelItems.flatMap(item => item.getAttachments());
+			let attachments = await Zotero.Items.getAsync(attachmentIDs);
+			await Zotero.Items.loadDataTypes(attachments);
+
+			// Load annotations.
+			// Zotero.Items.loadDataTypes on parent items will set the
+			// _annotations cache on attachments but not load the annotations themselves.
+			// So fetch annotationIDs from the cache and load annotations separately.
+			attachments = attachments.filter(attachment => attachment.isFileAttachment());
+			let annotationIDs = attachments.flatMap(attachment => attachment.getAnnotations(false, true));
+			let annotations = await Zotero.Items.getAsync(annotationIDs);
+			await Zotero.Items.loadDataTypes(annotations);
+		}
 	}
 }
