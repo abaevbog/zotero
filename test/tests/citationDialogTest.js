@@ -653,12 +653,12 @@ describe("Citation Dialog", function () {
 			attachment = await importFileAttachment('test.pdf', { parentID: parentItem.id });
 
 			highlightAnnotation = await createAnnotation('highlight', attachment);
-			highlightAnnotation.annotationText = 'highlighted text';
+			highlightAnnotation.annotationText = 'cd_highlighted_text';
 			highlightAnnotation.annotationComment = 'highlight comment';
 			await highlightAnnotation.saveTx();
 
 			underlineAnnotation = await createAnnotation('underline', attachment);
-			underlineAnnotation.annotationText = 'underlined text';
+			underlineAnnotation.annotationText = 'cd_underlined_text';
 			underlineAnnotation.annotationComment = 'underline';
 			await underlineAnnotation.saveTx();
 		});
@@ -691,14 +691,15 @@ describe("Citation Dialog", function () {
 
 		it("should find annotations by their content", async function () {
 			// Search for highlight annotation content
-			await annotationDialog.currentLayout.search("highlighted text", { skipDebounce: true });
+			await annotationDialog.currentLayout.search(highlightAnnotation.annotationText, { skipDebounce: true });
+			console.log(annotationSearchHandler.results.found);
 			assert.sameMembers(annotationSearchHandler.results.found, [highlightAnnotation]);
 
 			// Check that the annotation card is rendered in the dialog
 			assert.isOk(annotationDialog.document.querySelector(`.item[id="${highlightAnnotation.id}"]`));
 
 			// Search for underline annotation content
-			await annotationDialog.currentLayout.search("underlined text", { skipDebounce: true });
+			await annotationDialog.currentLayout.search(underlineAnnotation.annotationText, { skipDebounce: true });
 			assert.sameMembers(annotationSearchHandler.results.found, [underlineAnnotation]);
 
 			// Check that the annotation card is rendered in the dialog
