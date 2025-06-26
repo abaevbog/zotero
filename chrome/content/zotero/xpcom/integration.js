@@ -761,7 +761,9 @@ Zotero.Integration.Interface.prototype.addNote = async function () {
 			"integration.error.title");
 	}
 
-	let citations = await this._session.cite(null, true);
+	// let citations = await this._session.cite(null, true);
+	// TEMP: open in add annotation mode for now, till add annotations has a button
+	let citations = await this._session.cite(null, false, true);
 	if (this._session.data.prefs.delayCitationUpdates) {
 		for (let citation of citations) {
 			await this._session.writeDelayedCitation(citation.field, citation);
