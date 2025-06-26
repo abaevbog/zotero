@@ -692,7 +692,6 @@ describe("Citation Dialog", function () {
 		it("should find annotations by their content", async function () {
 			// Search for highlight annotation content
 			await annotationDialog.currentLayout.search(highlightAnnotation.annotationText, { skipDebounce: true });
-			console.log(annotationSearchHandler.results.found);
 			assert.sameMembers(annotationSearchHandler.results.found, [highlightAnnotation]);
 
 			// Check that the annotation card is rendered in the dialog
