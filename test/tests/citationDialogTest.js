@@ -446,7 +446,7 @@ describe("Citation Dialog", function () {
 			// Make sure actual nodes for search matches are rendered
 			let expectedItemCardIDs = [...selectedIDs, ...openIDs, ...citedIDs, ...libraryIDs];
 			for (let itemID of expectedItemCardIDs) {
-				let node = dialog.document.querySelector(`.item[id="${itemID}"]`);
+				let node = await waitForNode(dialog.document, `.item[id="${itemID}"]`);
 				assert.isOk(node);
 			}
 		});
