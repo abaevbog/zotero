@@ -439,35 +439,81 @@
 			overflow-y: auto;
 			scrollbar-color: var(--color-scrollbar) var(--color-scrollbar-background);
 			height: 100%;
-			padding-top: 4px;
-			padding-bottom: 8px;
-			.section {
+			--highlight-color: var(--accent-blue30);
+			overflow: scroll;
+			#items-list-virtualized-table {
+				height: 100%;;
 				// show dividers except for on the last section
 				.divider {
 					margin: 4px 16px;
 					border-bottom: 1px solid var(--fill-quinary);
 				}
-				&:last-child {
-					.divider {
-						display: none;
-					}
-				}
 				.header {
+					height: 26px;
+					box-sizing: border-box;
 					font-weight: 700;
 					font-size: 13px;
 					color: var(--fill-secondary);
 					padding: 4px 8px 4px 16px;
 					display: flex;
+					width: 100%;
+					&:not(.first) {
+						border-top: 1px solid var(--fill-quinary);
+					}
 					.header-btn-group {
 						display: flex;
 						align-items: center;
 						height: 17px;
 					}
+					&.expandable {
+						display: flex;
+						justify-content: space-between;
+						border-radius: 5px;
+
+						.header-label {
+							@include focus-ring;
+							border-radius: 5px;
+							-moz-window-dragging: no-drag;
+							&:hover {
+								cursor: pointer;
+								text-decoration: underline;
+							}
+							&::before {
+								@include svgicon("chevron-8", "universal", "8");
+								width: 8px;
+								height: 8px;
+								display: inline-block;
+								content: "";
+								white-space: pre;
+								margin-inline-end: 3px;
+
+								transform: rotate(180deg);
+								transform-origin: center;
+								transition: transform 0.2s ease-in-out;
+								vertical-align: middle;
+								margin-bottom: 3px;
+							}
+						}
+						&.expanded {
+							.header-label::before {
+								transform: rotate(0deg);
+							}
+						}
+					}
+					&.selected {
+						outline: 1px solid var(--selected-item-background);
+					}
 				}
 				.item {
-					@include focus-ring(true);
+					width: 100%;
+					height: 42px;
+					box-sizing: border-box;
+					overflow: hidden;;
 					margin: 0 8px;
 					padding: 4px 8px;
+					&[level="2"] {
+						padding-inline-start: 36px;
+					}
 					border-radius: 5px;
 					color: var(--fill-primary);
 					cursor: default;
@@ -476,9 +522,13 @@
 						background-color: var(--fill-quinary);
 					}
 					&.selected {
-						background-color: var(--selected-item-background);
-						border-radius: 0;
-						
+						&:not(.collapsible) {
+							background-color: var(--selected-item-background);
+						}
+						&.collapsible {
+							outline: 1px solid var(--selected-item-background);
+						}
+						border-radius: 0;	
 					}
 					&.selected-first {
 						border-top-left-radius: 5px;
@@ -501,11 +551,14 @@
 						&.annotation-icon {
 							-moz-context-properties: fill;
 						}
-						&.twisty {
+						&.twisty-icon {
 							@include svgicon("chevron-8", "universal", "8");
 							transform: rotate(180deg);
 							transform-origin: center;
 							transition: transform 0.2s ease-in-out;
+							height: 8px;
+							width: 8px;
+							color: var(--fill-secondary);
 						}
 					}
 					.description {
@@ -524,84 +577,9 @@
 							text-overflow: ellipsis;
 						}
 					}
-				}
-				// collapsible item (e.g. top-level item with annotations)
-				.item-with-children {
-					.children {
-						transition: max-height 0.3s ease;
-						overflow: hidden;
-						max-height: calc(42px * var(--children-count)); // 42px is max height of a child item
-						// small padding at the top and bottom to make sure the focus-ring is not cutoff by the overflow:hidden.
-						// negative margin preserves spacing set by other components.
-						padding: 1px 0;
-						margin: -1px 0;
-						.item {
-							padding-inline-start: 36px;
-						}
-					}
-					&:not(.expanded) {
-						.children {
-							max-height: 0 !important; // important to override max-height above
-						}
-						.twisty {
-							transform: rotate(0deg);
-						}
-					}
-					.parent .description {
-						// additional 16px inline margin to account for twisty icon
-						margin-inline-start: 36px;
-					}
-				}
-				&.expandable {
-					// styling for expandable header with a twisty
-					.header {
-						display: flex;
-						justify-content: space-between;
-
-						.header-label {
-							@include focus-ring;
-							border-radius: 5px;
-							-moz-window-dragging: no-drag;
-							&:hover {
-								cursor: pointer;
-								text-decoration: underline;
-							}
-							&::before {
-								@include svgicon("chevron-8", "universal", "8");
-								width: 8px;
-								height: 8px;
-								display: inline-block;
-								content: "";
-								white-space: pre;
-								margin-inline-end: 3px;
-
-								transform: rotate(0deg);
-								transform-origin: center;
-								transition: transform 0.2s ease-in-out;
-								vertical-align: middle;
-								margin-bottom: 3px;
-							}
-						}
-					}
 					&.expanded {
-						.header-label::before {
-							transform: rotate(180deg);
-						}
-					}
-					// item container has no height when it is collapsed
-					.itemsContainer {
-						transition: max-height 0.3s ease;
-						overflow: hidden;
-						max-height: calc(var(--children-count) * 42px); // 42px is max height of a child item
-						// add small padding at the top and bottom to make sure the focus-ring (if it appear) is not
-						// cutoff by the overflow:hidden. Negative margin is to preserve spacing set by other components.
-						padding: 1px 0;
-						margin: -1px 0;
-					}
-					&:not(.expanded) {
-						.itemsContainer {
-							max-height: 0 !important; // important to override inline height with items displayed
-							padding: 0;
+						.twisty-icon {
+							transform: rotate(0deg);
 						}
 					}
 				}

@@ -24,6 +24,7 @@
 */
 
 var { Zotero } = ChromeUtils.importESModule("chrome://zotero/content/zotero.mjs");
+const { getCSSIcon } = require('components/icons');
 
 // Helper functions for citationDialog.js
 export class CitationDialogHelpers {
@@ -165,26 +166,73 @@ export class CitationDialogHelpers {
 		return descriptionWrapper;
 	}
 
-	// Wrap node of a top-level item and its desired children (e.g. annotations) into a collapsible container
-	makeItemCollapsible(itemNode, itemID, childNodes) {
-		let mainItemWrapper = this.createNode("div", { id: `container-item-${itemID}` }, "item-with-children expandable");
-		let childWrapper = this.createNode("div", {}, "children");
-		mainItemWrapper.append(itemNode, childWrapper);
+	buildListSectionHeader({ ref, isCollapsible }) {
+		let header = this.createNode("div", {}, "header");
+		let headerSpan = this.createNode("span", {}, "header-label");
+		headerSpan.innerText = ref.name;
+		header.append(headerSpan);
+		let buttonGroup = this.createNode("div", {}, "header-btn-group");
+		header.append(buttonGroup);
 
-		itemNode.classList.add("parent");
-		itemNode.setAttribute("aria-expanded", "true");
-		for (let child of childNodes) {
-			child.classList.add("child", "hide-on-collapse");
-			childWrapper.appendChild(child);
+		if (isCollapsible) {
+			header.classList.add("expandable");
+			headerSpan.id = `header_${ref.id}`;
+			let addAllBtn = this.createNode("span", { role: "button", "aria-describedby": headerSpan.id }, "add-all");
+			addAllBtn.textContent = Zotero.getString("integration-citationDialog-add-all");
+			buttonGroup.append(addAllBtn);
+
+			headerSpan.setAttribute("role", "button");
+			headerSpan.setAttribute("aria-expanded", "true");
 		}
-		let twisty = this.createNode("button", {}, "icon btn-icon small twisty");
-		itemNode.querySelector(".title").prepend(twisty);
-		childWrapper.style.setProperty('--children-count', childNodes.length);
-		return mainItemWrapper;
+		return header;
 	}
 
-	// build a container for the item nodes in both layouts
-	buildItemsSection(id, headerText, isCollapsible, deckLength, dialogMode) {
+	// Create item node for an item group and store item ids in itemIDs attribute
+	buildListItemNode(item, isCollapsible, level = 0) {
+		let id = item.cslItemID || item.id;
+		let itemNode = this.createNode("div", {
+			id: id,
+			itemID: id,
+			"data-l10n-id": "integration-citationDialog-aria-item-list",
+			role: "option",
+			draggable: true,
+			level
+		}, "item keyboard-clickable hide-on-collapse");
+		let icon = null;
+		if (item.isAnnotation()) {
+			icon = this.createNode("img", {}, "icon annotation-icon");
+			let type = item.annotationType == "image" ? "area" : item.annotationType;
+			icon.src = 'chrome://zotero/skin/16/universal/annotate-' + type + '.svg';
+			icon.style.fill = item.annotationColor;
+		}
+		else {
+			icon = this.createNode("span", {}, "icon icon-css icon-item-type");
+			let dataTypeLabel = item.getItemTypeIconName(true);
+			icon.setAttribute("data-item-type", dataTypeLabel);
+		}
+
+		let title = this.buildItemTitle(item);
+		let titleContent = this.createNode("span", {}, "");
+		let description = this.buildItemDescription(item);
+		Zotero.Utilities.Internal.renderItemTitle(item.getDisplayTitle(), titleContent);
+		title.prepend(icon);
+		if (isCollapsible) {
+			itemNode.classList.add("collapsible");
+			let twisty = this.createNode("span", {}, "icon twisty-icon");
+			title.prepend(twisty);
+		}
+		itemNode.append(title, description);
+		if (Zotero.Retractions.isRetracted(item)) {
+			let retractedIcon = getCSSIcon("cross");
+			retractedIcon.classList.add("retracted");
+			icon.after(retractedIcon);
+		}
+		return itemNode;
+	}
+
+
+	// build a container for the item nodes in library layout layouts
+	buildLibraryItemsSection(id, headerText, isCollapsible, deckLength) {
 		let section = this.createNode("div", { id }, "section");
 		let header = this.createNode("div", {}, "header");
 		let headerSpan = this.createNode("span", {}, "header-label");
@@ -203,26 +251,54 @@ export class CitationDialogHelpers {
 			section.style.setProperty('--deck-length', deckLength);
 
 			let addAllBtn = this.createNode("span", { tabindex: -1, 'data-tabindex': 22, role: "button", "aria-describedby": headerSpan.id }, "add-all keyboard-clickable");
+			addAllBtn.textContent = Zotero.getString("integration-citationDialog-add-all");
 			buttonGroup.append(addAllBtn);
-			
-			if (dialogMode == "list") {
-				headerSpan.setAttribute("role", "button");
-				headerSpan.setAttribute("tabindex", -1);
-				headerSpan.setAttribute("data-tabindex", 21);
-				headerSpan.setAttribute("aria-expanded", "true");
-				headerSpan.classList.add("keyboard-clickable");
-			}
-			if (dialogMode == "library") {
-				itemContainer.setAttribute("tabindex", -1);
-				itemContainer.setAttribute("data-tabindex", 30);
-				itemContainer.setAttribute("aria-expanded", "true");
+					
+			itemContainer.setAttribute("tabindex", -1);
+			itemContainer.setAttribute("data-tabindex", 30);
+			itemContainer.setAttribute("aria-expanded", "true");
 
-				let collapseSectionBtn = this.createNode("button", { tabindex: -1, 'data-tabindex': 21, "aria-describedby": headerSpan.id }, "btn-icon collapse-section-btn keyboard-clickable");
-				this.doc.l10n.setAttributes(collapseSectionBtn, "integration-citationDialog-collapse-section");
-				buttonGroup.prepend(collapseSectionBtn);
-			}
+			let collapseSectionBtn = this.createNode("button", { tabindex: -1, 'data-tabindex': 21, "aria-describedby": headerSpan.id }, "btn-icon collapse-section-btn keyboard-clickable");
+			this.doc.l10n.setAttributes(collapseSectionBtn, "integration-citationDialog-collapse-section");
+			buttonGroup.prepend(collapseSectionBtn);
 		}
 		return section;
+	}
+
+	// Create item node for an item group and store item ids in itemIDs attribute
+	async buildLibraryItemNode(item, isAddingAnnotations, index = null) {
+		let itemNode = this.createNode("div", {
+			tabindex: "-1",
+			"data-l10n-id": "integration-citationDialog-aria-item-library",
+			role: "option",
+			"data-tabindex": 30,
+			"data-arrow-nav-enabled": true,
+			draggable: true
+		}, "item keyboard-clickable hide-on-collapse");
+		let id = item.cslItemID || item.id;
+		itemNode.setAttribute("itemID", id);
+		itemNode.setAttribute("role", "option");
+		itemNode.id = id;
+		let title = this.buildItemTitle(item);
+		let description = this.buildItemDescription(item, true);
+		itemNode.append(title, description);
+
+		if (isAddingAnnotations) {
+			itemNode.classList.add("tall");
+			if (item.isAnnotation()) {
+				let attachment = Zotero.Items.get(item.parentItemID);
+				let topLevelItem = attachment.parentItemID ? Zotero.Items.get(attachment.parentItemID) : attachment;
+				let topLevelItemTitle = this.buildItemTitle(topLevelItem);
+				topLevelItemTitle.classList.add("description");
+				itemNode.prepend(topLevelItemTitle);
+			}
+		}
+
+		if (index !== null) {
+			itemNode.style.setProperty('--deck-index', index);
+		}
+
+		return itemNode;
 	}
 
 	// Create mock item node to use as a the placeholder for cited items that are loading
