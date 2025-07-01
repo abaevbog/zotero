@@ -975,36 +975,13 @@ class ListLayout extends Layout {
 		if (row.isHeader) {
 			node = Helpers.buildListSectionHeader({ ref, isCollapsible });
 			node.classList.toggle("first", index === 0);
-			// Click on header itself should not affect focus/selection/etc.
-			node.addEventListener("mouseup", (event) => {
-				if (isCollapsible) {
-					if (event.target.classList.contains("header-label")) {
-						this.toggleOpenState(index);
-					}
-					else if (event.target.classList.contains("add-all")) {
-						IOManager.addItemsToCitation(row.children);
-					}
-				}
-				event.stopPropagation();
-			});
+			// Handle clicks to expand/collapse sections or clicks on "Add all" button
+			node.addEventListener("mouseup", event => this._handleHeaderMouseUp(event, index));
 		}
 		else {
 			node = Helpers.buildListItemNode(ref, isCollapsible, level);
-			if (isCollapsible) {
-				node.addEventListener("mouseup", (event) => {
-					this.toggleOpenState(index);
-					event.stopPropagation();
-				});
-			}
-			else {
-				node.addEventListener("mouseup", event => this._handleRowClick(event, index), true);
-			}
+			node.addEventListener("mouseup", event => this._handleRowMouseUp(event, index), true);
 		}
-		// Click on list rows should not affect focus
-		node.addEventListener("mousedown", (event) => {
-			event.preventDefault();
-			event.stopPropagation();
-		});
 		node.classList.toggle("expanded", row.isOpen);
 		node.classList.toggle('selected', selection.isSelected(index));
 		node.classList.toggle('selected-first', selection.isFirstRowOfSelectionBlock(index));
@@ -1067,15 +1044,13 @@ class ListLayout extends Layout {
 	}
 
 	async refreshItemsList(options = {}) {
-		this._listRows = [];
-		this.customRowHeights = [];
-		this._itemsListRef.invalidate();
+		let rows = [];
 		this._itemsListRef.selection.clearSelection();
 		let citedIDs = CitationDataManager.getCitedLibraryItemIDs();
 		let searchResultGroups = await SearchHandler.getOrderedSearchResultGroups(citedIDs);
 		for (let { ref, group } of searchResultGroups) {
 			let headerRow = ListRow.createHeaderRow({ ref, children: group, isOpen: true });
-			this._listRows.push(headerRow);
+			rows.push(headerRow);
 			let items = group;
 			if (isAddingAnnotations || isCitingNotes) {
 				// all child items have to be groupped by their top-level item
@@ -1088,29 +1063,37 @@ class ListLayout extends Layout {
 
 			for (let { item, children } of items) {
 				let rowData = ListRow.createItemRow({ item, children, isOpen: true });
-				this._listRows.push(rowData);
+				rows.push(rowData);
 				for (let child of children) {
 					let childRowData = ListRow.createItemRow({ item: child, level: 2, isOpen: true });
-					this._listRows.push(childRowData);
+					rows.push(childRowData);
 				}
 			}
 		}
+		this._listRows = rows;
 		this.updateRowHeights();
 		this.updateSelectedItems();
 		this._itemsListRef.invalidate();
 		// Hide padding of list layout if there is not a single item to show
 		let isEmpty = !_id("list-layout").querySelector(".item");
 		_id("list-layout").classList.toggle("empty", isEmpty);
-		// // If the selection is not empty, select the first item at index 1 (index 0 is the header)
-		if (!isEmpty) {
+		// // If the selection is not empty and no items are added, pre-select the first item
+		if (!isEmpty && !CitationDataManager.items.length) {
 			let firstItemRow = this._listRows.findIndex(row => !row.isHeader);
 			this._itemsListRef.selection.select(firstItemRow);
 			setTimeout(() => {
 				_id("list-layout").querySelector(".virtualized-table-body").scrollTop = 0;
 			});
 		}
+		else {
+			this._itemsListRef.selection.focused = 0;
+		}
 		if (!options.skipWindowResize) {
 			this.resizeWindow();
+		}
+		// Ensure focus is never lost
+		if (doc.activeElement.tagName == "body") {
+			IOManager._restorePreClickFocus();
 		}
 	}
 
@@ -1141,25 +1124,47 @@ class ListLayout extends Layout {
 		IOManager.addItemsToCitation(itemsToAdd);
 	}
 
-	_handleRowClick(event, index) {
+	_handleRowMouseUp(event, index) {
 		if (event.ctrlKey || event.metaKey || event.shiftKey) {
 			// allow multiselection to be handled by virtualized-table
 			// but return focus to where it was before the click
-			let focused = doc.activeElement;
 			setTimeout(() => {
-				focused?.focus();
+				IOManager._restorePreClickFocus();
 			}, 10);
 			return;
 		}
 		let rows = this.getVisibleRows();
 		let clickedRow = rows[index];
-		if (clickedRow.isCollapsible) return;
+		// handle collapse/expand of container items that cannot be selected
+		if (clickedRow.isCollapsible) {
+			this.toggleOpenState(index);
+			event.stopPropagation();
+			return;
+		}
 		// if click item is not selected, set selection to just that item
 		if (!this._itemsListRef.selection.isSelected(index)) {
 			this._itemsListRef.selection.select(index);
 		}
 		// add items that are currently selected
 		this.handleActivate();
+		// do not let event to propagate because virtualized-table will focus itself
+		event.stopPropagation();
+	}
+
+	_handleHeaderMouseUp(event, index) {
+		let row = this.getVisibleRows()[index];
+		if (row.isCollapsible) {
+			if (event.target.classList.contains("header-label")) {
+				this.toggleOpenState(index);
+			}
+			else if (event.target.classList.contains("add-all")) {
+				IOManager.addItemsToCitation(row.children);
+			}
+		}
+		setTimeout(() => {
+			IOManager._restorePreClickFocus();
+		}, 10);
+		event.stopPropagation();
 	}
 
 	resizeWindow() {
@@ -1229,7 +1234,7 @@ class ListLayout extends Layout {
 	}
 
 	_handleBubbleInputArrow(event) {
-		if (event.detail.key == "ArrowUp" && this._itemsListRef.selection.focused === 1) {
+		if (event.detail.key == "ArrowUp" && this._itemsListRef.selection.focused <= 1) {
 			this._itemsListRef.selection.focused = 0;
 			this._itemsListRef.selection.clearSelection();
 			return;
