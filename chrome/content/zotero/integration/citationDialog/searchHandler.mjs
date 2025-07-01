@@ -31,10 +31,11 @@ const MIN_QUERY_LENGTH = 2;
 // as the following object: { found: [], cited: [], open: [], selected: []}.
 // Can be refreshed via SearchHandler.refresh or refreshDebounced.
 export class CitationDialogSearchHandler {
-	constructor({ io }) {
+	constructor({ doc, io }) {
 		this.isCitingNotes = !!io.isCitingNotes;
 		this.isAddingAnnotations = !!io.isAddingAnnotations;
 		this.io = io;
+		this.doc = doc;
 
 		this.searchValue = "";
 		this.results = {
@@ -73,12 +74,18 @@ export class CitationDialogSearchHandler {
 		return Zotero.Items.get(id);
 	}
 
-	// how many selected items there are without applying the filter
-	allSelectedItemsCount() {
-		if (this.selectedItems === null) {
-			this.selectedItems = this._getSelectedLibraryItems();
+	// how many selected/open/cited items there are without applying the filter
+	allItemsCount(key) {
+		if (key === "selected") {
+			return (this.selectedItems || []).length;
 		}
-		return this.selectedItems.length;
+		if (key === "open") {
+			return (this.openItems || []).length;
+		}
+		if (key === "cited") {
+			return (this.citedItems || []).length;
+		}
+		return 0;
 	}
 
 	// Return results in a more helpful formatfor rendering.
@@ -89,7 +96,7 @@ export class CitationDialogSearchHandler {
 	// by the number of results in each library.
 	// Items/notes in the libraries group are sorted via _createItemsSort/_createNotesSort comparators.
 	// Takes citedItems as a parameter to filter them out from Selected, Opened and Cited groups.
-	getOrderedSearchResultGroups(citedItemIDs = new Set()) {
+	async getOrderedSearchResultGroups(citedItemIDs = new Set()) {
 		let removeItemsIncludedInCitation = (items) => {
 			return items.filter(i => !citedItemIDs.has(i.cslItemID ? i.cslItemID : i.id));
 		};
@@ -102,19 +109,21 @@ export class CitationDialogSearchHandler {
 				groupItems = removeItemsIncludedInCitation(groupItems);
 			}
 			if (groupItems.length) {
-				result.push({ key: groupKey, group: groupItems });
+				let name = await this.doc.l10n.formatValue(`integration-citationDialog-section-${groupKey}`, { count: groupItems.length, total: this.allItemsCount(groupKey) });
+				result.push({ group: groupItems, ref: { id: groupKey, name } });
 			}
 			// if cited items are being loaded, add their group with no items to indicate
 			// that a placeholder should be displayed
 			let loadingCitedItemsGroup = this.citedItems === null && groupKey === "cited";
 			if (loadingCitedItemsGroup && this.searchValue) {
-				result.push({ key: "cited", group: [] });
+				let name = await this.doc.l10n.formatValue(`integration-citationDialog-section-${groupKey}`, { count: groupItems.length, total: 0 });
+				result.push({ ref: { id: "cited", name }, group: [] });
 			}
 		}
 		// library items go after
 		let libraryItems = Object.values(this.results.found.reduce((acc, item) => {
 			if (!acc[item.libraryID]) {
-				acc[item.libraryID] = { key: item.libraryID, group: [], isLibrary: true };
+				acc[item.libraryID] = { group: [], ref: Zotero.Libraries.get(item.libraryID) };
 			}
 			acc[item.libraryID].group.push(item);
 			return acc;

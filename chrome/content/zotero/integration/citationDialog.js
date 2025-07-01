@@ -24,6 +24,9 @@
 */
 
 
+const React = require('react');
+const ReactDOM = require('react-dom');
+const VirtualizedTable = require('components/virtualized-table');
 const ItemTree = require('zotero/itemTree');
 const { getCSSIcon } = require('components/icons');
 const { COLUMNS } = require('zotero/itemTreeColumns');
@@ -38,7 +41,6 @@ var currentLayout, libraryLayout, listLayout;
 var Helpers, SearchHandler, PopupsHandler, KeyboardHandler;
 
 const ITEM_LIST_MAX_ITEMS = 50;
-const ITEM_LIST_MAX_CHILDREN = 50;
 const SEARCH_TIMEOUT = 250;
 
 var { CitationDialogHelpers } = ChromeUtils.importESModule('chrome://zotero/content/integration/citationDialog/helpers.mjs');
@@ -67,7 +69,7 @@ async function onLoad() {
 	timer.start();
 
 	Helpers = new CitationDialogHelpers({ doc, io });
-	SearchHandler = new CitationDialogSearchHandler({ io });
+	SearchHandler = new CitationDialogSearchHandler({ doc, io });
 	PopupsHandler = new CitationDialogPopupsHandler({ doc });
 	KeyboardHandler = new CitationDialogKeyboardHandler({ doc });
 
@@ -98,6 +100,7 @@ async function onLoad() {
 	// init library layout after bubble input is built since bubble-input's height is a factor
 	// determining initial library layout height
 	await libraryLayout.init();
+	await listLayout.init();
 	// fetch selected items so they are known
 	// before refreshing items list after dialog mode setting
 	await SearchHandler.refreshSelectedAndOpenItems();
@@ -202,93 +205,7 @@ class Layout {
 	}
 
 	// Re-render the items based on search results
-	// @param {Boolean} options.retainItemsState: try to restore focused and selected status of item nodes.
-	async refreshItemsList({ retainItemsState } = {}) {
-		Zotero.debug("Citation Dialog: refreshing items list");
-		let sections = [];
-
-		// Tell SearchHandler which currently cited items are so they are not included in results
-		let citedIDs = CitationDataManager.getCitedLibraryItemIDs();
-		let searchResultGroups = SearchHandler.getOrderedSearchResultGroups(citedIDs);
-		for (let { key, group, isLibrary } of searchResultGroups) {
-			// selected items become a collapsible deck/list if there are multiple items
-			let isGroupCollapsible = key == "selected" && group.length > 1;
-			
-			// Construct each section and items
-			let sectionHeader = "";
-			if (isLibrary) {
-				sectionHeader = Zotero.Libraries.get(key).name;
-			}
-			// special handling for selected items to display how many total selected items there are
-			else if (key == "selected") {
-				sectionHeader = await doc.l10n.formatValue(`integration-citationDialog-section-${key}`, { count: group.length, total: SearchHandler.allSelectedItemsCount() });
-			}
-			else {
-				sectionHeader = await doc.l10n.formatValue(`integration-citationDialog-section-${key}`, { count: group.length });
-			}
-			let section = Helpers.buildItemsSection(`${this.type}-${key}-items`, sectionHeader, isGroupCollapsible, group.length, this.type);
-			let itemContainer = section.querySelector(".itemsContainer");
-	
-			let items = await this.createItemNodes(group, isGroupCollapsible);
-			// if cited group is present but has no items, cited items must be
-			// still loading, so show a placeholder item card
-			if (group.length === 0 && key == "cited") {
-				let placeholder = Helpers.createCitedItemPlaceholder();
-				items = [placeholder];
-			}
-			itemContainer.replaceChildren(...items);
-			sections.push(section);
-			if (isGroupCollapsible) {
-				// handle click on "Add all"
-				section.querySelector(".add-all").addEventListener("click", () => IOManager.addItemsToCitation(group));
-				// await for "All all" label so it does not appear blank for a moment after render
-				let addAllLabel = await doc.l10n.formatValue("integration-citationDialog-add-all");
-				section.querySelector(".add-all").textContent = addAllLabel;
-				// if the user explicitly expanded or collapsed the section, keep it as such
-				if (IOManager.sectionExpandedStatus[section.id]) {
-					IOManager.toggleContainerCollapse(section, IOManager.sectionExpandedStatus[section.id]);
-				}
-				// otherwise, expand the section if something is typed or whenever the list layout is opened
-				else {
-					let activeSearch = SearchHandler.searchValue.length > 0;
-					IOManager.toggleContainerCollapse(section, (activeSearch || this.type == "list") ? "expanded" : "collapsed");
-				}
-			}
-		}
-		let previouslyFocused = doc.activeElement;
-		let previouslySelected = doc.querySelectorAll(".item.selected");
-		_id(`${this.type}-layout`).querySelector(".search-items").replaceChildren(...sections);
-		// Update which bubbles need to be highlighted
-		this.updateSelectedItems();
-
-		// Keep focus and selection on the same item nodes if specified.
-		if (retainItemsState) {
-			doc.getElementById(previouslyFocused.id)?.focus();
-			// Try to retain selected status of items, in case if multiselection was in progress
-			for (let oldNote of previouslySelected) {
-				let itemNode = doc.getElementById(oldNote.id);
-				if (!itemNode) continue;
-				itemNode.classList.add("selected");
-				itemNode.classList.toggle("current", oldNote.classList.contains("current"));
-			}
-		}
-		// Pre-select the item to be added on Enter of an input
-		else {
-			this.markPreSelected();
-		}
-		// Ensure focus is never lost
-		if (doc.activeElement.tagName == "body") {
-			IOManager._restorePreClickFocus();
-		}
-	}
-
-	// Create the node for selected/cited/opened item groups.
-	// It's different for list and library modes, so it is implemented by layouts.
-	async createItemNode() {}
-
-	// Create all item nodes to display. Implemented by layouts.
-	async createItemNodes() {}
-
+	async refreshItemsList() {}
 
 	// Run search and refresh items list
 	async search(value, { skipDebounce = false } = {}) {
@@ -358,24 +275,6 @@ class Layout {
 	resizeWindow() {}
 
 	updateSelectedItems() {}
-
-	// Mark initially selected item that can be selected on Enter in an input
-	// Item is pre-selected when there is an active search OR when there are no
-	// items in the citation yet
-	markPreSelected() {
-		for (let itemNode of [...doc.querySelectorAll(".item.selected")]) {
-			itemNode.classList.remove("selected");
-			itemNode.classList.remove("current");
-		}
-		let firstItemNode = _id(`${currentLayout.type}-layout`).querySelector(`.item:not([disabled])`);
-		if (!firstItemNode) return;
-		let activeSearch = SearchHandler.searchValue.length > 0;
-		let noBubbles = !CitationDataManager.items.length;
-		if (activeSearch || noBubbles) {
-			firstItemNode.classList.add("current");
-			IOManager.selectItemNodesRange(firstItemNode);
-		}
-	}
 }
 
 class LibraryLayout extends Layout {
@@ -397,62 +296,82 @@ class LibraryLayout extends Layout {
 		}
 	}
 
-	// Create one node per item
-	async createItemNodes(items, isCollapsible) {
-		let itemNodes = [];
-		let index = 0;
-		for (let item of items) {
-			// do not add an unreasonable number of nodes into the DOM
-			if (index >= ITEM_LIST_MAX_ITEMS) break;
-			// createItemNode implemented by layouts
-			let itemNode = await this.createItemNode(item, isCollapsible ? index : null);
-			itemNode.addEventListener("click", IOManager.handleItemClick);
-			// items can be dragged into bubble-input to add them into the citation
-			itemNode.addEventListener("dragstart", IOManager._handleItemDragStart);
-			itemNodes.push(itemNode);
-			index++;
-		}
-		return itemNodes;
-	}
+	// Re-render the items based on search results
+	// @param {Boolean} options.retainItemsState: try to restore focused and selected status of item nodes.
+	async refreshItemsList({ retainItemsState } = {}) {
+		Zotero.debug("Citation Dialog: refreshing items list");
+		let sections = [];
 
-	// Create item node for an item group and store item ids in itemIDs attribute
-	async createItemNode(item, index = null) {
-		let itemNode = Helpers.createNode("div", {
-			tabindex: "-1",
-			"data-l10n-id": "integration-citationDialog-aria-item-library",
-			role: "option",
-			"data-tabindex": 30,
-			"data-arrow-nav-enabled": true,
-			draggable: true
-		}, "item keyboard-clickable hide-on-collapse");
-		let id = item.cslItemID || item.id;
-		itemNode.setAttribute("itemID", id);
-		itemNode.setAttribute("role", "option");
-		itemNode.id = id;
-		let title = Helpers.buildItemTitle(item);
-		let description = Helpers.buildItemDescription(item, true);
-		itemNode.append(title, description);
-
-		if (isAddingAnnotations) {
-			itemNode.classList.add("tall");
-			if (item.isAnnotation()) {
-				let attachment = Zotero.Items.get(item.parentItemID);
-				let topLevelItem = attachment.parentItemID ? Zotero.Items.get(attachment.parentItemID) : attachment;
-				let topLevelItemTitle = Helpers.buildItemTitle(topLevelItem);
-				topLevelItemTitle.classList.add("description");
-				itemNode.prepend(topLevelItemTitle);
+		// Tell SearchHandler which currently cited items are so they are not included in results
+		let citedIDs = CitationDataManager.getCitedLibraryItemIDs();
+		let searchResultGroups = await SearchHandler.getOrderedSearchResultGroups(citedIDs);
+		for (let { ref, group } of searchResultGroups) {
+			// selected items become a collapsible deck/list if there are multiple items
+			let isGroupCollapsible = ref.id == "selected" && group.length > 1;
+			
+			let section = Helpers.buildLibraryItemsSection(`${this.type}-${ref.id}-items`, ref.name, isGroupCollapsible, group.length);
+			let itemContainer = section.querySelector(".itemsContainer");
+	
+			let items = [];
+			let index = 0;
+			for (let item of group) {
+				// do not add an unreasonable number of nodes into the DOM
+				if (index >= ITEM_LIST_MAX_ITEMS) break;
+				let itemNode = await Helpers.buildLibraryItemNode(item, isAddingAnnotations, index);
+				itemNode.addEventListener("click", event => this._handleItemClick(event));
+				// items can be dragged into bubble-input to add them into the citation
+				itemNode.addEventListener("dragstart", IOManager._handleItemDragStart);
+				items.push(itemNode);
+				index++;
+			}
+			// if cited group is present but has no items, cited items must be
+			// still loading, so show a placeholder item card
+			if (group.length === 0 && ref.id == "cited") {
+				let placeholder = Helpers.createCitedItemPlaceholder();
+				items = [placeholder];
+			}
+			itemContainer.replaceChildren(...items);
+			sections.push(section);
+			if (isGroupCollapsible) {
+				// handle click on "Add all"
+				section.querySelector(".add-all").addEventListener("click", () => IOManager.addItemsToCitation(group));
+				// if the user explicitly expanded or collapsed the section, keep it as such
+				if (IOManager.sectionExpandedStatus[section.id]) {
+					this._toggleContainerCollapse(section, IOManager.sectionExpandedStatus[section.id]);
+				}
+				// otherwise, expand the section if something is typed or whenever the list layout is opened
+				else {
+					let activeSearch = SearchHandler.searchValue.length > 0;
+					this._toggleContainerCollapse(section, (activeSearch || this.type == "list") ? "expanded" : "collapsed");
+				}
 			}
 		}
+		let previouslyFocused = doc.activeElement;
+		let previouslySelected = doc.querySelectorAll(".item.selected");
+		_id(`${this.type}-layout`).querySelector(".search-items").replaceChildren(...sections);
+		// Update which bubbles need to be highlighted
+		this.updateSelectedItems();
 
-		if (index !== null) {
-			itemNode.style.setProperty('--deck-index', index);
+		// Keep focus and selection on the same item nodes if specified.
+		if (retainItemsState) {
+			doc.getElementById(previouslyFocused.id)?.focus();
+			// Try to retain selected status of items, in case if multiselection was in progress
+			for (let oldNote of previouslySelected) {
+				let itemNode = doc.getElementById(oldNote.id);
+				if (!itemNode) continue;
+				itemNode.classList.add("selected");
+				itemNode.classList.toggle("current", oldNote.classList.contains("current"));
+			}
+		}
+		// Pre-select the item to be added on Enter of an input
+		else {
+			this._markPreSelected();
+		}
+		// Ensure focus is never lost
+		if (doc.activeElement.tagName == "body") {
+			IOManager._restorePreClickFocus();
 		}
 
-		return itemNode;
-	}
-
-	async refreshItemsList(options) {
-		await super.refreshItemsList(options);
 		_id("library-other-items").querySelector(".search-items").hidden = !_id("library-layout").querySelector(".section:not([hidden])");
 		_id("library-no-suggested-items-message").hidden = !_id("library-other-items").querySelector(".search-items").hidden;
 		// When there are no matches, show a message
@@ -462,10 +381,10 @@ class LibraryLayout extends Layout {
 		this.resizeWindow();
 		let collapsibleDecks = [..._id("library-other-items").querySelectorAll(".section.expandable")];
 		for (let collapsibleDeck of collapsibleDecks) {
-			collapsibleDeck.querySelector(".itemsContainer").addEventListener("click", this._captureItemsContainerClick, true);
+			collapsibleDeck.querySelector(".itemsContainer").addEventListener("click", event => this._captureItemsContainerClick(event), true);
 			collapsibleDeck.querySelector(".itemsContainer").classList.add("keyboard-clickable");
 			collapsibleDeck.querySelector(".collapse-section-btn").addEventListener("click", (event) => {
-				IOManager.toggleContainerCollapse(collapsibleDeck, "collapsed", true);
+				this._toggleContainerCollapse(collapsibleDeck, "collapsed", true);
 				// on mouse click, move focus from the button that will disappear onto the collapsed deck
 				if (!event.clientX && !event.clientY) {
 					collapsibleDeck.querySelector(".itemsContainer").focus();
@@ -522,17 +441,172 @@ class LibraryLayout extends Layout {
 		}
 	}
 
+	// Mark initially selected item that can be selected on Enter in an input
+	// Item is pre-selected when there is an active search OR when there are no
+	// items in the citation yet
+	_markPreSelected() {
+		for (let itemNode of [...doc.querySelectorAll(".item.selected")]) {
+			itemNode.classList.remove("selected");
+			itemNode.classList.remove("current");
+		}
+		let firstItemNode = _id(`${currentLayout.type}-layout`).querySelector(`.item:not([disabled])`);
+		if (!firstItemNode) return;
+		let activeSearch = SearchHandler.searchValue.length > 0;
+		let noBubbles = !CitationDataManager.items.length;
+		if (activeSearch || noBubbles) {
+			firstItemNode.classList.add("current");
+			this._selectItemNodesRange(firstItemNode);
+		}
+	}
+
+	// select all items between startNode and endNode
+	_selectItemNodesRange(startNode, endNode = null) {
+		let itemNodes = [...doc.querySelectorAll(".item")];
+		for (let node of itemNodes) {
+			node.classList.remove("selected", "selected-first", "selected-last");
+		}
+		if (startNode === null) return;
+
+		// can't select the collapsed deck of items
+		if (startNode.classList.contains("itemsContainer")) return;
+
+		let startIndex = itemNodes.indexOf(startNode);
+		let endIndex = endNode ? itemNodes.indexOf(endNode) : startIndex;
+
+		// if startIndex is after endIndex, just swap them
+		if (startIndex > endIndex) [startIndex, endIndex] = [endIndex, startIndex];
+
+		for (let i = startIndex; i <= endIndex; i++) {
+			this._toggleItemNodeSelect(itemNodes[i], true);
+		}
+		currentLayout.updateSelectedItems();
+	}
+
+	_toggleItemNodeSelect(itemNode, isSelected = null) {
+		if (isSelected === true) {
+			itemNode.classList.add("selected");
+		}
+		else if (isSelected === false) {
+			itemNode.classList.remove("selected");
+		}
+		else {
+			itemNode.classList.toggle("selected");
+		}
+		this.updateSelectedItems();
+	}
+
+	_handleItemClick(event) {
+		let targetItem = event.target.closest(".item");
+		let multiselectable = targetItem.closest("[data-multiselectable]");
+		
+		// Debounce double clicks so one does not add multiple items unintentionally
+		if (IOManager._lastClickTime && (new Date()).getTime() - IOManager._lastClickTime < 300) {
+			event.preventDefault();
+			event.stopPropagation();
+			return;
+		}
+		IOManager._lastClickTime = (new Date()).getTime();
+
+		// Cmd/Ctrl + mouseclick toggles selected item node
+		if (multiselectable && (Zotero.isMac && event.metaKey) || (!Zotero.isMac && event.ctrlKey)) {
+			this._toggleItemNodeSelect(targetItem);
+			return;
+		}
+		// Shift + click selects a range
+		if (multiselectable && event.shiftKey) {
+			let itemNodes = [..._id(`${currentLayout.type}-layout`).querySelectorAll(".item")];
+			let firstNode = _id(`${currentLayout.type}-layout`).querySelector(".item.selected") || itemNodes[0];
+			this._selectItemNodesRange(firstNode, targetItem);
+			return;
+		}
+		// get itemIDs associated with the nodes
+		let itemIDs = new Set([targetItem.getAttribute("itemID")]);
+		// if target item is selected, add all other selected itemIDs
+		if (targetItem.classList.contains("selected")) {
+			let selectedItemNodes = _id(`${currentLayout.type}-layout`).querySelectorAll(".item.selected");
+			for (let itemNode of selectedItemNodes) {
+				itemIDs.add(itemNode.getAttribute("itemID"));
+			}
+		}
+		let itemsToAdd = Array.from(itemIDs).map(itemID => SearchHandler.getItem(itemID));
+		IOManager.addItemsToCitation(itemsToAdd);
+	}
+
+	// Expand/collapse an expandable section (e.g. "Selected items")
+	// or an expandable item (e.g. a regular item with annotations in list mode)
+	// container - expandable node
+	// state - "expanded", "collapsed", or null to toggle
+	// userInitiated - Boolean, true if called by a user action
+	_toggleContainerCollapse(container, status, userInitiated) {
+		// set desired class
+		if (status == "expanded" && !container.classList.contains("expanded")) {
+			container.classList.add("expanded");
+		}
+		else if (status == "collapsed" && container.classList.contains("expanded")) {
+			container.classList.remove("expanded");
+		}
+		else if (!status) {
+			container.classList.toggle("expanded");
+		}
+		// Record if the user explicitly expanded or collapsed the container to not undo it during next refresh
+		if (userInitiated) {
+			IOManager.sectionExpandedStatus[container.id] = container.classList.contains("expanded") ? "expanded" : "collapsed";
+		}
+		let isCollapsed = !container.classList.contains("expanded");
+		// mark collapsed items as unfocusable
+		if (isCollapsed) {
+			for (let item of [...container.querySelectorAll(".item.hide-on-collapse")]) {
+				item.removeAttribute("tabindex");
+				item.setAttribute("draggable", false);
+				item.classList.remove("current");
+				item.classList.remove("selected");
+			}
+		}
+		// when expanded, make them focusable again
+		else {
+			for (let item of [...container.querySelectorAll(".item.hide-on-collapse")]) {
+				item.setAttribute("tabindex", -1);
+				item.setAttribute("draggable", true);
+			}
+		}
+		container.querySelector("[aria-expanded]").setAttribute("aria-expanded", container.classList.contains("expanded"));
+		// In list mode, there may be some empty space left after section collapse
+		if (currentLayout.type == "list") {
+			setTimeout(() => {
+				currentLayout.resizeWindow();
+			}, 300);
+		}
+		// Additional handling for selected items section in library mode
+		else if (container.classList.contains("section")) {
+			let itemsContainer = container.querySelector(".itemsContainer");
+			// the items deck itself becomes focusable
+			if (isCollapsed) {
+				itemsContainer.setAttribute("tabindex", -1);
+				itemsContainer.dataset.arrowNavEnabled = true;
+				// if an item if focused, focus the collapsed container for smoother transition
+				if (doc.activeElement.classList.contains("item")) {
+					itemsContainer.focus();
+				}
+			}
+			else {
+				container.dataset.arrowNavEnabled = false;
+				container.removeAttribute("tabindex");
+				container.classList.remove("selected", "current");
+			}
+		}
+	}
+
 	// handle click on the items container
 	_captureItemsContainerClick(event) {
 		let section = event.target.closest(".section");
 		// expand the deck of items if it is collapsed
 		if (section.classList.contains("expanded")) return;
 		event.stopPropagation();
-		IOManager.toggleContainerCollapse(section, "expanded", true);
+		this._toggleContainerCollapse(section, "expanded", true);
 		// if the click is keyboard-initiated, focus the first item
 		if (event.layerX == 0 && event.layerY == 0) {
 			let firstItem = section.querySelector(".item");
-			IOManager.selectItemNodesRange(firstItem);
+			this._selectItemNodesRange(firstItem);
 			section.querySelector(".item").focus();
 		}
 	}
@@ -814,119 +888,247 @@ class LibraryLayout extends Layout {
 	}
 }
 
+class ListRow {
+	constructor({ ref, level, children, isOpen, isHidden }) {
+		this.ref = ref;
+		this.children = children || [];
+		this.isOpen = isOpen || false;
+		this.isHidden = isHidden || false;
+		this.level = level || 0;
+	}
+
+	static createHeaderRow({ ref, children = [], isOpen = false }) {
+		return new ListRow({ ref, children, level: 0, isOpen });
+	}
+
+	static createItemRow({ item, level = 1, children, isOpen = null, isHidden = false }) {
+		return new ListRow({ ref: item, children, level, isOpen, isHidden });
+	}
+
+	get isHeader() {
+		return this.level === 0;
+	}
+
+	get height() {
+		if (this.isHeader) return 32;
+		return 42;
+	}
+
+	get isCollapsible() {
+		if (this.isHeader) return this.ref.id == "selected" && this.children.length > 1;
+		return this.children.length > 0;
+	}
+
+	get isSelectable() {
+		if (this.isHeader) return this.isCollapsible;
+		return true;
+	}
+}
+
 class ListLayout extends Layout {
 	constructor() {
 		super("list");
+		this._itemsListRef = null;
+		this._listRows = [];
 	}
 
-	// Create a node of each item, accounting for the fact that some items
-	// are top-level items, and some are child notes or annotations, which
-	// need to be displayed as child nodes within their ancestor.
-	async createItemNodes(items) {
-		let itemNodes = [];
-		let index = 0;
-		if (isAddingAnnotations || isCitingNotes) {
-			// all child items have to be groupped by their top-level item
-			items = Helpers.groupByTopLevelItems(items);
+	async init() {
+		await new Promise((resolve) => {
+			ReactDOM.createRoot(doc.querySelector('#list-layout-wrapper')).render(
+				<VirtualizedTable
+					getRowCount={() => this.getVisibleRows().length}
+					id="items-list-virtualized-table"
+					ref={(ref) => {
+						this._itemsListRef = ref;
+						resolve();
+					}}
+					renderItem={this.renderItem.bind(this)}
+					isContainer={this.isContainer.bind(this)}
+					isContainerEmpty={this.isContainerEmpty.bind(this)}
+					isContainerOpen={this.isContainerOpen.bind(this)}
+					multiSelect={true}
+					getRowString={index => this.getVisibleRows()[index].ref?.getDisplayTitle() || ""}
+					onActivate={this.handleActivate.bind(this)}
+					toggleOpenState={this.toggleOpenState.bind(this)}
+				/>
+			);
+		});
+		doc.querySelector('#list-layout-wrapper').addEventListener("keydown", (event) => {
+			if (["ArrowUp", "ArrowDown"].includes(event.key) && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
+				this.selectNextRow(event.key == "ArrowDown");
+				event.stopPropagation();
+				event.preventDefault();
+			}
+			else if ([Zotero.arrowPreviousKey, Zotero.arrowNextKey].includes(event.key)) {
+				let targetRow = this.getVisibleRows()[this._itemsListRef.selection.focused];
+				if (targetRow.isCollapsible) {
+					let isNextKey = event.key == Zotero.arrowNextKey;
+					if ((!isNextKey && targetRow.isOpen) || (isNextKey && !targetRow.isOpen)) {
+						this.toggleOpenState(this._itemsListRef.selection.focused);
+					}
+				}
+				event.stopPropagation();
+				event.preventDefault();
+			}
+			else if (event.key == "Enter") {
+				this.handleActivate();
+				event.stopPropagation();
+				event.preventDefault();
+			}
+		}, true);
+	}
+
+	getVisibleRows() {
+		return this._listRows.filter(row => !row.isHidden);
+	};
+
+	renderItem(index, selection, oldDiv = null, columns) {
+		let row = this.getVisibleRows()[index];
+		let div;
+		if (oldDiv) {
+			div = oldDiv;
+			div.innerHTML = "";
 		}
 		else {
-			// if not citing notes or adding annotations, items are already top-level
-			items = items.map(item => ({ item, children: [] }));
+			div = document.createElement('div');
+			div.className = "row";
 		}
-		// create a node for the top-level item
-		for (let { item, children } of items) {
-			// do not add an unreasonable number of items
-			if (index >= ITEM_LIST_MAX_ITEMS) break;
-			let itemNode = await this.createItemNode(item);
-			// at most ITEM_LIST_MAX_CHILDREN child nodes per item
-			children = children.slice(0, ITEM_LIST_MAX_CHILDREN);
-			if (children.length) {
-				// If there are child items that need to be displayed, created their nodes too
-				let childNodes = [];
-				for (let child of children) {
-					let childNode = await this.createItemNode(child);
-					childNode.addEventListener("click", IOManager.handleItemClick);
-					childNodes.push(childNode);
+		let node = null;
+		let { ref, isCollapsible, level } = row;
+		if (row.isHeader) {
+			node = Helpers.buildListSectionHeader({ ref, isCollapsible });
+			node.classList.toggle("first", index === 0);
+			// Click on header itself should not affect focus/selection/etc.
+			node.addEventListener("mouseup", (event) => {
+				if (isCollapsible) {
+					if (event.target.classList.contains("header-label")) {
+						this.toggleOpenState(index);
+					}
+					else if (event.target.classList.contains("add-all")) {
+						IOManager.addItemsToCitation(row.children);
+					}
 				}
-				// Then wrap the parent item and child nodes into one collapsible item
-				let collapsibleItem = Helpers.makeItemCollapsible(itemNode, item.id, childNodes);
-				collapsibleItem.querySelector(".twisty").addEventListener("click", (event) => {
+				event.stopPropagation();
+			});
+			// Click on section should not affect selection
+			node.addEventListener("mousedown", (event) => {
+				event.preventDefault();
+				event.stopPropagation();
+			});
+		}
+		else {
+			node = Helpers.buildListItemNode(ref, isCollapsible, level);
+			if (isCollapsible) {
+				node.addEventListener("mouseup", (event) => {
+					this.toggleOpenState(index);
 					event.stopPropagation();
-					IOManager.toggleContainerCollapse(collapsibleItem, null, true);
 				});
-				let initialItemStatus = IOManager.sectionExpandedStatus[collapsibleItem.id] || "expanded";
-				IOManager.toggleContainerCollapse(collapsibleItem, initialItemStatus, false);
-				itemNodes.push(collapsibleItem);
+				// Click on collapsible item should not affect selection
+				node.addEventListener("mousedown", (event) => {
+					event.preventDefault();
+					event.stopPropagation();
+				});
 			}
 			else {
-				itemNodes.push(itemNode);
+				node.addEventListener("mouseup", event => this._handleRowClick(event, index), true);
 			}
-			itemNode.addEventListener("click", IOManager.handleItemClick);
-			if (!(isCitingNotes || isAddingAnnotations)) {
-				// items can be dragged into bubble-input to add them into the citation
-				itemNode.addEventListener("dragstart", IOManager._handleItemDragStart);
-			}
-			index++;
 		}
-		return itemNodes;
+		node.classList.toggle("expanded", row.isOpen);
+		node.classList.toggle('selected', selection.isSelected(index));
+		node.classList.toggle('selected-first', selection.isFirstRowOfSelectionBlock(index));
+		node.classList.toggle('selected-last', selection.isLastRowOfSelectionBlock(index));
+		div.appendChild(node);
+		return div;
+	};
+
+	toggleOpenState = (index) => {
+		let row = this.getVisibleRows()[index];
+		let rowIndexInAllRows = this._listRows.findIndex(r => r.ref.id == row.ref.id);
+		let allRows = this._listRows;
+		let nextIndex = rowIndexInAllRows + 1;
+		row.isOpen = !row.isOpen;
+		while (nextIndex < allRows.length) {
+			let nextRow = allRows[nextIndex];
+			// Stop when we reach another header (same level) or a row with lower level
+			if (nextRow.level <= row.level) {
+				break;
+			}
+			nextRow.isHidden = !row.isOpen;
+			// un-select selected children of a collapsed item
+			if (nextRow.isHidden && this._itemsListRef.selection.isSelected(nextIndex)) {
+				this._itemsListRef.selection.toggleSelect(nextIndex);
+			}
+			nextIndex++;
+		}
+		this.updateRowHeights();
+		this._itemsListRef.invalidate();
+		setTimeout(() => {
+			this.resizeWindow();
+		});
+	};
+
+	isContainer(index) {
+		return this.getVisibleRows()[index].isCollapsible;
 	}
 
-	// Create item node for an item group and store item ids in itemIDs attribute
-	async createItemNode(item) {
-		let itemNode = Helpers.createNode("div", {
-			tabindex: "-1",
-			"data-l10n-id": "integration-citationDialog-aria-item-list",
-			role: "option",
-			"data-tabindex": 30,
-			"data-arrow-nav-enabled": true,
-			draggable: true
-		}, "item keyboard-clickable hide-on-collapse");
-		let id = item.cslItemID || item.id;
-		itemNode.setAttribute("itemID", id);
-		itemNode.setAttribute("role", "option");
-		itemNode.id = id;
-		let icon = null;
-		if (item.isAnnotation()) {
-			icon = Helpers.createNode("img", {}, "icon annotation-icon");
-			let type = item.annotationType == "image" ? "area" : item.annotationType;
-			icon.src = 'chrome://zotero/skin/16/universal/annotate-' + type + '.svg';
-			icon.style.fill = item.annotationColor;
-		}
-		else {
-			icon = Helpers.createNode("span", {}, "icon icon-css icon-item-type");
-			let dataTypeLabel = item.getItemTypeIconName(true);
-			icon.setAttribute("data-item-type", dataTypeLabel);
-		}
+	isContainerEmpty(index) {
+		return this.getVisibleRows()[index].children.length === 0;
+	}
 
-		let title = Helpers.buildItemTitle(item);
-		let titleContent = Helpers.createNode("span", {}, "");
-		let description = Helpers.buildItemDescription(item);
-		Zotero.Utilities.Internal.renderItemTitle(item.getDisplayTitle(), titleContent);
-		title.prepend(icon);
-		itemNode.append(title, description);
-		if (Zotero.Retractions.isRetracted(item)) {
-			let retractedIcon = getCSSIcon("cross");
-			retractedIcon.classList.add("retracted");
-			icon.after(retractedIcon);
+	isContainerOpen(index) {
+		return this.getVisibleRows()[index].isOpen;
+	}
+
+	updateRowHeights() {
+		let customRowHeights = [];
+		for (let [index, row] of this.getVisibleRows().entries()) {
+			customRowHeights.push([index, row.height]);
 		}
-		return itemNode;
+		this._itemsListRef.updateCustomRowHeights(customRowHeights);
 	}
 
 	async refreshItemsList(options = {}) {
-		await super.refreshItemsList(options);
+		this._listRows = [];
+		this.customRowHeights = [];
+		this._itemsListRef.invalidate();
+		this._itemsListRef.selection.clearSelection();
+		let citedIDs = CitationDataManager.getCitedLibraryItemIDs();
+		let searchResultGroups = await SearchHandler.getOrderedSearchResultGroups(citedIDs);
+		for (let { ref, group } of searchResultGroups) {
+			let headerRow = ListRow.createHeaderRow({ ref, children: group, isOpen: true });
+			this._listRows.push(headerRow);
+			let items = group;
+			if (isAddingAnnotations || isCitingNotes) {
+				// all child items have to be groupped by their top-level item
+				items = Helpers.groupByTopLevelItems(items);
+			}
+			else {
+				// if not citing notes or adding annotations, items are already top-level
+				items = items.map(item => ({ item, children: [] }));
+			}
 
-		// Hide padding of list layout if there is not a single item to show
-		let isEmpty = !_id("list-layout").querySelector(".section:not([hidden])");
-		_id("list-layout").classList.toggle("empty", isEmpty);
-		// Record number of children to set max-height based on that for the expand/collapse transition
-		for (let container of [..._id("list-layout").querySelectorAll(".section.expandable .itemsContainer")]) {
-			let addedChildrenCount = container.querySelectorAll(".item").length;
-			container.style.setProperty('--children-count', addedChildrenCount);
+			for (let { item, children } of items) {
+				let rowData = ListRow.createItemRow({ item, children, isOpen: true });
+				this._listRows.push(rowData);
+				for (let child of children) {
+					let childRowData = ListRow.createItemRow({ item: child, level: 2, isOpen: true });
+					this._listRows.push(childRowData);
+				}
+			}
 		}
-		// collapse/expand collapsible section when header is clicked
-		let collapsibleSection = doc.querySelector(".section.expandable");
-		if (collapsibleSection) {
-			collapsibleSection.querySelector(".header-label").addEventListener("click", () => IOManager.toggleContainerCollapse(collapsibleSection, null, true));
+		this.updateRowHeights();
+		this.updateSelectedItems();
+		this._itemsListRef.invalidate();
+		// Hide padding of list layout if there is not a single item to show
+		let isEmpty = !_id("list-layout").querySelector(".item");
+		_id("list-layout").classList.toggle("empty", isEmpty);
+		// // If the selection is not empty, select the first item at index 1 (index 0 is the header)
+		if (!isEmpty) {
+			let firstItemRow = this._listRows.findIndex(row => !row.isHeader);
+			this._itemsListRef.selection.select(firstItemRow);
+			setTimeout(() => {
+				_id("list-layout").querySelector(".virtualized-table-body").scrollTop = 0;
+			});
 		}
 		if (!options.skipWindowResize) {
 			this.resizeWindow();
@@ -934,21 +1136,68 @@ class ListLayout extends Layout {
 	}
 
 	updateSelectedItems() {
-		let selectedIDs = new Set([...doc.querySelectorAll(".item.selected")].map(node => parseInt(node.getAttribute("itemID"))));
+		let selectedIndexes = [...this._itemsListRef.selection.selected];
+		let rows = this.getVisibleRows();
+		let selectedItemIDs = new Set(selectedIndexes.map(index => rows[index].ref.id));
 		for (let bubbleItem of CitationDataManager.items) {
-			bubbleItem.selected = selectedIDs.has(bubbleItem.id);
+			bubbleItem.selected = selectedItemIDs.has(bubbleItem.id);
 		}
 		IOManager.updateBubbleInput();
+	}
+
+	selectNextRow(forward) {
+		let selected = listLayout._itemsListRef.selection.focused || 0;
+		let moveSelection = (index) => {
+			if (forward) return index + 1;
+			return index - 1;
+		};
+		
+		let rows = listLayout.getVisibleRows();
+		let nextIndex = moveSelection(selected);
+		while (rows[nextIndex]?.isSelectable === false) {
+			nextIndex = moveSelection(nextIndex);
+		}
+		if (rows[nextIndex]) {
+			listLayout._itemsListRef.selection.select(nextIndex);
+		}
+	}
+
+	handleActivate() {
+		let itemIDs = new Set();
+		let rows = this.getVisibleRows();
+		for (let index of [...this._itemsListRef.selection.selected]) {
+			itemIDs.add(rows[index].ref.id);
+		}
+		let itemsToAdd = Array.from(itemIDs).map(itemID => SearchHandler.getItem(itemID));
+		IOManager.addItemsToCitation(itemsToAdd);
+	}
+
+	_handleRowClick(event, index) {
+		if (event.ctrlKey || event.metaKey || event.shiftKey) {
+			// allow multiselection to be handled by virtualized-table
+			// but return focus to where it was before the click
+			let focused = doc.activeElement;
+			setTimeout(() => {
+				focused?.focus();
+			});
+			return;
+		}
+		let rows = this.getVisibleRows();
+		let clickedRow = rows[index];
+		if (clickedRow.isCollapsible) return;
+		// if click item is not selected, set selection to just that item
+		if (!this._itemsListRef.selection.isSelected(index)) {
+			this._itemsListRef.selection.select(index);
+		}
+		// add items that are currently selected
+		this.handleActivate();
 	}
 
 	resizeWindow() {
 		let bubbleInputHeight = Helpers.getSearchRowHeight();
 
 		// height of all sections
-		let sectionsHeight = 0;
-		for (let section of [..._id("list-layout").querySelectorAll(".section:not([hidden])")]) {
-			sectionsHeight += section.getBoundingClientRect().height;
-		}
+		let sectionsHeight = _id("list-layout").querySelector(".windowed-list").getBoundingClientRect().height;
 		// cap at 400px
 		sectionsHeight = Math.min(sectionsHeight, 400);
 
@@ -974,36 +1223,6 @@ class ListLayout extends Layout {
 		setTimeout(() => {
 			window.resizeTo(window.innerWidth, parseInt(autoHeight));
 		}, 10);
-	}
-
-	_markRoundedCorners() {
-		let selectedGroupStarted = false;
-		let previousRow;
-		let items = [...doc.querySelectorAll(".item")];
-		for (let rowIndex = 0; rowIndex < items.length; rowIndex++) {
-			let row = items[rowIndex];
-			row.classList.remove("selected-first", "selected-last");
-			// stop if we reached the end of the container
-			if (previousRow && selectedGroupStarted && row.parentNode !== previousRow.parentNode) {
-				selectedGroupStarted = false;
-				previousRow.classList.add("selected-last");
-			}
-			// mark the first item in a group of consecutively selected
-			if (row.classList.contains("selected") && !selectedGroupStarted) {
-				row.classList.add("selected-first");
-				selectedGroupStarted = true;
-			}
-			// mark the last item in a group of consecutively selected
-			if (!row.classList.contains("selected") && selectedGroupStarted && previousRow) {
-				previousRow.classList.add("selected-last");
-				selectedGroupStarted = false;
-			}
-			// if this is the last selected item, mark it as the last selected too
-			if (row.classList.contains("selected") && rowIndex == items.length - 1) {
-				row.classList.add("selected-last");
-			}
-			previousRow = row;
-		}
 	}
 }
 
@@ -1035,7 +1254,9 @@ const IOManager = {
 		// display details popup for the bubble
 		doc.addEventListener("show-details-popup", ({ detail: { dialogReferenceID } }) => this._openItemDetailsPopup(dialogReferenceID));
 		// mark item nodes as selected to highlight them and mark relevant bubbles
-		doc.addEventListener("select-items", ({ detail: { startNode, endNode } }) => this.selectItemNodesRange(startNode, endNode));
+		doc.addEventListener("select-items", ({ detail: { startNode, endNode } }) => libraryLayout._selectItemNodesRange(startNode, endNode));
+		// navigate items list on arrow up/down keypresses from bubble-input
+		doc.addEventListener("list-arrow-handle", ({ detail: { isForward } }) => listLayout.selectNextRow(isForward));
 		// update bubbles after citation item is updated by itemDetails popup
 		doc.addEventListener("item-details-updated", () => this.updateBubbleInput());
 
@@ -1127,26 +1348,10 @@ const IOManager = {
 		if (isAddingAnnotations) {
 			CitationDataManager.items = [];
 			let annotations = [];
-			// create BubbleItem for every selected (or child) annotation
+			// create BubbleItem for every selected annotation
 			for (let item of items) {
 				if (item.isAnnotation()) {
 					annotations.push(BubbleItem.fromItem(item));
-				}
-				else if (item.isFileAttachment()) {
-					let attachmentAnnotations = item.getAnnotations();
-					for (let attachmentAnnotation of attachmentAnnotations) {
-						// if one selects an annotation and its attachment, make sure the selected
-						// annotation row is ignored and the annotation appears only once
-						// in the correct order relative to other annotations of the attachment
-						let addedEarlierIndex = annotations.findIndex(a => a.id == attachmentAnnotation.id);
-						if (addedEarlierIndex > -1) {
-							annotations.splice(addedEarlierIndex, 1);
-						}
-						annotations.push(BubbleItem.fromItem(attachmentAnnotation));
-					}
-				}
-				else if (item.isRegularItem()) {
-					items.push(...Zotero.Items.get(item.getAttachments()));
 				}
 			}
 			// Sort annotations but only within the same attachment
@@ -1218,148 +1423,6 @@ const IOManager = {
 		dialogNotPristine();
 	},
 
-	// select all items between startNode and endNode
-	selectItemNodesRange(startNode, endNode = null) {
-		let itemNodes = [...doc.querySelectorAll(".item")];
-		for (let node of itemNodes) {
-			node.classList.remove("selected", "selected-first", "selected-last");
-		}
-		if (startNode === null) return;
-
-		// can't select the collapsed deck of items
-		if (startNode.classList.contains("itemsContainer")) return;
-
-		let startIndex = itemNodes.indexOf(startNode);
-		let endIndex = endNode ? itemNodes.indexOf(endNode) : startIndex;
-
-		// if startIndex is after endIndex, just swap them
-		if (startIndex > endIndex) [startIndex, endIndex] = [endIndex, startIndex];
-
-		for (let i = startIndex; i <= endIndex; i++) {
-			IOManager.toggleItemNodeSelect(itemNodes[i], true);
-		}
-		currentLayout.updateSelectedItems();
-	},
-
-	toggleItemNodeSelect(itemNode, isSelected = null) {
-		if (isSelected === true) {
-			itemNode.classList.add("selected");
-		}
-		else if (isSelected === false) {
-			itemNode.classList.remove("selected");
-		}
-		else {
-			itemNode.classList.toggle("selected");
-		}
-		currentLayout.updateSelectedItems();
-		// For library view, this is handled in itemTree.jsx
-		if (currentLayout.type == "list") {
-			listLayout._markRoundedCorners();
-		}
-	},
-
-	handleItemClick(event) {
-		let targetItem = event.target.closest(".item");
-		let multiselectable = targetItem.closest("[data-multiselectable]");
-		
-		// Debounce double clicks so one does not add multiple items unintentionally
-		if (IOManager._lastClickTime && (new Date()).getTime() - IOManager._lastClickTime < 300) {
-			event.preventDefault();
-			event.stopPropagation();
-			return;
-		}
-		IOManager._lastClickTime = (new Date()).getTime();
-
-		// Cmd/Ctrl + mouseclick toggles selected item node
-		if (multiselectable && (Zotero.isMac && event.metaKey) || (!Zotero.isMac && event.ctrlKey)) {
-			IOManager.toggleItemNodeSelect(targetItem);
-			return;
-		}
-		// Shift + click selects a range
-		if (multiselectable && event.shiftKey) {
-			let itemNodes = [..._id(`${currentLayout.type}-layout`).querySelectorAll(".item")];
-			let firstNode = _id(`${currentLayout.type}-layout`).querySelector(".item.selected") || itemNodes[0];
-			IOManager.selectItemNodesRange(firstNode, targetItem);
-			return;
-		}
-		// get itemIDs associated with the nodes
-		let itemIDs = new Set([targetItem.getAttribute("itemID")]);
-		// if target item is selected, add all other selected itemIDs
-		if (targetItem.classList.contains("selected")) {
-			let selectedItemNodes = _id(`${currentLayout.type}-layout`).querySelectorAll(".item.selected");
-			for (let itemNode of selectedItemNodes) {
-				itemIDs.add(itemNode.getAttribute("itemID"));
-			}
-		}
-		let itemsToAdd = Array.from(itemIDs).map(itemID => SearchHandler.getItem(itemID));
-		IOManager.addItemsToCitation(itemsToAdd);
-	},
-
-	// Expand/collapse an expandable section (e.g. "Selected items")
-	// or an expandable item (e.g. a regular item with annotations in list mode)
-	// container - expandable node
-	// state - "expanded", "collapsed", or null to toggle
-	// userInitiated - Boolean, true if called by a user action
-	toggleContainerCollapse(container, status, userInitiated) {
-		// set desired class
-		if (status == "expanded" && !container.classList.contains("expanded")) {
-			container.classList.add("expanded");
-		}
-		else if (status == "collapsed" && container.classList.contains("expanded")) {
-			container.classList.remove("expanded");
-		}
-		else if (!status) {
-			container.classList.toggle("expanded");
-		}
-		// Record if the user explicitly expanded or collapsed the container to not undo it during next refresh
-		if (userInitiated) {
-			IOManager.sectionExpandedStatus[container.id] = container.classList.contains("expanded") ? "expanded" : "collapsed";
-		}
-		let isCollapsed = !container.classList.contains("expanded");
-		// mark collapsed items as unfocusable
-		if (isCollapsed) {
-			for (let item of [...container.querySelectorAll(".item.hide-on-collapse")]) {
-				item.removeAttribute("tabindex");
-				item.setAttribute("draggable", false);
-				item.classList.remove("current");
-				item.classList.remove("selected");
-			}
-		}
-		// when expanded, make them focusable again
-		else {
-			for (let item of [...container.querySelectorAll(".item.hide-on-collapse")]) {
-				item.setAttribute("tabindex", -1);
-				item.setAttribute("draggable", true);
-			}
-		}
-		container.querySelector("[aria-expanded]").setAttribute("aria-expanded", container.classList.contains("expanded"));
-		// In list mode, there may be some empty space left after section collapse
-		if (currentLayout.type == "list") {
-			setTimeout(() => {
-				currentLayout.resizeWindow();
-			}, 300);
-		}
-		// Additional handling for selected items section in library mode
-		else if (container.classList.contains("section")) {
-			let itemsContainer = container.querySelector(".itemsContainer");
-			// the items deck itself becomes focusable
-			if (isCollapsed) {
-				itemsContainer.setAttribute("tabindex", -1);
-				itemsContainer.dataset.arrowNavEnabled = true;
-				// if an item if focused, focus the collapsed container for smoother transition
-				if (doc.activeElement.classList.contains("item")) {
-					itemsContainer.focus();
-				}
-			}
-			else {
-				container.dataset.arrowNavEnabled = false;
-				container.removeAttribute("tabindex");
-				container.classList.remove("selected", "current");
-			}
-		}
-	},
-
-
 	// when focus leaves the input or suggested items area in library mode, un-select all items
 	// so they do not apear highlighted, since Enter would not add them anymore
 	// it does not apply to list mode
@@ -1369,7 +1432,7 @@ const IOManager = {
 		let itemsShouldRemainSelected = focused.classList.contains("input") || _id("library-other-items").contains(focused);
 		if (itemsShouldRemainSelected) {
 			if (!doc.querySelector(".item.selected")) {
-				currentLayout.markPreSelected();
+				libraryLayout._markPreSelected();
 			}
 			return;
 		}
@@ -1802,6 +1865,7 @@ window.addEventListener("blur", () => {
 });
 window.addEventListener("focus", async () => {
 	let now = (new Date()).getTime();
+	return;
 	// On linux, resizing the dialog causes the window to loose and immediately regain focus.
 	// Do not run the search if the window lost focus less than 100 ms ago.
 	if (Zotero.isLinux && now - windowLostFocusOn < 100) {
