@@ -17,6 +17,18 @@ describe("Citation Dialog", function () {
 	};
 	let dialog, win, IOManager, CitationDataManager, SearchHandler;
 
+	let waitForNode = async (doc, selector) => {
+		let maxWaitLoops = 1000;
+		let loopCount = 0;
+		let node = doc.querySelector(selector);
+		while (!node && loopCount < maxWaitLoops) {
+			await Zotero.Promise.delay(5);
+			node = doc.querySelector(selector);
+			loopCount++;
+		}
+		return node;
+	};
+
 	before(async function () {
 		// one of helper functions of searchHandler uses zotero pane
 		win = await loadZoteroPane();
@@ -684,9 +696,11 @@ describe("Citation Dialog", function () {
 			// Both annotations should be found in search results
 			assert.sameMembers(annotationSearchHandler.results.found, [highlightAnnotation, underlineAnnotation]);
 
+			let highlightNode = await waitForNode(annotationDialog.document, `.item[id="${highlightAnnotation.id}"]`);
+			let underlineNode = await waitForNode(annotationDialog.document, `.item[id="${underlineAnnotation.id}"]`);
 			// Check that annotation cards are rendered in the dialog
-			assert.isOk(annotationDialog.document.querySelector(`.item[id="${highlightAnnotation.id}"]`));
-			assert.isOk(annotationDialog.document.querySelector(`.item[id="${underlineAnnotation.id}"]`));
+			assert.isOk(highlightNode);
+			assert.isOk(underlineNode);
 		});
 
 		it("should find annotations by their content", async function () {
@@ -745,16 +759,11 @@ describe("Citation Dialog", function () {
 			assert.sameMembers(annotationSearchHandler.results.cited, [itemWithAnnotations3]);
 		});
 
-		it("should include annotations if top-level item is added", async function () {
-			// If a parent item is added, all of its annotations should be included
-			await annotationDialog.IOManager.addItemsToCitation([parentItem]);
-			let addedAnnotationIDs = annotationDialog.CitationDataManager.items.map(item => item.id);
-			assert.sameMembers(addedAnnotationIDs, [highlightAnnotation.id, underlineAnnotation.id]);
-
-			// If a parent item is added together with its child annotation, make sure the annotation won't appear twice
-			await annotationDialog.IOManager.addItemsToCitation([underlineAnnotation, parentItem]);
+		it("should only include annotations", async function () {
+			let item = await createDataObject('item', { title: "test_item" });
+			await annotationDialog.IOManager.addItemsToCitation([underlineAnnotation, parentItem, item]);
 			addedAnnotationIDs = annotationDialog.CitationDataManager.items.map(item => item.id);
-			assert.sameMembers(addedAnnotationIDs, [highlightAnnotation.id, underlineAnnotation.id]);
+			assert.sameMembers(addedAnnotationIDs, [underlineAnnotation.id]);
 		});
 	});
 
