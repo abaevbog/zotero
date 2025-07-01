@@ -532,9 +532,7 @@ class LibraryLayout extends Layout {
 		IOManager.addItemsToCitation(itemsToAdd);
 	}
 
-	// Expand/collapse an expandable section (e.g. "Selected items")
-	// or an expandable item (e.g. a regular item with annotations in list mode)
-	// container - expandable node
+	// Expand/collapse an expandable section.
 	// state - "expanded", "collapsed", or null to toggle
 	// userInitiated - Boolean, true if called by a user action
 	_toggleContainerCollapse(container, status, userInitiated) {
@@ -937,7 +935,7 @@ class ListLayout extends Layout {
 			ReactDOM.createRoot(doc.querySelector('#list-layout-wrapper')).render(
 				<VirtualizedTable
 					getRowCount={() => this.getVisibleRows().length}
-					id="items-list-virtualized-table"
+					id="items-list"
 					ref={(ref) => {
 						this._itemsListRef = ref;
 						resolve();
@@ -946,36 +944,15 @@ class ListLayout extends Layout {
 					isContainer={this.isContainer.bind(this)}
 					isContainerEmpty={this.isContainerEmpty.bind(this)}
 					isContainerOpen={this.isContainerOpen.bind(this)}
+					isSelectable={this.isSelectable.bind(this)}
 					multiSelect={true}
-					getRowString={index => this.getVisibleRows()[index].ref?.getDisplayTitle() || ""}
 					onActivate={this.handleActivate.bind(this)}
 					toggleOpenState={this.toggleOpenState.bind(this)}
 				/>
 			);
 		});
-		doc.querySelector('#list-layout-wrapper').addEventListener("keydown", (event) => {
-			if (["ArrowUp", "ArrowDown"].includes(event.key) && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
-				this.selectNextRow(event.key == "ArrowDown");
-				event.stopPropagation();
-				event.preventDefault();
-			}
-			else if ([Zotero.arrowPreviousKey, Zotero.arrowNextKey].includes(event.key)) {
-				let targetRow = this.getVisibleRows()[this._itemsListRef.selection.focused];
-				if (targetRow.isCollapsible) {
-					let isNextKey = event.key == Zotero.arrowNextKey;
-					if ((!isNextKey && targetRow.isOpen) || (isNextKey && !targetRow.isOpen)) {
-						this.toggleOpenState(this._itemsListRef.selection.focused);
-					}
-				}
-				event.stopPropagation();
-				event.preventDefault();
-			}
-			else if (event.key == "Enter") {
-				this.handleActivate();
-				event.stopPropagation();
-				event.preventDefault();
-			}
-		}, true);
+		doc.querySelector('#list-layout-wrapper').addEventListener("keydown", e => this._handleRowKeyDown(e), true);
+		doc.addEventListener("list-arrow-keypress", event => this._handleBubbleInputArrow(event));
 	}
 
 	getVisibleRows() {
@@ -1010,11 +987,6 @@ class ListLayout extends Layout {
 				}
 				event.stopPropagation();
 			});
-			// Click on section should not affect selection
-			node.addEventListener("mousedown", (event) => {
-				event.preventDefault();
-				event.stopPropagation();
-			});
 		}
 		else {
 			node = Helpers.buildListItemNode(ref, isCollapsible, level);
@@ -1023,16 +995,16 @@ class ListLayout extends Layout {
 					this.toggleOpenState(index);
 					event.stopPropagation();
 				});
-				// Click on collapsible item should not affect selection
-				node.addEventListener("mousedown", (event) => {
-					event.preventDefault();
-					event.stopPropagation();
-				});
 			}
 			else {
 				node.addEventListener("mouseup", event => this._handleRowClick(event, index), true);
 			}
 		}
+		// Click on list rows should not affect focus
+		node.addEventListener("mousedown", (event) => {
+			event.preventDefault();
+			event.stopPropagation();
+		});
 		node.classList.toggle("expanded", row.isOpen);
 		node.classList.toggle('selected', selection.isSelected(index));
 		node.classList.toggle('selected-first', selection.isFirstRowOfSelectionBlock(index));
@@ -1077,6 +1049,13 @@ class ListLayout extends Layout {
 
 	isContainerOpen(index) {
 		return this.getVisibleRows()[index].isOpen;
+	}
+
+	isSelectable(index) {
+		let row = this.getVisibleRows()[index];
+		if (!row) return false;
+		if (row.isHeader) return row.isCollapsible;
+		return true;
 	}
 
 	updateRowHeights() {
@@ -1145,27 +1124,17 @@ class ListLayout extends Layout {
 		IOManager.updateBubbleInput();
 	}
 
-	selectNextRow(forward) {
-		let selected = listLayout._itemsListRef.selection.focused || 0;
-		let moveSelection = (index) => {
-			if (forward) return index + 1;
-			return index - 1;
-		};
-		
-		let rows = listLayout.getVisibleRows();
-		let nextIndex = moveSelection(selected);
-		while (rows[nextIndex]?.isSelectable === false) {
-			nextIndex = moveSelection(nextIndex);
-		}
-		if (rows[nextIndex]) {
-			listLayout._itemsListRef.selection.select(nextIndex);
-		}
-	}
-
 	handleActivate() {
 		let itemIDs = new Set();
 		let rows = this.getVisibleRows();
-		for (let index of [...this._itemsListRef.selection.selected]) {
+		let selectedIndexes = [...this._itemsListRef.selection.selected];
+		// Handle activation of "Selected Items" section via space/enter on it
+		if (selectedIndexes.length == 1 && rows[selectedIndexes[0]].ref.id == "selected") {
+			let selectedRow = rows[selectedIndexes[0]];
+			IOManager.addItemsToCitation(selectedRow.children);
+			return;
+		}
+		for (let index of selectedIndexes) {
 			itemIDs.add(rows[index].ref.id);
 		}
 		let itemsToAdd = Array.from(itemIDs).map(itemID => SearchHandler.getItem(itemID));
@@ -1179,7 +1148,7 @@ class ListLayout extends Layout {
 			let focused = doc.activeElement;
 			setTimeout(() => {
 				focused?.focus();
-			});
+			}, 10);
 			return;
 		}
 		let rows = this.getVisibleRows();
@@ -1224,6 +1193,53 @@ class ListLayout extends Layout {
 			window.resizeTo(window.innerWidth, parseInt(autoHeight));
 		}, 10);
 	}
+
+	_handleRowKeyDown(event) {
+		// arrow right/left on collapsible rows will expand/collapse them but never
+		// move selection to the parent row (as in virtualized-table)
+		if ([Zotero.arrowPreviousKey, Zotero.arrowNextKey].includes(event.key)) {
+			let targetRow = this.getVisibleRows()[this._itemsListRef.selection.focused];
+			if (targetRow.isCollapsible) {
+				let isNextKey = event.key == Zotero.arrowNextKey;
+				if ((!isNextKey && targetRow.isOpen) || (isNextKey && !targetRow.isOpen)) {
+					this.toggleOpenState(this._itemsListRef.selection.focused);
+				}
+			}
+			event.stopPropagation();
+			event.preventDefault();
+		}
+		// allow up from the top-most selectable row will focus bubble-input
+		else if (event.key == "ArrowUp") {
+			let nextSelectable = this._itemsListRef.selection.focused - 1;
+			while (nextSelectable >= 0 && !this.isSelectable(nextSelectable)) {
+				nextSelectable--;
+			}
+			if (!this.isSelectable(nextSelectable)) {
+				this._itemsListRef.selection.focused = 0;
+				this._itemsListRef.selection.clearSelection();
+				_id("bubble-input").focus();
+			}
+		}
+		// Enter/space on a row is equivalent to clicking on it
+		else if (["Enter", " "].includes(event.key)) {
+			this.handleActivate();
+			event.stopPropagation();
+			event.preventDefault();
+		}
+	}
+
+	_handleBubbleInputArrow(event) {
+		if (event.detail.key == "ArrowUp" && this._itemsListRef.selection.focused === 1) {
+			this._itemsListRef.selection.focused = 0;
+			this._itemsListRef.selection.clearSelection();
+			return;
+		}
+		var arrowKeyPress = new KeyboardEvent('keydown', {
+			key: event.detail.key,
+			bubbles: true
+		});
+		_id("list-layout").querySelector(".virtualized-table-body").dispatchEvent(arrowKeyPress);
+	}
 }
 
 //
@@ -1255,8 +1271,6 @@ const IOManager = {
 		doc.addEventListener("show-details-popup", ({ detail: { dialogReferenceID } }) => this._openItemDetailsPopup(dialogReferenceID));
 		// mark item nodes as selected to highlight them and mark relevant bubbles
 		doc.addEventListener("select-items", ({ detail: { startNode, endNode } }) => libraryLayout._selectItemNodesRange(startNode, endNode));
-		// navigate items list on arrow up/down keypresses from bubble-input
-		doc.addEventListener("list-arrow-handle", ({ detail: { isForward } }) => listLayout.selectNextRow(isForward));
 		// update bubbles after citation item is updated by itemDetails popup
 		doc.addEventListener("item-details-updated", () => this.updateBubbleInput());
 

@@ -149,10 +149,10 @@ export class CitationDialogKeyboardHandler {
 		}
 		// arrow up/down from bubble-input in list mode will move selection in the items list
 		else if (!this._id("list-layout").hidden && (event.key == "ArrowDown" || event.key == "ArrowUp") && this._id("bubble-input").contains(event.target) && onlyShiftModifierPossible) {
-			this.doc.dispatchEvent(new CustomEvent("list-arrow-handle", {
+			this.doc.dispatchEvent(new CustomEvent("list-arrow-keypress", {
 				bubbles: true,
 				detail: {
-					isForward: event.key == "ArrowDown",
+					key: event.key
 				}
 			}));
 			handled = true;
