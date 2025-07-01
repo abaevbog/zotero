@@ -732,6 +732,10 @@
 		top: -1000px;
 		height: 200px;
 		width: 100%;
+
+		.item {
+			background-color: var(--selected-item-background);
+		}
 	}
 }
 

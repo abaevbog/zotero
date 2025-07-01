@@ -969,19 +969,27 @@ class ListLayout extends Layout {
 		else {
 			div = document.createElement('div');
 			div.className = "row";
+			div.addEventListener("mouseup", event => this._handleRowMouseUp(event, index), true);
+			if (!isAddingAnnotations && !isCitingNotes) {
+				div.addEventListener("dragstart", event => this._handleDragStart(event, index));
+			}
 		}
+		div.removeAttribute("draggable");
 		let node = null;
 		let { ref, isCollapsible, level } = row;
 		if (row.isHeader) {
 			node = Helpers.buildListSectionHeader({ ref, isCollapsible });
 			node.classList.toggle("first", index === 0);
-			// Handle clicks to expand/collapse sections or clicks on "Add all" button
-			node.addEventListener("mouseup", event => this._handleHeaderMouseUp(event, index));
 		}
 		else {
 			node = Helpers.buildListItemNode(ref, isCollapsible, level);
-			node.addEventListener("mouseup", event => this._handleRowMouseUp(event, index), true);
+			div.setAttribute("draggable", !isAddingAnnotations && !isCitingNotes);
 		}
+		// Intercept mousedown event to prevent having the row selected on mousedown.
+		// All our event handling occurs on mouseup, and having no mousedown event
+		// means the row does not re-render when drag starts, which means there is no
+		// need for pointer-events: none workaround as in virtualized-table.css
+		div.addEventListener("mousedown", e => e.stopPropagation(), true);
 		node.classList.toggle("expanded", row.isOpen);
 		node.classList.toggle('selected', selection.isSelected(index));
 		node.classList.toggle('selected-first', selection.isFirstRowOfSelectionBlock(index));
@@ -1128,13 +1136,24 @@ class ListLayout extends Layout {
 		if (event.ctrlKey || event.metaKey || event.shiftKey) {
 			// allow multiselection to be handled by virtualized-table
 			// but return focus to where it was before the click
-			setTimeout(() => {
-				IOManager._restorePreClickFocus();
-			}, 10);
+			setTimeout(IOManager._restorePreClickFocus, 10);
 			return;
 		}
 		let rows = this.getVisibleRows();
 		let clickedRow = rows[index];
+		// handle clicks on header rows to expand/collapse the section
+		// or add all items when "Add all" button is clicked
+		if (clickedRow.isHeader) {
+			if (event.target.classList.contains("header-label")) {
+				this.toggleOpenState(index);
+			}
+			else if (event.target.classList.contains("add-all")) {
+				IOManager.addItemsToCitation(clickedRow.children);
+			}
+			setTimeout(IOManager._restorePreClickFocus, 10);
+			event.stopPropagation();
+			return;
+		}
 		// handle collapse/expand of container items that cannot be selected
 		if (clickedRow.isCollapsible) {
 			this.toggleOpenState(index);
@@ -1151,20 +1170,13 @@ class ListLayout extends Layout {
 		event.stopPropagation();
 	}
 
-	_handleHeaderMouseUp(event, index) {
-		let row = this.getVisibleRows()[index];
-		if (row.isCollapsible) {
-			if (event.target.classList.contains("header-label")) {
-				this.toggleOpenState(index);
-			}
-			else if (event.target.classList.contains("add-all")) {
-				IOManager.addItemsToCitation(row.children);
-			}
+	_handleDragStart(event, index) {
+		let rows = this.getVisibleRows();
+		let itemIDs = [rows[index].ref.id];
+		if (this._itemsListRef.selection.isSelected(index)) {
+			itemIDs = [...this._itemsListRef.selection.selected].map(i => rows[i].ref.id);
 		}
-		setTimeout(() => {
-			IOManager._restorePreClickFocus();
-		}, 10);
-		event.stopPropagation();
+		IOManager._handleItemDragStart(event, itemIDs);
 	}
 
 	resizeWindow() {
@@ -1475,7 +1487,7 @@ const IOManager = {
 	},
 	
 	// handle drag start of item nodes into bubble-input
-	_handleItemDragStart(event) {
+	_handleItemDragStart(event, itemIDs) {
 		let itemNode = event.target;
 		if (!itemNode.classList.contains("item")) return;
 		let selectedItems = itemNode.classList.contains("selected") ? [...doc.querySelectorAll(".item.selected")] : [itemNode];
@@ -1487,7 +1499,10 @@ const IOManager = {
 		let offsetY = event.clientY - rect.top;
 		event.dataTransfer.setDragImage(wrapper, offsetX, offsetY);
 		// Same format as with drag-drop of items in itemTree via Zotero.Utilities.Internal.onDragItems
-		let draggedItemIDs = selectedItems.map(node => node.getAttribute("itemID")).join(",");
+		if (!itemIDs) {
+			itemIDs = selectedItems.map(node => node.getAttribute("itemID"));
+		}
+		let draggedItemIDs = itemIDs.join(",");
 		event.dataTransfer.setData("zotero/item", draggedItemIDs);
 		setTimeout(() => {
 			itemNode.parentNode.removeChild(wrapper);

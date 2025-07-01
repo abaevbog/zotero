@@ -195,7 +195,6 @@ export class CitationDialogHelpers {
 			itemID: id,
 			"data-l10n-id": "integration-citationDialog-aria-item-list",
 			role: "option",
-			draggable: true,
 			level
 		}, "item keyboard-clickable hide-on-collapse");
 		let icon = null;
