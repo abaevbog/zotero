@@ -936,6 +936,7 @@ class ListLayout extends Layout {
 		this._itemsListRef = null;
 		this._listRows = [];
 		this._shouldExpandAllChildren = new Set();
+		this._collasedItems = new Set();
 	}
 
 	async init() {
@@ -993,7 +994,12 @@ class ListLayout extends Layout {
 			node = Helpers.buildListMoreChildrenRow(row.ref.itemID, row.ref.name);
 		}
 		else {
-			node = Helpers.buildListItemNode(ref, isCollapsible, level);
+			let section = this.getRowParent(index, 0);
+			let annotationsCount = null;
+			if (isAddingAnnotations && ["selected", "open"].includes(section.ref.id)) {
+				annotationsCount = Helpers.getAllAnnotations(row.ref).length;
+			}
+			node = Helpers.buildListItemNode(ref, isCollapsible, level, annotationsCount);
 			div.setAttribute("draggable", !isAddingAnnotations && !isCitingNotes);
 		}
 		// Intercept mousedown event to prevent having the row selected on mousedown.
@@ -1009,12 +1015,19 @@ class ListLayout extends Layout {
 		return div;
 	};
 
-	toggleOpenState = (index) => {
+	toggleOpenState = (index, skipRender) => {
 		let row = this.getVisibleRows()[index];
 		let rowIndexInAllRows = this._listRows.findIndex(r => r.ref.id == row.ref.id);
 		let allRows = this._listRows;
 		let nextIndex = rowIndexInAllRows + 1;
 		row.isOpen = !row.isOpen;
+		// Record the item was collapsed to keep it collapsed on next refresh
+		if (row.isOpen) {
+			this._collasedItems.delete(row.ref.id);
+		}
+		else {
+			this._collasedItems.add(row.ref.id);
+		}
 		while (nextIndex < allRows.length) {
 			let nextRow = allRows[nextIndex];
 			// Stop when we reach another header (same level) or a row with lower level
@@ -1033,6 +1046,7 @@ class ListLayout extends Layout {
 			}
 			nextIndex++;
 		}
+		if (skipRender) return;
 		this.updateRowHeights();
 		this._itemsListRef.invalidate();
 		setTimeout(() => {
@@ -1058,6 +1072,19 @@ class ListLayout extends Layout {
 		if (row.isHeader) return row.isCollapsible;
 		if (row.isMoreChildrenRow) return true;
 		return true;
+	}
+
+	getRowParent(rowIndex, parentLevel) {
+		let rows = this.getVisibleRows();
+		let row = rows[rowIndex];
+		if (parentLevel === undefined) {
+			parentLevel = row.level - 1;
+		}
+		while (row && row.level > parentLevel) {
+			rowIndex--;
+			row = rows[rowIndex];
+		}
+		return row;
 	}
 
 	updateRowHeights() {
@@ -1091,13 +1118,14 @@ class ListLayout extends Layout {
 				rows.push(topLevelItemRow);
 				if (this._shouldExpandAllChildren.has(item.id)) {
 					children = Helpers.getAllAnnotations(item);
+					topLevelItemRow.children = children;
 				}
 				for (let child of children) {
 					let childRowData = ListRow.createItemRow({ item: child, level: 2, isOpen: true });
 					rows.push(childRowData);
 				}
-				// Special handling for "Selected Items" section
-				if (ref.id == "selected") {
+				// Special handling for "Selected" and "Opened" section
+				if (["selected", "open"].includes(ref.id)) {
 					let allAnnotations = Helpers.getAllAnnotations(item);
 					// If some annotations are selected and some are not, hide not-selected annotations
 					// behind the "X More..." row. Clicking on it will show all annotations.
@@ -1118,6 +1146,12 @@ class ListLayout extends Layout {
 			}
 		}
 		this._listRows = rows;
+		// Keep rows that were collapsed before refreshed still collapsed
+		for (let [index, row] of rows.entries()) {
+			if (this._collasedItems.has(row.ref.id) && row.isOpen) {
+				this.toggleOpenState(index, true);
+			}
+		}
 		this.updateRowHeights();
 		this.updateSelectedItems();
 		this._itemsListRef.invalidate();
@@ -1125,31 +1159,14 @@ class ListLayout extends Layout {
 		let isEmpty = !_id("list-layout").querySelector(".item");
 		_id("list-layout").classList.toggle("empty", isEmpty);
 
-		// Select the row that is explicitly provided.
-		// If not, select the first item row - but only when no other items are added.
+		// Select the first item row when no other items are added, unless specified otherwise.
 		// If there is no row to select, just set the first row as focused.
-		let rowToSelect = options.selectIndex;
-		if (!isEmpty && !CitationDataManager.items.length && rowToSelect === undefined) {
-			rowToSelect = this._listRows.findIndex(row => !row.isHeader && !row.isCollapsible);
-		}
-		if (rowToSelect !== undefined) {
-			this._itemsListRef.selection.select(rowToSelect);
-			// If there is a row to select that's close to the top, scroll all the way up.
-			// Otherwise, scroll to the row itself
-			setTimeout(() => {
-				if (rowToSelect > 2) {
-					this._itemsListRef.scrollToRow(rowToSelect);
-				}
-				else {
-					_id("list-layout").querySelector(".virtualized-table-body").scrollTop = 0;
-				}
-			});
-		}
-		else {
+		if (!options.skipSelect && !isEmpty && !CitationDataManager.items.length) {
+			let firstRow = this._listRows.findIndex(row => !row.isHeader && !row.isCollapsible);
+			this._itemsListRef.selection.select(firstRow);
 			setTimeout(() => {
 				_id("list-layout").querySelector(".virtualized-table-body").scrollTop = 0;
 			});
-			this._itemsListRef.selection.focused = 0;
 		}
 
 		if (!options.skipWindowResize) {
@@ -1215,24 +1232,30 @@ class ListLayout extends Layout {
 			event.stopPropagation();
 			return;
 		}
+		// handle click on the annotations icon to select all annotations
+		if (event.target.closest(".annotations-icon-button")) {
+			this._showAllChildrenOfItem(clickedRow.ref.itemID, true);
+		}
 		// handle collapse/expand of container items that cannot be selected
-		if (clickedRow.isCollapsible) {
+		else if (clickedRow.isCollapsible) {
 			this.toggleOpenState(index);
-			event.stopPropagation();
-			return;
 		}
-		if (clickedRow.isMoreChildrenRow && event.target.closest(".more-chidlren-row")) {
+		// handle clicks on "X more" row to show all remaining annotations of an item
+		else if (clickedRow.isMoreChildrenRow && event.target.closest(".more-chidlren-row")) {
 			this._showAllChildrenOfItem(clickedRow.ref.itemID);
-			event.stopPropagation();
-			return;
 		}
-		// if click item is not selected, set selection to just that item
-		if (!this._itemsListRef.selection.isSelected(index)) {
-			this._itemsListRef.selection.select(index);
+		// handle click on regular item rows
+		else {
+			// if click item is not selected, set selection to just that item
+			if (!this._itemsListRef.selection.isSelected(index)) {
+				this._itemsListRef.selection.select(index);
+			}
+			// add items that are currently selected
+			this.handleActivate();
 		}
-		// add items that are currently selected
-		this.handleActivate();
 		// do not let event to propagate because virtualized-table will focus itself
+		// if focus does leave (e.g. due to mousedown event), try to restore it after a small delay
+		setTimeout(IOManager._restorePreClickFocus, 10);
 		event.stopPropagation();
 	}
 
@@ -1324,10 +1347,18 @@ class ListLayout extends Layout {
 		_id("list-layout").querySelector(".virtualized-table-body").dispatchEvent(arrowKeyPress);
 	}
 
-	_showAllChildrenOfItem(itemID) {
+	async _showAllChildrenOfItem(itemID, selectChildren = false) {
 		this._shouldExpandAllChildren.add(itemID);
-		let rowIndex = this._listRows.findIndex(row => row.ref.id == itemID);
-		this.refreshItemsList({ selectIndex: rowIndex });
+		let visibleRows = this.getVisibleRows();
+		let rowIndex = visibleRows.findIndex(row => row.ref.id == itemID);
+		await this.refreshItemsList({ skipSelect: true });
+		if (selectChildren) {
+			let row = visibleRows[rowIndex];
+			this._itemsListRef.selection.rangedSelect(rowIndex + 1, rowIndex + 1 + row.children.length, true);
+		}
+		else {
+			this._itemsListRef.selection.select(rowIndex);
+		}
 	}
 }
 

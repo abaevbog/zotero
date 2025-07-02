@@ -188,7 +188,7 @@ export class CitationDialogHelpers {
 	}
 
 	// Create item node for an item group and store item ids in itemIDs attribute
-	buildListItemNode(item, isCollapsible, level = 0) {
+	buildListItemNode(item, isCollapsible, level = 0, annotationsCount = null) {
 		let id = item.cslItemID || item.id;
 		let itemNode = this.createNode("div", {
 			id: id,
@@ -225,6 +225,14 @@ export class CitationDialogHelpers {
 			let retractedIcon = getCSSIcon("cross");
 			retractedIcon.classList.add("retracted");
 			icon.after(retractedIcon);
+		}
+		if (annotationsCount) {
+			let annotationWrapper = this.createNode("div", {}, "btn-icon annotations-icon-button");
+			let annotationIcon = this.createNode("span", {}, "icon icon-annotation");
+			let annotationsCountSpan = this.createNode("span", {}, "annotations-count");
+			annotationsCountSpan.textContent = annotationsCount;
+			annotationWrapper.append(annotationIcon, annotationsCountSpan);
+			title.append(annotationWrapper);
 		}
 		return itemNode;
 	}
