@@ -442,7 +442,7 @@
 			--highlight-color: var(--accent-blue30);
 			overflow: scroll;
 			#items-list {
-				height: 100%;;
+				height: 100%;
 				// show dividers except for on the last section
 				.divider {
 					margin: 4px 16px;
@@ -454,10 +454,11 @@
 					font-weight: 700;
 					font-size: 13px;
 					color: var(--fill-secondary);
-					padding: 4px 8px 4px 16px;
+					padding: 4px 0;
+					margin-inline: 8px; // inline margin vs padding for top-divider to not be too wide
 					display: flex;
 					width: 100%;
-					&:not(.first) {
+					&.has-top-divider {
 						border-top: 1px solid var(--fill-quinary);
 					}
 					.header-btn-group {
@@ -509,7 +510,7 @@
 					height: 42px;
 					box-sizing: border-box;
 					overflow: hidden;;
-					margin: 0 8px;
+					margin: 0;
 					padding: 4px 8px;
 					&[level="2"] {
 						padding-inline-start: 36px;

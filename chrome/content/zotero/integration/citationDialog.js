@@ -908,7 +908,7 @@ class ListRow {
 	}
 
 	get height() {
-		if (this.isHeader) return 32;
+		if (this.isHeader) return 26;
 		return 42;
 	}
 
@@ -979,7 +979,7 @@ class ListLayout extends Layout {
 		let { ref, isCollapsible, level } = row;
 		if (row.isHeader) {
 			node = Helpers.buildListSectionHeader({ ref, isCollapsible });
-			node.classList.toggle("first", index === 0);
+			node.classList.toggle("has-top-divider", index !== 0);
 		}
 		else {
 			node = Helpers.buildListItemNode(ref, isCollapsible, level);
@@ -1014,6 +1014,10 @@ class ListLayout extends Layout {
 			// un-select selected children of a collapsed item
 			if (nextRow.isHidden && this._itemsListRef.selection.isSelected(nextIndex)) {
 				this._itemsListRef.selection.toggleSelect(nextIndex);
+			}
+			// if a child row is focused when parent is collapsed, move focus to the top
+			if (nextRow.isHidden && this._itemsListRef.selection.focused == nextIndex) {
+				this._itemsListRef.selection.focused = 0;
 			}
 			nextIndex++;
 		}
