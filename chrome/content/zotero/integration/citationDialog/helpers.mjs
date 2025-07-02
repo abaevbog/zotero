@@ -196,7 +196,7 @@ export class CitationDialogHelpers {
 			"data-l10n-id": "integration-citationDialog-aria-item-list",
 			role: "option",
 			level
-		}, "item keyboard-clickable hide-on-collapse");
+		}, "item");
 		let icon = null;
 		if (item.isAnnotation()) {
 			icon = this.createNode("img", {}, "icon annotation-icon");
@@ -226,6 +226,17 @@ export class CitationDialogHelpers {
 			retractedIcon.classList.add("retracted");
 			icon.after(retractedIcon);
 		}
+		return itemNode;
+	}
+
+	buildListMoreChildrenRow(itemID, label, level = 2) {
+		let itemNode = this.createNode("div", {
+			id: "more-children-" + itemID,
+			level
+		}, "more-chidlren-row");
+		let span = this.createNode("span", {}, "more-children-label");
+		span.textContent = label;
+		itemNode.append(span);
 		return itemNode;
 	}
 
@@ -491,5 +502,17 @@ export class CitationDialogHelpers {
 			}
 		}
 		return Array.from(topLevelMap.values());
+	}
+
+	getAllAnnotations(item) {
+		if (item.isFileAttachment()) return item.getAnnotations();
+		let attachmentIDs = item.getAttachments();
+		let attachments = Zotero.Items.get(attachmentIDs).filter(item => item.isFileAttachment());
+		let annotations = attachments.flatMap(attachment => attachment.getAnnotations());
+		annotations.sort((a, b) => {
+			if (a.parentItemID !== b.parentItemID) return 0;
+			return (a.annotationSortIndex > b.annotationSortIndex) - (a.annotationSortIndex < b.annotationSortIndex);
+		});
+		return annotations;
 	}
 }

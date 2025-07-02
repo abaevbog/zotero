@@ -903,23 +903,30 @@ class ListRow {
 		return new ListRow({ ref: item, children, level, isOpen, isHidden });
 	}
 
+	static createMoreChildrenRow({ itemID, level = 2, children }) {
+		let id = "more-children-" + itemID;
+		let name = Zotero.getString('general.numMore', children.length);
+		return new ListRow({ ref: { id, name, itemID }, children, level });
+	}
+
 	get isHeader() {
 		return this.level === 0;
 	}
 
+	get isMoreChildrenRow() {
+		return `${this.ref.id}`.startsWith("more-children-");
+	}
+
 	get height() {
 		if (this.isHeader) return 26;
+		if (this.isMoreChildrenRow) return 26;
 		return 42;
 	}
 
 	get isCollapsible() {
 		if (this.isHeader) return this.ref.id == "selected" && this.children.length > 1;
+		if (this.isMoreChildrenRow) return false;
 		return this.children.length > 0;
-	}
-
-	get isSelectable() {
-		if (this.isHeader) return this.isCollapsible;
-		return true;
 	}
 }
 
@@ -928,6 +935,7 @@ class ListLayout extends Layout {
 		super("list");
 		this._itemsListRef = null;
 		this._listRows = [];
+		this._shouldExpandAllChildren = new Set();
 	}
 
 	async init() {
@@ -981,6 +989,9 @@ class ListLayout extends Layout {
 			node = Helpers.buildListSectionHeader({ ref, isCollapsible });
 			node.classList.toggle("has-top-divider", index !== 0);
 		}
+		else if (row.isMoreChildrenRow) {
+			node = Helpers.buildListMoreChildrenRow(row.ref.itemID, row.ref.name);
+		}
 		else {
 			node = Helpers.buildListItemNode(ref, isCollapsible, level);
 			div.setAttribute("draggable", !isAddingAnnotations && !isCitingNotes);
@@ -1010,14 +1021,15 @@ class ListLayout extends Layout {
 			if (nextRow.level <= row.level) {
 				break;
 			}
+			nextRow.isOpen = row.isOpen;
 			nextRow.isHidden = !row.isOpen;
 			// un-select selected children of a collapsed item
 			if (nextRow.isHidden && this._itemsListRef.selection.isSelected(nextIndex)) {
 				this._itemsListRef.selection.toggleSelect(nextIndex);
 			}
-			// if a child row is focused when parent is collapsed, move focus to the top
+			// if a child row is focused when parent is collapsed, move focus to the parent
 			if (nextRow.isHidden && this._itemsListRef.selection.focused == nextIndex) {
-				this._itemsListRef.selection.focused = 0;
+				this._itemsListRef.selection.focused = index;
 			}
 			nextIndex++;
 		}
@@ -1044,6 +1056,7 @@ class ListLayout extends Layout {
 		let row = this.getVisibleRows()[index];
 		if (!row) return false;
 		if (row.isHeader) return row.isCollapsible;
+		if (row.isMoreChildrenRow) return true;
 		return true;
 	}
 
@@ -1074,11 +1087,33 @@ class ListLayout extends Layout {
 			}
 
 			for (let { item, children } of items) {
-				let rowData = ListRow.createItemRow({ item, children, isOpen: true });
-				rows.push(rowData);
+				let topLevelItemRow = ListRow.createItemRow({ item, children, isOpen: true });
+				rows.push(topLevelItemRow);
+				if (this._shouldExpandAllChildren.has(item.id)) {
+					children = Helpers.getAllAnnotations(item);
+				}
 				for (let child of children) {
 					let childRowData = ListRow.createItemRow({ item: child, level: 2, isOpen: true });
 					rows.push(childRowData);
+				}
+				// Special handling for "Selected Items" section
+				if (ref.id == "selected") {
+					let allAnnotations = Helpers.getAllAnnotations(item);
+					// If some annotations are selected and some are not, hide not-selected annotations
+					// behind the "X More..." row. Clicking on it will show all annotations.
+					if (children.length && allAnnotations.length > children.length) {
+						let remainingAnnotations = allAnnotations.filter(annotation => !children.some(child => child.id == annotation.id));
+						rows.push(ListRow.createMoreChildrenRow({ itemID: item.id, children: remainingAnnotations }));
+					}
+					// If a top-level item is selected and none of its children are, add all child
+					// rows but collapse the item.
+					else if (!children.length) {
+						topLevelItemRow.isOpen = false;
+						topLevelItemRow.children = allAnnotations;
+						for (let annotation of allAnnotations) {
+							rows.push(ListRow.createItemRow({ item: annotation, level: 2, isOpen: false, isHidden: true }));
+						}
+					}
 				}
 			}
 		}
@@ -1089,17 +1124,34 @@ class ListLayout extends Layout {
 		// Hide padding of list layout if there is not a single item to show
 		let isEmpty = !_id("list-layout").querySelector(".item");
 		_id("list-layout").classList.toggle("empty", isEmpty);
-		// // If the selection is not empty and no items are added, pre-select the first item
-		if (!isEmpty && !CitationDataManager.items.length) {
-			let firstItemRow = this._listRows.findIndex(row => !row.isHeader);
-			this._itemsListRef.selection.select(firstItemRow);
+
+		// Select the row that is explicitly provided.
+		// If not, select the first item row - but only when no other items are added.
+		// If there is no row to select, just set the first row as focused.
+		let rowToSelect = options.selectIndex;
+		if (!isEmpty && !CitationDataManager.items.length && rowToSelect === undefined) {
+			rowToSelect = this._listRows.findIndex(row => !row.isHeader && !row.isCollapsible);
+		}
+		if (rowToSelect !== undefined) {
+			this._itemsListRef.selection.select(rowToSelect);
+			// If there is a row to select that's close to the top, scroll all the way up.
+			// Otherwise, scroll to the row itself
 			setTimeout(() => {
-				_id("list-layout").querySelector(".virtualized-table-body").scrollTop = 0;
+				if (rowToSelect > 2) {
+					this._itemsListRef.scrollToRow(rowToSelect);
+				}
+				else {
+					_id("list-layout").querySelector(".virtualized-table-body").scrollTop = 0;
+				}
 			});
 		}
 		else {
+			setTimeout(() => {
+				_id("list-layout").querySelector(".virtualized-table-body").scrollTop = 0;
+			});
 			this._itemsListRef.selection.focused = 0;
 		}
+
 		if (!options.skipWindowResize) {
 			this.resizeWindow();
 		}
@@ -1127,6 +1179,11 @@ class ListLayout extends Layout {
 		if (selectedIndexes.length == 1 && rows[selectedIndexes[0]].ref.id == "selected") {
 			let selectedRow = rows[selectedIndexes[0]];
 			IOManager.addItemsToCitation(selectedRow.children);
+			return;
+		}
+		// Handle Enter on "More Children" row
+		if (selectedIndexes.length == 1 && rows[selectedIndexes[0]].isMoreChildrenRow) {
+			this._showAllChildrenOfItem(rows[selectedIndexes[0]].ref.itemID);
 			return;
 		}
 		for (let index of selectedIndexes) {
@@ -1161,6 +1218,11 @@ class ListLayout extends Layout {
 		// handle collapse/expand of container items that cannot be selected
 		if (clickedRow.isCollapsible) {
 			this.toggleOpenState(index);
+			event.stopPropagation();
+			return;
+		}
+		if (clickedRow.isMoreChildrenRow && event.target.closest(".more-chidlren-row")) {
+			this._showAllChildrenOfItem(clickedRow.ref.itemID);
 			event.stopPropagation();
 			return;
 		}
@@ -1260,6 +1322,12 @@ class ListLayout extends Layout {
 			bubbles: true
 		});
 		_id("list-layout").querySelector(".virtualized-table-body").dispatchEvent(arrowKeyPress);
+	}
+
+	_showAllChildrenOfItem(itemID) {
+		this._shouldExpandAllChildren.add(itemID);
+		let rowIndex = this._listRows.findIndex(row => row.ref.id == itemID);
+		this.refreshItemsList({ selectIndex: rowIndex });
 	}
 }
 
