@@ -892,6 +892,7 @@ class LibraryLayout extends Layout {
 	}
 }
 
+// Data representation of a row to be rendered in the list layout virtualized table
 class ListRow {
 	constructor({ ref, level, children, isOpen, isHidden }) {
 		this.ref = ref;
@@ -967,10 +968,14 @@ class ListLayout extends Layout {
 				/>
 			);
 		});
+		// Override some default keydown handling of virtualied-table
 		doc.querySelector('#list-layout-wrapper').addEventListener("keydown", e => this._handleRowKeyDown(e), true);
+		// Handle arrow keypress events from bubble-input - passed from KeyboardHandler
 		doc.addEventListener("list-arrow-keypress", event => this._handleBubbleInputArrow(event));
 	}
 
+	// get rows that are currently visible, since _listRows has both visible items
+	// and their hidden children (if the parent is collapsed)
 	getVisibleRows() {
 		return this._listRows.filter(row => !row.isHidden);
 	};
@@ -986,6 +991,7 @@ class ListLayout extends Layout {
 		else {
 			div = document.createElement('div');
 			div.className = "row";
+			// Handle clicks on rows, overriding default click handling of virtualized-table
 			div.addEventListener("mouseup", event => this._handleRowMouseUp(event, index), true);
 			if (!isAddingAnnotations && !isCitingNotes) {
 				div.addEventListener("dragstart", event => this._handleDragStart(event, index));
@@ -1009,6 +1015,7 @@ class ListLayout extends Layout {
 		else {
 			let section = this.getRowParent(index, 0);
 			let annotationsCount = null;
+			// Add annotations icon button to item nodes in selected and open sections
 			if (isAddingAnnotations && ["selected", "open"].includes(section.ref.id)) {
 				annotationsCount = SearchHandler.getAllAnnotations(row.ref).length;
 			}
@@ -1110,6 +1117,8 @@ class ListLayout extends Layout {
 		return selectedItems;
 	}
 
+	// Rows have varying heights, so we need to tell virtualized-table
+	// about the custom heights of each row.
 	updateRowHeights() {
 		let customRowHeights = [];
 		for (let [index, row] of this.getVisibleRows().entries()) {
@@ -1118,6 +1127,8 @@ class ListLayout extends Layout {
 		this._itemsListRef.updateCustomRowHeights(customRowHeights);
 	}
 
+	// Refresh the _listRows to reflect the state of search results and
+	// trigger a re-render of the virtualized table.
 	async refreshItemsList(options = {}) {
 		let rows = [];
 		let citedIDs = CitationDataManager.getCitedLibraryItemIDs();
@@ -1138,6 +1149,9 @@ class ListLayout extends Layout {
 			for (let { item, children } of items) {
 				let topLevelItemRow = ListRow.createItemRow({ item, children, isOpen: true });
 				rows.push(topLevelItemRow);
+				// while adding annotations, if one annotation is selected, its siblings are
+				// initially hidden behind "X More..." row. _shouldExpandAllChildren records if we
+				// should show all children, even if they were not selected initially.
 				if (this._shouldExpandAllChildren.has(item.id)) {
 					children = SearchHandler.getAllAnnotations(item);
 					topLevelItemRow.children = children;
@@ -1206,6 +1220,7 @@ class ListLayout extends Layout {
 		}
 	}
 
+	// Highlight bubbles of selected items
 	updateSelectedItems() {
 		let selectedItemIDs = this.getSelectedItems(true);
 		for (let bubbleItem of CitationDataManager.items) {
@@ -1224,7 +1239,7 @@ class ListLayout extends Layout {
 			IOManager.addItemsToCitation(selectedRow.children);
 			return;
 		}
-		// Handle Enter on "More Children" row
+		// Handle Enter on "X More..." row (for children of a top-level item)
 		if (selectedIndexes.length == 1 && rows[selectedIndexes[0]].isMoreChildrenRow) {
 			this._showAllChildrenOfItem(rows[selectedIndexes[0]].ref.itemID);
 			return;
@@ -1360,12 +1375,15 @@ class ListLayout extends Layout {
 		}
 	}
 
+	// Handle arrow keypress events from bubble-input
 	_handleBubbleInputArrow(event) {
+		// Arrow up from the very top will clear the selection
 		if (event.detail.key == "ArrowUp" && this._itemsListRef.selection.focused <= 1) {
 			this._itemsListRef.selection.focused = 0;
 			this._itemsListRef.selection.clearSelection();
 			return;
 		}
+		// forward arrowUp/arrowDown keypress to the virtualized-table for it to handle navigation
 		var arrowKeyPress = new KeyboardEvent('keydown', {
 			key: event.detail.key,
 			bubbles: true
