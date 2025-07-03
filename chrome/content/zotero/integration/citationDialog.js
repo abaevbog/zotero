@@ -1183,8 +1183,8 @@ class ListLayout extends Layout {
 		// Select the first item row when no other items are added, unless specified otherwise.
 		// If there is no row to select, just set the first row as focused.
 		if (!options.retainItemsState) {
-			if (!isEmpty && !CitationDataManager.items.length) {
-				let firstRow = this._listRows.findIndex(row => !row.isHidden && !row.isHeader && !row.isCollapsible);
+			let firstRow = this.getVisibleRows().findIndex(row => !row.isHidden && !row.isHeader && !row.isCollapsible);
+			if (!isEmpty && !CitationDataManager.items.length && firstRow >= 0) {
 				this._itemsListRef.selection.select(firstRow);
 				this._itemsListRef.selection.focused = firstRow;
 				setTimeout(() => {
