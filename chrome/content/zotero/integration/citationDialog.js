@@ -306,6 +306,16 @@ class LibraryLayout extends Layout {
 		let citedIDs = CitationDataManager.getCitedLibraryItemIDs();
 		let searchResultGroups = await SearchHandler.getOrderedSearchResultGroups(citedIDs);
 		for (let { ref, group } of searchResultGroups) {
+			if (isAddingAnnotations) {
+				// For now, only keep actual annotation items
+				if (["open", "cited"].includes(ref.id)) continue;
+				group = group.filter(item => item.isAnnotation());
+				if (!group.length) continue;
+				// Since some selected items are excluded, re-fetch the title
+				let total = SearchHandler.selectedItems.filter(item => item.isAnnotation()).length;
+				let count = group.length;
+				ref.name = await doc.l10n.formatValue(`integration-citationDialog-section-${ref.id}`, { count, total });
+			}
 			// selected items become a collapsible deck/list if there are multiple items
 			let isGroupCollapsible = ref.id == "selected" && group.length > 1;
 			
