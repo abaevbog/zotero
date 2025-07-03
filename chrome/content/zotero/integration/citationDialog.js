@@ -732,7 +732,15 @@ class LibraryLayout extends Layout {
 			hideSources: ['duplicates', 'trash', 'feeds'],
 			initialFolder: Zotero.Prefs.get("integration.citationDialogCollectionLastSelected"),
 			onActivate: () => {},
-			filterLibraryIDs: io.filterLibraryIDs
+			filterLibraryIDs: io.filterLibraryIDs,
+			extraPseudoCollections: [{ index: 0, collection: {
+				id: "selected-open-cited",
+				name: "Selected/Open/Cited",
+				getItems: async () => {
+					let { selected, open, cited } = SearchHandler.results;
+					return [...selected, ...open, ...cited];
+				}
+			} }]
 		});
 		// Add aria-description with instructions on what this collection tree is for
 		// Voiceover announces the description placed on the actual tree when focus enters it
@@ -760,7 +768,7 @@ class LibraryLayout extends Layout {
 		
 		// Load library data if necessary
 		var library = Zotero.Libraries.get(collectionTreeRow.ref.libraryID);
-		if (!library.getDataLoaded('item')) {
+		if (library && !library.getDataLoaded('item')) {
 			Zotero.debug("Waiting for items to load for library " + library.libraryID);
 			await library.waitForDataLoad('item');
 		}
