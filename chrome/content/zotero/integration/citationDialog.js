@@ -997,7 +997,7 @@ class ListLayout extends Layout {
 			let section = this.getRowParent(index, 0);
 			let annotationsCount = null;
 			if (isAddingAnnotations && ["selected", "open"].includes(section.ref.id)) {
-				annotationsCount = Helpers.getAllAnnotations(row.ref).length;
+				annotationsCount = SearchHandler.getAllAnnotations(row.ref).length;
 			}
 			node = Helpers.buildListItemNode(ref, isCollapsible, level, annotationsCount);
 			div.setAttribute("draggable", !isAddingAnnotations && !isCitingNotes);
@@ -1117,7 +1117,7 @@ class ListLayout extends Layout {
 				let topLevelItemRow = ListRow.createItemRow({ item, children, isOpen: true });
 				rows.push(topLevelItemRow);
 				if (this._shouldExpandAllChildren.has(item.id)) {
-					children = Helpers.getAllAnnotations(item);
+					children = SearchHandler.getAllAnnotations(item);
 					topLevelItemRow.children = children;
 				}
 				for (let child of children) {
@@ -1126,7 +1126,7 @@ class ListLayout extends Layout {
 				}
 				// Special handling for "Selected" and "Opened" section
 				if (["selected", "open"].includes(ref.id)) {
-					let allAnnotations = Helpers.getAllAnnotations(item);
+					let allAnnotations = SearchHandler.getAllAnnotations(item);
 					// If some annotations are selected and some are not, hide not-selected annotations
 					// behind the "X More..." row. Clicking on it will show all annotations.
 					if (children.length && allAnnotations.length > children.length) {
@@ -1222,7 +1222,7 @@ class ListLayout extends Layout {
 		// handle clicks on header rows to expand/collapse the section
 		// or add all items when "Add all" button is clicked
 		if (clickedRow.isHeader) {
-			if (event.target.classList.contains("header-label")) {
+			if (clickedRow.isCollapsible && event.target.classList.contains("header-label")) {
 				this.toggleOpenState(index);
 			}
 			else if (event.target.classList.contains("add-all")) {
@@ -1349,11 +1349,10 @@ class ListLayout extends Layout {
 
 	async _showAllChildrenOfItem(itemID, selectChildren = false) {
 		this._shouldExpandAllChildren.add(itemID);
-		let visibleRows = this.getVisibleRows();
-		let rowIndex = visibleRows.findIndex(row => row.ref.id == itemID);
+		let rowIndex = this.getVisibleRows().findIndex(row => row.ref.id == itemID);
 		await this.refreshItemsList({ skipSelect: true });
 		if (selectChildren) {
-			let row = visibleRows[rowIndex];
+			let row = this.getVisibleRows()[rowIndex];
 			this._itemsListRef.selection.rangedSelect(rowIndex + 1, rowIndex + 1 + row.children.length, true);
 		}
 		else {

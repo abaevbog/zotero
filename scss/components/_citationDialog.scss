@@ -582,16 +582,23 @@
 							text-overflow: ellipsis;
 						}
 					}
-					.annotations-icon-button {
-						position: absolute;
-						right: 8px;
-						top: 4px;
-						display: flex;
-						color: var(--fill-secondary);
-						height: 20px;
-						min-width: 32px;
-						align-items: center;
-						justify-content: center;
+					&.has-annotations-icon {
+						.title {
+							// make sure long title is custoff before overlapping with annotations icon btn
+							padding-inline-end: 30px;
+						}
+						.annotations-icon-button {
+							position: absolute;
+							right: 8px;
+							top: 4px;
+							display: flex;
+							color: var(--fill-secondary);
+							height: 20px;
+							width: auto;
+							padding: 1px 2px;
+							align-items: center;
+							justify-content: center;
+						}
 					}
 					&.expanded {
 						.twisty-icon {

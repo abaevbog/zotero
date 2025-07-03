@@ -238,6 +238,27 @@ export class CitationDialogSearchHandler {
 		});
 	}
 
+	getTopParent(item) {
+		if (!item.parentItemID) return item;
+		let parent = Zotero.Items.get(item.parentItemID);
+		if (parent.parentItemID) {
+			parent = Zotero.Items.get(parent.parentItemID);
+		}
+		return parent;
+	}
+
+	getAllAnnotations(item) {
+		if (item.isFileAttachment()) return item.getAnnotations();
+		let attachmentIDs = item.getAttachments();
+		let attachments = Zotero.Items.get(attachmentIDs).filter(item => item.isFileAttachment());
+		let annotations = attachments.flatMap(attachment => attachment.getAnnotations());
+		annotations.sort((a, b) => {
+			if (a.parentItemID !== b.parentItemID) return 0;
+			return (a.annotationSortIndex > b.annotationSortIndex) - (a.annotationSortIndex < b.annotationSortIndex);
+		});
+		return annotations;
+	}
+
 	// make sure that each item appears only in one group.
 	// Items that are selected are removed from opened.
 	// Items that are selected or opened are removed from cited.
@@ -246,6 +267,21 @@ export class CitationDialogSearchHandler {
 		let selectedIDs = new Set(this.results.selected.map(item => item.id));
 		let openIDs = new Set(this.results.open.map(item => item.id));
 		let citedIDs = new Set(this.results.cited.map(item => item.id));
+		if (this.isAddingAnnotations || this.isCitingNotes) {
+			// Top-level parent or siblings of annotations/notes in selected/open set
+			// are excluded from search results.
+			let excludeAllAnnotationSiblings = (set) => {
+				for (let itemID of [...set]) {
+					let topLevelItem = this.getTopParent(Zotero.Items.get(itemID));
+					set.add(topLevelItem.id);
+					for (let annotation of this.getAllAnnotations(topLevelItem)) {
+						set.add(annotation.id);
+					}
+				}
+			};
+			excludeAllAnnotationSiblings(selectedIDs);
+			excludeAllAnnotationSiblings(openIDs);
+		}
 
 		this.results.open = this.results.open.filter(item => !selectedIDs.has(item.id));
 		this.results.cited = this.results.cited.filter(item => !selectedIDs.has(item.id) && !openIDs.has(item.id));
@@ -365,13 +401,34 @@ export class CitationDialogSearchHandler {
 	_filterNonMatchingItems(items) {
 		let matchedItems = new Set();
 		let splits = Zotero.Fulltext.semanticSplitter(this.searchValue);
-		for (let item of items) {
-			// Generate a string to search for each item
-			let itemStr = item.getCreators()
+
+		let makeSearchString = (item) => {
+			return item.getCreators()
 				.map(creator => creator.firstName + " " + creator.lastName)
 				.concat([item.getField("title"), item.getField("date", true, true).substr(0, 4)])
 				.join(" ")
 				.toLowerCase();
+		};
+
+		for (let item of items) {
+			// Generate a string to search for each item
+			let itemStr = makeSearchString(item);
+
+			if (this.isAddingAnnotations) {
+				if (item.isAnnotation()) {
+					// Include annotation text and comment
+					itemStr += " " + (item.annotationText || "").toLowerCase();
+					itemStr += " " + (item.annotationComment || "").toLowerCase();
+					// Also allow to search by the parent item's info
+					let parentItem = this.getTopParent(item);
+					itemStr += " " + makeSearchString(parentItem);
+				}
+			}
+			if (this.isCitingNotes) {
+				// Allow to search selected notes by parent item info
+				let parentItem = this.getTopParent(item);
+				itemStr += " " + makeSearchString(parentItem);
+			}
 			
 			// Include items that match every word that was typed
 			let allMatch = splits.every(split => itemStr.includes(split));

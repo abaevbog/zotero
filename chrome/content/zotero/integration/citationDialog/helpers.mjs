@@ -232,7 +232,8 @@ export class CitationDialogHelpers {
 			let annotationsCountSpan = this.createNode("span", {}, "annotations-count");
 			annotationsCountSpan.textContent = annotationsCount;
 			annotationWrapper.append(annotationIcon, annotationsCountSpan);
-			title.append(annotationWrapper);
+			itemNode.classList.add("has-annotations-icon");
+			itemNode.append(annotationWrapper);
 		}
 		return itemNode;
 	}
@@ -510,17 +511,5 @@ export class CitationDialogHelpers {
 			}
 		}
 		return Array.from(topLevelMap.values());
-	}
-
-	getAllAnnotations(item) {
-		if (item.isFileAttachment()) return item.getAnnotations();
-		let attachmentIDs = item.getAttachments();
-		let attachments = Zotero.Items.get(attachmentIDs).filter(item => item.isFileAttachment());
-		let annotations = attachments.flatMap(attachment => attachment.getAnnotations());
-		annotations.sort((a, b) => {
-			if (a.parentItemID !== b.parentItemID) return 0;
-			return (a.annotationSortIndex > b.annotationSortIndex) - (a.annotationSortIndex < b.annotationSortIndex);
-		});
-		return annotations;
 	}
 }
