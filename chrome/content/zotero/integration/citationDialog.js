@@ -319,7 +319,7 @@ class LibraryLayout extends Layout {
 			// selected items become a collapsible deck/list if there are multiple items
 			let isGroupCollapsible = ref.id == "selected" && group.length > 1;
 			
-			let section = Helpers.buildLibraryItemsSection(`${this.type}-${ref.id}-items`, ref.name, isGroupCollapsible, group.length);
+			let section = Helpers.buildLibraryItemsSection(`${this.type}-${ref.id}-items`, ref.name, isGroupCollapsible, group.length, !isCitingNotes);
 			let itemContainer = section.querySelector(".itemsContainer");
 	
 			let items = [];
@@ -343,16 +343,16 @@ class LibraryLayout extends Layout {
 			itemContainer.replaceChildren(...items);
 			sections.push(section);
 			if (isGroupCollapsible) {
-				// handle click on "Add all"
-				section.querySelector(".add-all").addEventListener("click", () => IOManager.addItemsToCitation(group));
+				// handle click on "Add all", if it exists
+				section.querySelector(".add-all")?.addEventListener("click", () => IOManager.addItemsToCitation(group));
 				// if the user explicitly expanded or collapsed the section, keep it as such
 				if (IOManager.sectionExpandedStatus[section.id]) {
-					this._toggleContainerCollapse(section, IOManager.sectionExpandedStatus[section.id]);
+					this._toggleSectionCollapse(section, IOManager.sectionExpandedStatus[section.id]);
 				}
 				// otherwise, expand the section if something is typed or whenever the list layout is opened
 				else {
 					let activeSearch = SearchHandler.searchValue.length > 0;
-					this._toggleContainerCollapse(section, (activeSearch || this.type == "list") ? "expanded" : "collapsed");
+					this._toggleSectionCollapse(section, (activeSearch || this.type == "list") ? "expanded" : "collapsed");
 				}
 			}
 		}
@@ -394,7 +394,7 @@ class LibraryLayout extends Layout {
 			collapsibleDeck.querySelector(".itemsContainer").addEventListener("click", event => this._captureItemsContainerClick(event), true);
 			collapsibleDeck.querySelector(".itemsContainer").classList.add("keyboard-clickable");
 			collapsibleDeck.querySelector(".collapse-section-btn").addEventListener("click", (event) => {
-				this._toggleContainerCollapse(collapsibleDeck, "collapsed", true);
+				this._toggleSectionCollapse(collapsibleDeck, "collapsed", true);
 				// on mouse click, move focus from the button that will disappear onto the collapsed deck
 				if (!event.clientX && !event.clientY) {
 					collapsibleDeck.querySelector(".itemsContainer").focus();
@@ -545,63 +545,51 @@ class LibraryLayout extends Layout {
 	// Expand/collapse an expandable section.
 	// state - "expanded", "collapsed", or null to toggle
 	// userInitiated - Boolean, true if called by a user action
-	_toggleContainerCollapse(container, status, userInitiated) {
+	_toggleSectionCollapse(section, status, userInitiated) {
 		// set desired class
-		if (status == "expanded" && !container.classList.contains("expanded")) {
-			container.classList.add("expanded");
+		if (status == "expanded" && !section.classList.contains("expanded")) {
+			section.classList.add("expanded");
 		}
-		else if (status == "collapsed" && container.classList.contains("expanded")) {
-			container.classList.remove("expanded");
+		else if (status == "collapsed" && section.classList.contains("expanded")) {
+			section.classList.remove("expanded");
 		}
 		else if (!status) {
-			container.classList.toggle("expanded");
+			section.classList.toggle("expanded");
 		}
 		// Record if the user explicitly expanded or collapsed the container to not undo it during next refresh
 		if (userInitiated) {
-			IOManager.sectionExpandedStatus[container.id] = container.classList.contains("expanded") ? "expanded" : "collapsed";
+			IOManager.sectionExpandedStatus[section.id] = section.classList.contains("expanded") ? "expanded" : "collapsed";
 		}
-		let isCollapsed = !container.classList.contains("expanded");
+		let isCollapsed = !section.classList.contains("expanded");
+		let itemsContainer = section.querySelector(".itemsContainer");
 		// mark collapsed items as unfocusable
 		if (isCollapsed) {
-			for (let item of [...container.querySelectorAll(".item.hide-on-collapse")]) {
+			for (let item of [...section.querySelectorAll(".item")]) {
 				item.removeAttribute("tabindex");
 				item.setAttribute("draggable", false);
 				item.classList.remove("current");
 				item.classList.remove("selected");
 			}
+			// when the deck is collapsed, the itemsContainer itself becomes focusable
+			itemsContainer.setAttribute("tabindex", -1);
+			itemsContainer.dataset.arrowNavEnabled = true;
+			// if an item if focused, focus the collapsed container for smoother transition
+			if (doc.activeElement.classList.contains("item")) {
+				itemsContainer.focus();
+			}
 		}
-		// when expanded, make them focusable again
+		// when expanded, make items focusable again
 		else {
-			for (let item of [...container.querySelectorAll(".item.hide-on-collapse")]) {
+			for (let item of [...section.querySelectorAll(".item")]) {
 				item.setAttribute("tabindex", -1);
 				item.setAttribute("draggable", true);
 			}
+			// collapsed deck is no longer focusable
+			itemsContainer.removeAttribute("tabindex");
+			itemsContainer.dataset.arrowNavEnabled = false;
+			itemsContainer.classList.remove("selected", "current");
 		}
-		container.querySelector("[aria-expanded]").setAttribute("aria-expanded", container.classList.contains("expanded"));
-		// In list mode, there may be some empty space left after section collapse
-		if (currentLayout.type == "list") {
-			setTimeout(() => {
-				currentLayout.resizeWindow();
-			}, 300);
-		}
-		// Additional handling for selected items section in library mode
-		else if (container.classList.contains("section")) {
-			let itemsContainer = container.querySelector(".itemsContainer");
-			// the items deck itself becomes focusable
-			if (isCollapsed) {
-				itemsContainer.setAttribute("tabindex", -1);
-				itemsContainer.dataset.arrowNavEnabled = true;
-				// if an item if focused, focus the collapsed container for smoother transition
-				if (doc.activeElement.classList.contains("item")) {
-					itemsContainer.focus();
-				}
-			}
-			else {
-				container.dataset.arrowNavEnabled = false;
-				container.removeAttribute("tabindex");
-				container.classList.remove("selected", "current");
-			}
-		}
+		section.querySelector("[aria-expanded]").setAttribute("aria-expanded", !isCollapsed);
 	}
 
 	// handle click on the items container
@@ -610,7 +598,7 @@ class LibraryLayout extends Layout {
 		// expand the deck of items if it is collapsed
 		if (section.classList.contains("expanded")) return;
 		event.stopPropagation();
-		this._toggleContainerCollapse(section, "expanded", true);
+		this._toggleSectionCollapse(section, "expanded", true);
 		// if the click is keyboard-initiated, focus the first item
 		if (event.layerX == 0 && event.layerY == 0) {
 			let firstItem = section.querySelector(".item");
@@ -972,9 +960,10 @@ class ListLayout extends Layout {
 					isContainerEmpty={this.isContainerEmpty.bind(this)}
 					isContainerOpen={this.isContainerOpen.bind(this)}
 					isSelectable={this.isSelectable.bind(this)}
-					multiSelect={true}
+					multiSelect={!isCitingNotes}
 					onActivate={this.handleActivate.bind(this)}
 					toggleOpenState={this.toggleOpenState.bind(this)}
+					onSelectionChange={this.updateSelectedItems.bind(this)}
 				/>
 			);
 		});
@@ -992,6 +981,7 @@ class ListLayout extends Layout {
 		if (oldDiv) {
 			div = oldDiv;
 			div.innerHTML = "";
+			if (!row) return div;
 		}
 		else {
 			div = document.createElement('div');
@@ -1000,12 +990,17 @@ class ListLayout extends Layout {
 			if (!isAddingAnnotations && !isCitingNotes) {
 				div.addEventListener("dragstart", event => this._handleDragStart(event, index));
 			}
+			// Intercept mousedown event to prevent having the row selected on mousedown.
+			// All our event handling occurs on mouseup, and having no mousedown event
+			// means the row does not re-render when drag starts, which means there is no
+			// need for pointer-events: none workaround as in virtualized-table.css
+			div.addEventListener("mousedown", e => e.stopPropagation(), true);
 		}
 		div.removeAttribute("draggable");
 		let node = null;
 		let { ref, isCollapsible, level } = row;
 		if (row.isHeader) {
-			node = Helpers.buildListSectionHeader({ ref, isCollapsible });
+			node = Helpers.buildListSectionHeader({ ref, isCollapsible, createAddAllBtn: !isCitingNotes });
 			node.classList.toggle("has-top-divider", index !== 0);
 		}
 		else if (row.isMoreChildrenRow) {
@@ -1020,11 +1015,6 @@ class ListLayout extends Layout {
 			node = Helpers.buildListItemNode(ref, isCollapsible, level, annotationsCount);
 			div.setAttribute("draggable", !isAddingAnnotations && !isCitingNotes);
 		}
-		// Intercept mousedown event to prevent having the row selected on mousedown.
-		// All our event handling occurs on mouseup, and having no mousedown event
-		// means the row does not re-render when drag starts, which means there is no
-		// need for pointer-events: none workaround as in virtualized-table.css
-		div.addEventListener("mousedown", e => e.stopPropagation(), true);
 		node.classList.toggle("expanded", row.isOpen);
 		node.classList.toggle('selected', selection.isSelected(index));
 		node.classList.toggle('selected-first', selection.isFirstRowOfSelectionBlock(index));
@@ -1035,6 +1025,7 @@ class ListLayout extends Layout {
 
 	toggleOpenState = (index, skipRender) => {
 		let row = this.getVisibleRows()[index];
+		if (!row || !row.isCollapsible) return;
 		let rowIndexInAllRows = this._listRows.findIndex(r => r.ref.id == row.ref.id);
 		let allRows = this._listRows;
 		let nextIndex = rowIndexInAllRows + 1;
@@ -1056,7 +1047,7 @@ class ListLayout extends Layout {
 			nextRow.isHidden = !row.isOpen;
 			// un-select selected children of a collapsed item
 			if (nextRow.isHidden && this._itemsListRef.selection.isSelected(nextIndex)) {
-				this._itemsListRef.selection.toggleSelect(nextIndex);
+				this._itemsListRef.selection.selected.delete(nextIndex);
 			}
 			// if a child row is focused when parent is collapsed, move focus to the parent
 			if (nextRow.isHidden && this._itemsListRef.selection.focused == nextIndex) {
@@ -1105,6 +1096,20 @@ class ListLayout extends Layout {
 		return row;
 	}
 
+	getSelectedItems(asIDs) {
+		let selectedIndexes = [...this._itemsListRef.selection.selected];
+		let rows = this.getVisibleRows();
+		let selectedItems = [];
+		for (let index of selectedIndexes) {
+			if (index < 0 || index >= rows.length) continue;
+			let item = rows[index].ref;
+			if (!(item instanceof Zotero.Item)) continue;
+			selectedItems.push(item);
+		}
+		if (asIDs) return selectedItems.map(item => item.id);
+		return selectedItems;
+	}
+
 	updateRowHeights() {
 		let customRowHeights = [];
 		for (let [index, row] of this.getVisibleRows().entries()) {
@@ -1115,7 +1120,6 @@ class ListLayout extends Layout {
 
 	async refreshItemsList(options = {}) {
 		let rows = [];
-		this._itemsListRef.selection.clearSelection();
 		let citedIDs = CitationDataManager.getCitedLibraryItemIDs();
 		let searchResultGroups = await SearchHandler.getOrderedSearchResultGroups(citedIDs);
 		for (let { ref, group } of searchResultGroups) {
@@ -1142,8 +1146,8 @@ class ListLayout extends Layout {
 					let childRowData = ListRow.createItemRow({ item: child, level: 2, isOpen: true });
 					rows.push(childRowData);
 				}
-				// Special handling for "Selected" and "Opened" section
-				if (["selected", "open"].includes(ref.id)) {
+				// Special handling for "Selected" and "Opened" section when adding annotations
+				if (isAddingAnnotations && ["selected", "open"].includes(ref.id)) {
 					let allAnnotations = SearchHandler.getAllAnnotations(item);
 					// If some annotations are selected and some are not, hide not-selected annotations
 					// behind the "X More..." row. Clicking on it will show all annotations.
@@ -1171,7 +1175,6 @@ class ListLayout extends Layout {
 			}
 		}
 		this.updateRowHeights();
-		this.updateSelectedItems();
 		this._itemsListRef.invalidate();
 		// Hide padding of list layout if there is not a single item to show
 		let isEmpty = !_id("list-layout").querySelector(".item");
@@ -1179,12 +1182,19 @@ class ListLayout extends Layout {
 
 		// Select the first item row when no other items are added, unless specified otherwise.
 		// If there is no row to select, just set the first row as focused.
-		if (!options.skipSelect && !isEmpty && !CitationDataManager.items.length) {
-			let firstRow = this._listRows.findIndex(row => !row.isHeader && !row.isCollapsible);
-			this._itemsListRef.selection.select(firstRow);
-			setTimeout(() => {
-				_id("list-layout").querySelector(".virtualized-table-body").scrollTop = 0;
-			});
+		if (!options.retainItemsState) {
+			if (!isEmpty && !CitationDataManager.items.length) {
+				let firstRow = this._listRows.findIndex(row => !row.isHidden && !row.isHeader && !row.isCollapsible);
+				this._itemsListRef.selection.select(firstRow);
+				this._itemsListRef.selection.focused = firstRow;
+				setTimeout(() => {
+					_id("list-layout").querySelector(".virtualized-table-body").scrollTop = 0;
+				});
+			}
+			else {
+				this._itemsListRef.selection.clearSelection();
+				this._itemsListRef.selection.focused = 0;
+			}
 		}
 
 		if (!options.skipWindowResize) {
@@ -1197,11 +1207,9 @@ class ListLayout extends Layout {
 	}
 
 	updateSelectedItems() {
-		let selectedIndexes = [...this._itemsListRef.selection.selected];
-		let rows = this.getVisibleRows();
-		let selectedItemIDs = new Set(selectedIndexes.map(index => rows[index].ref.id));
+		let selectedItemIDs = this.getSelectedItems(true);
 		for (let bubbleItem of CitationDataManager.items) {
-			bubbleItem.selected = selectedItemIDs.has(bubbleItem.id);
+			bubbleItem.selected = selectedItemIDs.includes(bubbleItem.id);
 		}
 		IOManager.updateBubbleInput();
 	}
@@ -1367,8 +1375,9 @@ class ListLayout extends Layout {
 
 	async _showAllChildrenOfItem(itemID, selectChildren = false) {
 		this._shouldExpandAllChildren.add(itemID);
+		this._collasedItems.delete(itemID);
 		let rowIndex = this.getVisibleRows().findIndex(row => row.ref.id == itemID);
-		await this.refreshItemsList({ skipSelect: true });
+		await this.refreshItemsList({ retainItemsState: true });
 		if (selectChildren) {
 			let row = this.getVisibleRows()[rowIndex];
 			this._itemsListRef.selection.rangedSelect(rowIndex + 1, rowIndex + 1 + row.children.length, true);
@@ -1609,7 +1618,9 @@ const IOManager = {
 	// handle drag start of item nodes into bubble-input
 	_handleItemDragStart(event, itemIDs) {
 		let itemNode = event.target;
-		if (!itemNode.classList.contains("item")) return;
+		if (!itemNode.classList.contains("item")) {
+			itemNode = itemNode.querySelector(".item");
+		}
 		let selectedItems = itemNode.classList.contains("selected") ? [...doc.querySelectorAll(".item.selected")] : [itemNode];
 		let wrapper = Helpers.createNode("div", {}, "drag-image-wrapper");
 		wrapper.append(...selectedItems.map(node => node.cloneNode(true)));

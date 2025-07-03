@@ -392,7 +392,7 @@ export class CitationDialogSearchHandler {
 			return selected.filter(i => i.isNote());
 		}
 		if (this.isAddingAnnotations) {
-			return this.keepItemsWithAnnotations(selected);
+			return this.keepItemsWithAnnotations(Zotero.Items.keepTopLevel(selected));
 		}
 		return selected.filter(i => i.isRegularItem());
 	}

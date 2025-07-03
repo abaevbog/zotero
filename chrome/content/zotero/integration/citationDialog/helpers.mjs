@@ -166,7 +166,7 @@ export class CitationDialogHelpers {
 		return descriptionWrapper;
 	}
 
-	buildListSectionHeader({ ref, isCollapsible }) {
+	buildListSectionHeader({ ref, isCollapsible, createAddAllBtn = true }) {
 		let header = this.createNode("div", {}, "header");
 		let headerSpan = this.createNode("span", {}, "header-label");
 		headerSpan.innerText = ref.name;
@@ -177,9 +177,12 @@ export class CitationDialogHelpers {
 		if (isCollapsible) {
 			header.classList.add("expandable");
 			headerSpan.id = `header_${ref.id}`;
-			let addAllBtn = this.createNode("span", { role: "button", "aria-describedby": headerSpan.id }, "add-all");
-			addAllBtn.textContent = Zotero.getString("integration-citationDialog-add-all");
-			buttonGroup.append(addAllBtn);
+
+			if (createAddAllBtn) {
+				let addAllBtn = this.createNode("span", { role: "button", "aria-describedby": headerSpan.id }, "add-all");
+				addAllBtn.textContent = Zotero.getString("integration-citationDialog-add-all");
+				buttonGroup.append(addAllBtn);
+			}
 
 			headerSpan.setAttribute("role", "button");
 			headerSpan.setAttribute("aria-expanded", "true");
@@ -251,7 +254,7 @@ export class CitationDialogHelpers {
 
 
 	// build a container for the item nodes in library layout layouts
-	buildLibraryItemsSection(id, headerText, isCollapsible, deckLength) {
+	buildLibraryItemsSection(id, headerText, isCollapsible, deckLength, createAddAllBtn = true) {
 		let section = this.createNode("div", { id }, "section");
 		let header = this.createNode("div", {}, "header");
 		let headerSpan = this.createNode("span", {}, "header-label");
@@ -268,10 +271,12 @@ export class CitationDialogHelpers {
 			headerSpan.id = `header_${id}`;
 			section.classList.add("expandable");
 			section.style.setProperty('--deck-length', deckLength);
-
-			let addAllBtn = this.createNode("span", { tabindex: -1, 'data-tabindex': 22, role: "button", "aria-describedby": headerSpan.id }, "add-all keyboard-clickable");
-			addAllBtn.textContent = Zotero.getString("integration-citationDialog-add-all");
-			buttonGroup.append(addAllBtn);
+			console.log(createAddAllBtn);
+			if (createAddAllBtn) {
+				let addAllBtn = this.createNode("span", { tabindex: -1, 'data-tabindex': 22, role: "button", "aria-describedby": headerSpan.id }, "add-all keyboard-clickable");
+				addAllBtn.textContent = Zotero.getString("integration-citationDialog-add-all");
+				buttonGroup.append(addAllBtn);
+			}
 					
 			itemContainer.setAttribute("tabindex", -1);
 			itemContainer.setAttribute("data-tabindex", 30);
@@ -293,7 +298,7 @@ export class CitationDialogHelpers {
 			"data-tabindex": 30,
 			"data-arrow-nav-enabled": true,
 			draggable: true
-		}, "item keyboard-clickable hide-on-collapse");
+		}, "item keyboard-clickable");
 		let id = item.cslItemID || item.id;
 		itemNode.setAttribute("itemID", id);
 		itemNode.setAttribute("role", "option");
