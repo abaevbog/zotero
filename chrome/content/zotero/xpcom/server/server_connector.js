@@ -1115,7 +1115,7 @@ Zotero.Server.Connector.Ping.prototype = {
 					supportsAttachmentUpload: true,
 					supportsTagsAutocomplete: true,
 					googleDocsAddNoteEnabled: true,
-					googleDocsAddAannotationEnabled: true,
+					googleDocsAddAnnotationEnabled: true,
 					canUserAddNote: true,
 					googleDocsCitationExplorerEnabled: false,
 					translatorsHash,
