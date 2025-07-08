@@ -375,6 +375,14 @@
 				min-height: 100%;
 				flex: 1; /* expand all the way to the right */
 
+				// push +/- icon to the end of the row, since annotations
+				// rows are rendered disregarding the layout of columns
+				.annotation-row {
+					.clickable {
+						margin-inline-start: auto;
+					}
+				}
+
 				// the column with the + button
 				.clickable {
 					// make sure the button is centered

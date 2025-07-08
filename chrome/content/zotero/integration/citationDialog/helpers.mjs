@@ -439,12 +439,33 @@ export class CitationDialogHelpers {
 	}
 
 	buildBubbleString(bubbleItem) {
+		let item = bubbleItem.item;
+		let annotationContent = "";
+		// Construct annotation string if relevant
+		if (item.isAnnotation()) {
+			let text = item.annotationText || "";
+			let comment = item.annotationComment || "";
+			if (text) {
+				let annotationText = text.substr(0, 32) + (text.length > 32 ? "…" : "");
+				annotationContent = Zotero.getString("punctuation.openingQMark") + annotationText + Zotero.getString("punctuation.closingQMark");
+			}
+			else if (comment) {
+				let annotationCommment = text.substr(0, 32) + (text.length > 32 ? "…" : "");
+				annotationContent = annotationCommment;
+			}
+			else {
+				annotationContent = Zotero.getString(`pdfReader.${item.annotationType}Annotation`);
+			}
+			while (item.parentItem) {
+				item = item.parentItem;
+			}
+		}
 		// Creator
 		var title;
-		var str = bubbleItem.item.getField("firstCreator");
+		var str = item.getField("firstCreator");
 		
 		// Title, if no creator (getDisplayTitle in order to get case, e-mail, statute which don't have a title field)
-		title = bubbleItem.item.getDisplayTitle();
+		title = item.getDisplayTitle();
 		title = title.substr(0, 32) + (title.length > 32 ? "…" : "");
 		if (!str && title) {
 			str = Zotero.getString("punctuation.openingQMark") + title + Zotero.getString("punctuation.closingQMark");
@@ -454,9 +475,14 @@ export class CitationDialogHelpers {
 		}
 		
 		// Date
-		var date = bubbleItem.item.getField("date", true, true);
+		var date = item.getField("date", true, true);
 		if (date && (date = date.substr(0, 4)) !== "0000") {
 			str += ", " + parseInt(date);
+		}
+
+		// If original item is an annotaiton, return the bubble string with the annotation info
+		if (bubbleItem.item.isAnnotation()) {
+			return str + " " + annotationContent;
 		}
 		
 		// Locator

@@ -31,7 +31,7 @@ const ItemTree = require('zotero/itemTree');
 const { getCSSIcon } = require('components/icons');
 const { COLUMNS } = require('zotero/itemTreeColumns');
 
-var doc, io, ioReadyPromise, isCitingNotes, isAddingAnnotations, accepted;
+var doc, io, ioReadyPromise, isCitingItems, isCitingNotes, isAddingAnnotations, accepted;
 
 // used for tests
 var loaded = false;
@@ -62,6 +62,7 @@ async function onLoad() {
 	}
 	isCitingNotes = !!io.isCitingNotes;
 	isAddingAnnotations = !!io.isAddingAnnotations;
+	isCitingItems = !isCitingNotes && !isAddingAnnotations;
 	window.isPristine = true;
 
 	Zotero.debug("Citation Dialog: initializing");
@@ -616,46 +617,43 @@ class LibraryLayout extends Layout {
 		});
 		let columnLabel = Zotero.getString('integration-citationDialog-add-to-citation');
 		// Add + column to add an item to the citation on click
-		if (!isAddingAnnotations) {
-			itemColumns.push({
-				dataKey: 'addToCitation',
-				label: columnLabel,
-				htmlLabel: ' ', // space for column label to appear empty
-				width: 26,
-				staticWidth: true,
-				fixedWidth: true,
-				showInColumnPicker: false,
-				renderer: (index, inCitation, column) => {
-					let cell = Helpers.createNode("span", {}, `cell ${column.className} clickable`);
-					let iconWrapper = Helpers.createNode("span", {}, `icon-action`);
-					cell.append(iconWrapper);
-					let icon = getCSSIcon('plus-circle');
-					if (inCitation === null) {
-						// no icon should be shown when an item cannot be added
-						// (e.g. when citing notes, parent items are displayed but not included)
-						icon = getCSSIcon("");
-					}
-					// add aria-label for screen readers to announce if this item is added
-					else if (inCitation) {
-						doc.l10n.setAttributes(cell, "integration-citationDialog-items-table-added")
-					}
-					else {
-						doc.l10n.setAttributes(cell, "integration-citationDialog-items-table");
-					}
-					iconWrapper.append(icon);
-					return cell;
+		itemColumns.push({
+			dataKey: 'addToCitation',
+			label: columnLabel,
+			htmlLabel: ' ', // space for column label to appear empty
+			width: 26,
+			staticWidth: true,
+			fixedWidth: true,
+			showInColumnPicker: false,
+			renderer: (index, inCitation, column) => {
+				let cell = Helpers.createNode("span", {}, `cell ${column.className} clickable`);
+				// no icon should be shown when an item cannot be added
+				// (e.g. when citing notes, parent items are displayed but not included)
+				if (inCitation === null) return cell;
+				let iconWrapper = Helpers.createNode("span", {}, `icon-action`);
+				cell.append(iconWrapper);
+				let icon = getCSSIcon('plus-circle');
+				// add aria-label for screen readers to announce if this item is added
+				if (inCitation) {
+					doc.l10n.setAttributes(cell, "integration-citationDialog-items-table-added")
 				}
-			});
-		}
+				else {
+					doc.l10n.setAttributes(cell, "integration-citationDialog-items-table");
+				}
+				iconWrapper.append(icon);
+				return cell;
+			}
+		});
+		
 		this.itemsView = await ItemTree.init(itemsTree, {
 			id: "citationDialog",
-			dragAndDrop: !(isCitingNotes || isAddingAnnotations),
+			dragAndDrop: isCitingItems,
 			persistColumns: true,
 			columnPicker: true,
 			onSelectionChange: () => {
 				libraryLayout.updateSelectedItems();
 			},
-			regularOnly: !(isCitingNotes || isAddingAnnotations),
+			regularOnly: isCitingItems,
 			multiSelect: !isCitingNotes,
 			onActivate: (event, items) => {
 				// Prevent Enter event from reaching KeyboardHandler which would accept the dialog
@@ -663,6 +661,12 @@ class LibraryLayout extends Layout {
 				event.stopPropagation();
 				let row = event.target;
 				let isClick = event.type == "dblclick";
+				if (isAddingAnnotations && items.some(item => !item.isAnnotation())) {
+					return;
+				}
+				if (isCitingNotes && items.some(item => !item.isNote())) {
+					return;
+				}
 				// on Enter, clear the selection and try to find
 				// the last item's row to keep it visible after items are added
 				if (!isClick) {
@@ -685,7 +689,8 @@ class LibraryLayout extends Layout {
 				if (key == "addToCitation") {
 					if (!(item instanceof Zotero.Item)) return null;
 					if (isCitingNotes && !item.isNote()) return null;
-					if (!isCitingNotes && !item.isRegularItem()) return null;
+					if (isCitingItems && !item.isRegularItem()) return null;
+					if (isAddingAnnotations && !item.isAnnotation()) return null;
 					// The returned value needs to be a string due to a call to .toLowerCase()
 					// in _handleTyping of virtualized-table. Otherwise, errors are thrown if you type
 					// when the addToCitation column is used for sorting.
@@ -1521,27 +1526,9 @@ const IOManager = {
 		if (!Array.isArray(items)) {
 			items = [items];
 		}
-		// one can select the annotations themselves or their ancestors,
-		// in which case all of their child annotations are added
+		// When adding annotations, only annotation items are allowed
 		if (isAddingAnnotations) {
-			CitationDataManager.items = [];
-			let annotations = [];
-			// create BubbleItem for every selected annotation
-			for (let item of items) {
-				if (item.isAnnotation()) {
-					annotations.push(BubbleItem.fromItem(item));
-				}
-			}
-			// Sort annotations but only within the same attachment
-			annotations.sort((a, b) => {
-				if (a.item.parentItemID !== b.item.parentItemID) return 0;
-				return (a.item.annotationSortIndex > b.item.annotationSortIndex) - (a.item.annotationSortIndex < b.item.annotationSortIndex);
-			});
-			// if no annotations are selected, do nothing
-			if (annotations.length == 0) return;
-			await CitationDataManager.addItems({ bubbleItems: annotations });
-			accept();
-			return;
+			items = items.filter(item => item.isAnnotation());
 		}
 		// if selecting a note, add it and immediately accept the dialog
 		if (isCitingNotes) {
@@ -1568,7 +1555,7 @@ const IOManager = {
 		// If the last input has a locator, add it into the item
 		let input = _id("bubble-input").getCurrentInput();
 		let inputValue = SearchHandler.cleanSearchQuery(input?.value || "");
-		let locator = Helpers.extractLocator(inputValue);
+		let locator = isCitingItems ? Helpers.extractLocator(inputValue) : null;
 		// Add the item at a position based on current input if it is not explicitly specified
 		if (index === null && input) {
 			index = _id("bubble-input").getFutureBubbleIndex();
@@ -1670,7 +1657,7 @@ const IOManager = {
 	// Handle Enter keypress on an input. If a locator has been typed, add it to previous bubble.
 	// Otherwise, add pre-selected item if any. Otherwise, accept the dialog.
 	_handleInputEnter(input) {
-		let locator = Helpers.extractLocator(input.value);
+		let locator = isCitingItems ? Helpers.extractLocator(input.value) : null;
 		let bubble = input.previousElementSibling;
 		let item = CitationDataManager.getItem({ dialogReferenceID: bubble?.getAttribute("dialogReferenceID") });
 		if (item && locator && locator.onlyLocator && bubble) {
@@ -1727,6 +1714,7 @@ const IOManager = {
 	},
 
 	_openItemDetailsPopup(dialogReferenceID) {
+		if (!isCitingItems) return;
 		let bubbleItem = CitationDataManager.getItem({ dialogReferenceID });
 		PopupsHandler.openItemDetails(bubbleItem, Helpers.buildItemDescription(bubbleItem.item));
 	},
@@ -1960,7 +1948,7 @@ const CitationDataManager = {
 		this.itemAddedCache = new Set();
 		for (let bubbleItem of this.items) {
 			if (!bubbleItem.item.id) continue;
-			this.itemAddedCache.add(bubbleItem.item.id.id);
+			this.itemAddedCache.add(bubbleItem.item.id);
 		}
 	},
  	
@@ -1979,7 +1967,7 @@ const CitationDataManager = {
 			}
 		}
 		// No sorting happens when citing notes, since the dialog is accepted right after
-		if (isCitingNotes || isAddingAnnotations) return;
+		if (isCitingNotes) return;
 		await this.sort();
 		this.updateItemAddedCache();
 	},
@@ -2012,6 +2000,14 @@ const CitationDataManager = {
 	// Resorts the items in the citation
 	async sort() {
 		if (!_id("keepSorted").checked) return;
+		if (this.isAddingAnnotations) {
+			// Sort annotations but only within the same attachment
+			this.items.sort((a, b) => {
+				if (a.item.parentItemID !== b.item.parentItemID) return 0;
+				return (a.item.annotationSortIndex > b.item.annotationSortIndex) - (a.item.annotationSortIndex < b.item.annotationSortIndex);
+			});
+			return;
+		}
 		// It can take arbitrarily long time for documents with many cited items to load
 		// all data necessary to run io.sort().
 		// Do nothing if io.sort() is not yet ready to run.
