@@ -1609,6 +1609,12 @@ const IOManager = {
 
 	// Set the initial dialog mode per user's preference
 	setInitialDialogMode() {
+		// For now, only library mode for annotations
+		if (isAddingAnnotations) {
+			this.toggleDialogMode("library");
+			_id("mode-button").hidden = true;
+			return;
+		}
 		let desiredMode = Zotero.Prefs.get("integration.citationDialogMode");
 		if (desiredMode == "last-used") {
 			desiredMode = Zotero.Prefs.get("integration.citationDialogLastUsedMode");
