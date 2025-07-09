@@ -292,8 +292,10 @@ class LibraryLayout extends Layout {
 		// on mouse scrollwheel in suggested items, scroll the list horizontally
 		_id("library-other-items").addEventListener('wheel', this._scrollHorizontallyOnWheel);
 		if (isAddingAnnotations) {
-			// Annotaiton item cards are taller than regular, so suggested items area needs to be taller
-			_id("library-other-items").classList.add("tall");
+			// No suggested items in annotations mode
+			_id("library-other-items").hidden = true;
+			// But the sidebar apepars
+			_id("annotations-sidebar").hidden = false;
 		}
 	}
 
@@ -652,6 +654,11 @@ class LibraryLayout extends Layout {
 			columnPicker: true,
 			onSelectionChange: () => {
 				libraryLayout.updateSelectedItems();
+				if (isAddingAnnotations) {
+					let selectedItems = this.itemsView.getSelectedItems().filter(item => item.isAnnotation());
+					_id("annotations-list").items = selectedItems;
+					_id("annotations-list").render();
+				}
 			},
 			regularOnly: isCitingItems,
 			multiSelect: !isCitingNotes,

@@ -438,6 +438,13 @@
 					border-bottom-right-radius: 5px;
 				}
 			}
+
+			#annotations-sidebar {
+				border-inline-start: var(--material-panedivider);
+				width: 300px;
+				background: var(--material-sidepane);
+				overflow-y: auto;
+			}
 		}
 	}
 
