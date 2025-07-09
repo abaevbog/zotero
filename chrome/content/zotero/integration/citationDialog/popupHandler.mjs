@@ -118,10 +118,6 @@ export class CitationDialogPopupsHandler {
 
 		if (this.isAddingAnnotations) {
 			let annotationRow = this._getNode("#itemDetails").querySelector("annotation-row");
-			if (!annotationRow) {
-				annotationRow = this.doc.createXULElement("annotation-row");
-				this.doc.querySelector("#itemDetails .annotation-detail").prepend(annotationRow);
-			}
 			annotationRow.annotation = this.bubbleItem.item;
 			return;
 		}

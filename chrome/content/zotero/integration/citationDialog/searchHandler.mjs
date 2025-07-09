@@ -237,6 +237,19 @@ export class CitationDialogSearchHandler {
 		});
 	}
 
+	getAllAnnotations(item) {
+		if (item.isAnnotation()) return [item];
+		if (item.isFileAttachment()) return item.getAnnotations();
+		let attachmentIDs = item.getAttachments();
+		let attachments = Zotero.Items.get(attachmentIDs).filter(item => item.isFileAttachment());
+		let annotations = attachments.flatMap(attachment => attachment.getAnnotations());
+		annotations.sort((a, b) => {
+			if (a.parentItemID !== b.parentItemID) return 0;
+			return (a.annotationSortIndex > b.annotationSortIndex) - (a.annotationSortIndex < b.annotationSortIndex);
+		});
+		return annotations;
+	}
+
 	// make sure that each item appears only in one group.
 	// Items that are selected are removed from opened.
 	// Items that are selected or opened are removed from cited.

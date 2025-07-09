@@ -408,6 +408,19 @@ class LibraryLayout extends Layout {
 			// Annotaiton item cards are taller than regular, so suggested items area needs to be taller
 			_id("library-other-items").classList.add("tall");
 			this.collapsibleGroupID = "selectedAnnotations";
+			_id("annotations-list").annotationsAction = "plus";
+			_id("annotations-list").addEventListener("click", (event) => {
+				if (!event.target.classList.contains("zotero-clicky-plus")) return;
+				let annotationRow = event.target.closest("annotation-row");
+				let item = Zotero.Items.get(annotationRow.annotation.id);
+				IOManager.addItemsToCitation(item);
+			});
+			// Show sidebar with annotations
+			_id("annotations-sidebar").hidden = false;
+			_id("annotations-sidebar-filter").addEventListener("input", (event) => {
+				_id("annotations-list").filter = event.target.value;
+				_id("annotations-list").render();
+			});
 		}
 	}
 
@@ -475,13 +488,13 @@ class LibraryLayout extends Layout {
 		await this._refreshItemsViewHighlightedRows();
 		// Save selected items, clear selection to not scroll after refresh
 		let selectedItemIDs = this.itemsView.getSelectedItems(true);
+		this.itemsView.selection.selectEventsSuppressed = true;
 		this.itemsView.selection.clearSelection();
 		// Refresh to reset row cache to get latest data of which items are included
 		await this.itemsView.refresh();
 		// Redraw the itemTree
 		this.itemsView.tree.invalidate();
 		// Restore selection without scrolling
-		this.itemsView.selection.selectEventsSuppressed = true;
 		await this.itemsView.selectItems(selectedItemIDs, true, true);
 		this.itemsView.selection.selectEventsSuppressed = false;
 	}
@@ -578,6 +591,24 @@ class LibraryLayout extends Layout {
 			columnPicker: true,
 			onSelectionChange: () => {
 				libraryLayout.updateSelectedItems();
+				if (isAddingAnnotations) {
+					let selectedItems = this.itemsView.getSelectedItems().filter(item => item.isAnnotation() || item.isFileAttachment() || item.isRegularItem());
+					let selectedAnnotations = selectedItems.flatMap(item => SearchHandler.getAllAnnotations(item));
+					let uniqueAnnotations = [];
+					let annotationIDs = new Set();
+					for (let annotation of selectedAnnotations) {
+						if (annotationIDs.has(annotation.id)) continue;
+						uniqueAnnotations.push(annotation);
+						annotationIDs.add(annotation.id);
+					}
+					// Don't re-render if the list has not changed
+					let rendered = new Set(_id("annotations-list").items.map(item => item.id));
+					if (rendered.isSupersetOf(annotationIDs) && rendered.isSubsetOf(annotationIDs)) return;
+					_id("annotations-list").items = uniqueAnnotations;
+					_id("annotations-list").filter = "";
+					_id("annotations-sidebar-filter").value = "";
+					_id("annotations-list").render();
+				}
 			},
 			regularOnly: isCitingItems,
 			multiSelect: !isCitingNotes,

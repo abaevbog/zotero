@@ -85,6 +85,12 @@
 				<div id="item-tree-container" class="hbox virtualized-table-container">
 					<div id="zotero-items-tree" data-tabindex="60" style="--highlight-color: var(--accent-blue30);"/>
 				</div>
+				<div id="annotations-sidebar" hidden="true">
+					<div id="annotations-sidebar-filter-wrapper">
+						<input id="annotations-sidebar-filter" data-l10n-id="integration-citationDialog-annotations-filter"/>
+					</div>
+					<xul:annotation-items-pane id="annotations-list"/>
+				</div>
 			</div>
 		</div>
 
@@ -107,7 +113,7 @@
 							<div id="itemTitle"></div>
 						</div>
 					</div>
-					<div class="details" role="group">
+					<div class="details" role="group" mode="citation">
 							<!--fx128: size="0" forces select have default native style -->
 							<select name="locator" id="label" class="details-label" size="0"></select>
 							<input id="locator" class="details-data" aria-labelledby="label" aria-describedby="itemDetails-combinedInfo"/>
@@ -126,7 +132,7 @@
 							</div>
 					</div>
 					<div class="annotation-detail" mode="annotation" hidden="true">
-						<!-- annotation-row will be dynamically inserted here by popupHandler -->
+						<xul:annotation-row/>
 						<div id="keep-comments-row" class="row">
 							<input id="keep-comments" type="checkbox"/>
 							<label for="keep-comments" data-l10n-id="integration-citationDialog-details-keepComments"></label>
