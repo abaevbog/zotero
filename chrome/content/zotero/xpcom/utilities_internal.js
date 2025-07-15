@@ -2962,12 +2962,17 @@ Zotero.Utilities.Internal.activate = new function () {
 				}
 			}
 
-			win.addEventListener("load", function () {
-				var intervalID;
-				intervalID = win.setInterval(function () {
-					_X11BringToForeground(win, intervalID);
-				}, 50);
-			}, false);
+			if (win.document.readyState == 'complete') {
+				_X11BringToForeground(win, null);
+			}
+			else {
+				win.addEventListener("load", function () {
+					var intervalID;
+					intervalID = win.setInterval(function () {
+						_X11BringToForeground(win, intervalID);
+					}, 50);
+				}, false);
+			}
 		}
 		else if ((Zotero.isWin || Zotero.isLinux) && win) {
 			dump(" --- Activating windows or wayland window\n");

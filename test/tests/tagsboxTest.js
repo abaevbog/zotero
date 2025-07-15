@@ -25,12 +25,8 @@ describe("Item Tags Box", function () {
 				// Not required on all platforms. In some cases (e.g. Linux), the window is at the front from the start.
 				let win = Zotero.getMainWindow();
 				dump(` --- Selected tab: ${win.Zotero_Tabs.selectedID}\n`);
-				let activatePromise = new Promise(
-					resolve => win.addEventListener('activate', resolve, { once: true })
-				);
 				Zotero.Utilities.Internal.activate();
 				Zotero.Utilities.Internal.activate(win);
-				await activatePromise;
 			}
 		});
 		it("should update tag when pressing Enter in textbox", async function () {
