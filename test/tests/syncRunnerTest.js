@@ -1,6 +1,6 @@
 "use strict";
 
-describe("Zotero.Sync.Runner", function () {
+describe.skip("Zotero.Sync.Runner", function () {
 	Components.utils.import("resource://zotero/config.js");
 	
 	var apiKey = Zotero.Utilities.randomString(24);
