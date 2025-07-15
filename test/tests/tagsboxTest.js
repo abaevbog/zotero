@@ -21,10 +21,10 @@ describe("Item Tags Box", function () {
 			dump(" -- Tag editing before \n");
 			if (!doc.hasFocus()) {
 				dump(" --- Must bring window to the front\n");
-				dump(` --- Selected tab: ${win.Zotero_Tabs.selectedID}\n`);
 				// editable-text behavior relies on focus, so we first need to bring the window to the front.
 				// Not required on all platforms. In some cases (e.g. Linux), the window is at the front from the start.
 				let win = Zotero.getMainWindow();
+				dump(` --- Selected tab: ${win.Zotero_Tabs.selectedID}\n`);
 				let activatePromise = new Promise(
 					resolve => win.addEventListener('activate', resolve, { once: true })
 				);
