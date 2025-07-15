@@ -27,6 +27,7 @@ describe("Item Tags Box", function () {
 				dump(` --- Selected tab: ${win.Zotero_Tabs.selectedID}\n`);
 				Zotero.Utilities.Internal.activate();
 				Zotero.Utilities.Internal.activate(win);
+				dump(` Activated? `, doc.hasFocus());
 			}
 		});
 		it("should update tag when pressing Enter in textbox", async function () {
@@ -52,9 +53,11 @@ describe("Item Tags Box", function () {
 				'keyCode': 13,
 				'which': 13
 			});
+			dump(` Will wait for modify? `);
 			let promise = waitForItemEvent('modify');
 			firstRow.ref.dispatchEvent(enterEvent);
 			await promise;
+			dump(` Waited! `);
 			
 			rows = tagsbox.querySelectorAll('.row editable-text');
 			assert.equal(rows[0].value, newTag);
