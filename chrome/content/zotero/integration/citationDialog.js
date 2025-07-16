@@ -292,10 +292,12 @@ class LibraryLayout extends Layout {
 		// on mouse scrollwheel in suggested items, scroll the list horizontally
 		_id("library-other-items").addEventListener('wheel', this._scrollHorizontallyOnWheel);
 		if (isAddingAnnotations) {
-			// No suggested items in annotations mode
-			_id("library-other-items").hidden = true;
-			// But the sidebar apepars
+			// Show sidebar with annotations
 			_id("annotations-sidebar").hidden = false;
+			_id("annotations-sidebar-filter").addEventListener("input", (event) => {
+				_id("annotations-list").filter = event.target.value;
+				_id("annotations-list").render();
+			});
 		}
 	}
 
@@ -655,8 +657,16 @@ class LibraryLayout extends Layout {
 			onSelectionChange: () => {
 				libraryLayout.updateSelectedItems();
 				if (isAddingAnnotations) {
-					let selectedItems = this.itemsView.getSelectedItems().filter(item => item.isAnnotation());
-					_id("annotations-list").items = selectedItems;
+					let selectedItems = this.itemsView.getSelectedItems().filter(item => item.isAnnotation() || item.isFileAttachment() || item.isRegularItem());
+					let selectedAnnotations = selectedItems.flatMap(item => SearchHandler.getAllAnnotations(item));
+					let uniqueAnnotations = [];
+					for (let annotation of selectedAnnotations) {
+						if (!uniqueAnnotations.some(a => a.id == annotation.id)) {
+							uniqueAnnotations.push(annotation);
+						}
+					}
+					_id("annotations-list").items = uniqueAnnotations;
+					_id("annotations-list").filter = "";
 					_id("annotations-list").render();
 				}
 			},

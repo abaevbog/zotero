@@ -446,6 +446,20 @@
 				overflow-y: auto;
 			}
 		}
+
+		#annotations-sidebar {
+			#annotations-sidebar-filter-wrapper {
+				display: flex;
+				margin: 3px 5px;
+
+				#annotations-sidebar-filter {
+					width: 100%;
+					border-radius: 5px;
+					border: 1px solid var(--fill-quarternary);
+					padding: 2px 3px;
+				}
+			}
+		}
 	}
 
 	#list-layout {

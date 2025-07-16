@@ -39,6 +39,14 @@
 			return this._items || [];
 		}
 
+		get filter() {
+			return (this._filter || "").toLowerCase();
+		}
+
+		set filter(val) {
+			this._filter = val;
+		}
+
 		init() {
 			this._body = this.querySelector('.body');
 			this._notifierID = Zotero.Notifier.registerObserver(this, ['item']);
@@ -73,7 +81,9 @@
 		render() {
 			if (!this.initialized) return;
 
-			let topLevelItems = Zotero.Items.getTopLevel(this.items);
+			let annotations = this.items.filter(item => this._passesFilter(item));
+
+			let topLevelItems = Zotero.Items.getTopLevel(annotations);
 
 			// Remove collapsible sections for top-level items whose annotations are no longer selected
 			for (let section of [...this.querySelectorAll("collapsible-section")]) {
@@ -83,7 +93,7 @@
 				}
 			}
 			for (let parentItem of topLevelItems) {
-				let selectedAnnotations = this.items.filter(item => item.topLevelItem.id == parentItem.id);
+				let selectedAnnotations = annotations.filter(item => item.topLevelItem.id == parentItem.id);
 				// Create a collapsible section for each top-level item if it does not exist yet
 				let section = this.querySelector(`[data-pane="annotations-${parentItem.id}"]`);
 				if (!section) {
@@ -111,7 +121,7 @@
 			// Remove annotation rows for annotations that are no longer selected
 			for (let row of [...this.querySelectorAll("annotation-row")]) {
 				let rowID = row.getAttribute("annotation-id");
-				if (!this.items.some(obj => obj.id == rowID)) {
+				if (!annotations.some(obj => obj.id == rowID)) {
 					row.remove();
 				}
 			}
@@ -127,6 +137,14 @@
 				doc: document,
 				append,
 			});
+		}
+
+		_passesFilter(annotation) {
+			if (!this.filter) return true;
+			let text = (annotation.annotationText || "").toLowerCase();
+			let comment = (annotation.annotationComment || "").toLowerCase();
+			let tags = (annotation.getTags() || []).map(tag => tag.tag.toLowerCase()).join(" ");
+			return text.includes(this.filter) || comment.includes(this.filter) || tags.includes(this.filter);
 		}
 	}
 

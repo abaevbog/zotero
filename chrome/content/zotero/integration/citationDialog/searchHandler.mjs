@@ -248,6 +248,7 @@ export class CitationDialogSearchHandler {
 	}
 
 	getAllAnnotations(item) {
+		if (item.isAnnotation()) return [item];
 		if (item.isFileAttachment()) return item.getAnnotations();
 		let attachmentIDs = item.getAttachments();
 		let attachments = Zotero.Items.get(attachmentIDs).filter(item => item.isFileAttachment());
