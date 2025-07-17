@@ -101,11 +101,15 @@ export class CitationDialogSearchHandler {
 			return items.filter(i => !citedItemIDs.has(i.cslItemID ? i.cslItemID : i.id));
 		};
 		let result = [];
+		let groupKeys = ["selected", "open", "cited"];
+		if (this.isAddingAnnotations) {
+			groupKeys = ["selectedAnnotations", "selectedItems", "open", "cited"];
+		}
 		// selected/open/cited go first
-		for (let groupKey of ["selected", "open", "cited"]) {
+		for (let groupKey of groupKeys) {
 			let groupItems = this.results[groupKey];
 			// in selected and opened items, do not display items already in the citation
-			if (groupKey == "selected" || groupKey == "open") {
+			if (["selected", "selectedAnnotations", "selectedItems", "open"].includes(groupKey)) {
 				groupItems = removeItemsIncludedInCitation(groupItems);
 			}
 			if (groupItems.length) {
@@ -157,6 +161,10 @@ export class CitationDialogSearchHandler {
 		// apply filtering to item groups
 		this.results.open = this.searchValue ? this._filterNonMatchingItems(this.openItems) : this.openItems;
 		this.results.selected = this.searchValue ? this._filterNonMatchingItems(this.selectedItems) : this.selectedItems;
+		if (this.isAddingAnnotations) {
+			this.results.selectedItems = this.results.selected.filter(item => !item.isAnnotation());
+			this.results.selectedAnnotations = this.results.selected.filter(item => item.isAnnotation());
+		}
 		// if a specific library ID is specified, only keep items from that library
 		if (this.io.filterLibraryIDs) {
 			this.results.open = this.results.open.filter(item => this.io.filterLibraryIDs.includes(item.libraryID));
@@ -381,7 +389,9 @@ export class CitationDialogSearchHandler {
 			items.push(item);
 		}
 		await this._ensureRelevantItemsAreLoaded(items);
-		items = this.keepItemsWithAnnotations(items);
+		if (this.isAddingAnnotations) {
+			items = this.keepItemsWithAnnotations(items);
+		}
 		// Return deduplicated items since there may be multiple tabs opened for the same
 		// top-level item (duplicate tabs or a multiple attachments belonging to the same item)
 		return [...new Set(items)];

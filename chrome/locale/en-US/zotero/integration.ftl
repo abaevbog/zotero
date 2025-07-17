@@ -25,6 +25,8 @@ integration-citationDialog-section-cited = { $count ->
     [0] Cited Items
     *[other] Cited Items ({ $count })
 }
+integration-citationDialog-section-selectedAnnotations = Selected Annotations
+integration-citationDialog-section-selectedItems = Selected Items
 integration-citationDialog-details-suffix = Suffix
 integration-citationDialog-details-prefix = Prefix
 integration-citationDialog-details-suppressAuthor = Omit Author

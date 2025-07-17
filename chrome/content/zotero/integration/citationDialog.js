@@ -282,6 +282,7 @@ class LibraryLayout extends Layout {
 	constructor() {
 		super("library");
 		this.lastHeight = null;
+		this.collapsibleGroupID = "selected";
 	}
 
 	async init() {
@@ -292,6 +293,8 @@ class LibraryLayout extends Layout {
 		// on mouse scrollwheel in suggested items, scroll the list horizontally
 		_id("library-other-items").addEventListener('wheel', this._scrollHorizontallyOnWheel);
 		if (isAddingAnnotations) {
+			_id("library-other-items").classList.add("tall");
+			this.collapsibleGroupID = "selectedAnnotations";
 			// Show sidebar with annotations
 			_id("annotations-sidebar").hidden = false;
 			_id("annotations-sidebar-filter").addEventListener("input", (event) => {
@@ -311,18 +314,8 @@ class LibraryLayout extends Layout {
 		let citedIDs = CitationDataManager.getCitedLibraryItemIDs();
 		let searchResultGroups = await SearchHandler.getOrderedSearchResultGroups(citedIDs);
 		for (let { ref, group } of searchResultGroups) {
-			if (isAddingAnnotations) {
-				// For now, only keep actual annotation items
-				if (["open", "cited"].includes(ref.id)) continue;
-				group = group.filter(item => item.isAnnotation());
-				if (!group.length) continue;
-				// Since some selected items are excluded, re-fetch the title
-				let total = SearchHandler.selectedItems.filter(item => item.isAnnotation()).length;
-				let count = group.length;
-				ref.name = await doc.l10n.formatValue(`integration-citationDialog-section-${ref.id}`, { count, total });
-			}
 			// selected items become a collapsible deck/list if there are multiple items
-			let isGroupCollapsible = ref.id == "selected" && group.length > 1;
+			let isGroupCollapsible = ref.id == this.collapsibleGroupID && group.length > 1;
 			
 			let section = Helpers.buildLibraryItemsSection(`${this.type}-${ref.id}-items`, ref.name, isGroupCollapsible, group.length, !isCitingNotes);
 			let itemContainer = section.querySelector(".itemsContainer");
@@ -532,6 +525,13 @@ class LibraryLayout extends Layout {
 			let itemNodes = [..._id(`${currentLayout.type}-layout`).querySelectorAll(".item")];
 			let firstNode = _id(`${currentLayout.type}-layout`).querySelector(".item.selected") || itemNodes[0];
 			this._selectItemNodesRange(firstNode, targetItem);
+			return;
+		}
+		// while adding annotations, clicking on selected non-annotation will select it in itemTree
+		let clickedItem = Zotero.Items.get(targetItem.getAttribute("itemID"));
+		if (isAddingAnnotations && !clickedItem.isAnnotation()) {
+			this.itemsView.selectItem(clickedItem.id);
+			_id("zotero-items-tree").querySelector("[tabindex]").focus();
 			return;
 		}
 		// get itemIDs associated with the nodes
@@ -1612,7 +1612,7 @@ const IOManager = {
 		if (currentLayout.type == "list") return;
 		let focused = event.target;
 		let itemsShouldRemainSelected = focused.classList.contains("input") || _id("library-other-items").contains(focused);
-		if (itemsShouldRemainSelected) {
+		if (itemsShouldRemainSelected && !isAddingAnnotations) {
 			if (!doc.querySelector(".item.selected")) {
 				libraryLayout._markPreSelected();
 			}
