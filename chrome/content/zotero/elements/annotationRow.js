@@ -69,7 +69,7 @@
 		}
 
 		render() {
-			if (!this.initialized) return;
+			if (!this.initialized || !this._annotation) return;
 
 			this._title.textContent = Zotero.getString('pdfReader.page') + ' '
 				+ (this._annotation.annotationPageLabel || '-');

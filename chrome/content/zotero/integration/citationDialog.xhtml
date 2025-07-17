@@ -113,7 +113,7 @@
 							<div id="itemTitle"></div>
 						</div>
 					</div>
-					<div class="details" role="group">
+					<div class="details" role="group" mode="citation">
 							<div class="row">
 								<!--fx128: size="0" forces select have default native style -->
 								<select name="locator" id="label" class="details-label" size="0"></select>
@@ -131,6 +131,13 @@
 								<input id="suppress-author" type="checkbox"/>
 								<label for="suppress-author" data-l10n-id="integration-citationDialog-details-suppressAuthor"></label>
 							</div>				
+					</div>
+					<div class="annotation-detail" mode="annotation" hidden="true">
+						<!-- annotation-row will be dynamically inserted here by popupHandler -->
+						<div id="keep-comments-row" class="row">
+							<input id="keep-comments" type="checkbox"/>
+							<label for="keep-comments" data-l10n-id="integration-citationDialog-details-keepComments"></label>
+						</div>
 					</div>
 					<div class="buttons">
 						<button class="remove" data-l10n-id="integration-citationDialog-details-remove"></button>

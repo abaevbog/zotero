@@ -71,7 +71,7 @@ async function onLoad() {
 
 	Helpers = new CitationDialogHelpers({ doc, io });
 	SearchHandler = new CitationDialogSearchHandler({ doc, io });
-	PopupsHandler = new CitationDialogPopupsHandler({ doc });
+	PopupsHandler = new CitationDialogPopupsHandler({ doc, io });
 	KeyboardHandler = new CitationDialogKeyboardHandler({ doc });
 
 	// Initial height for the dialog (search row with no bubbles)
@@ -1737,9 +1737,12 @@ const IOManager = {
 	},
 
 	_openItemDetailsPopup(dialogReferenceID) {
-		if (!isCitingItems) return;
 		let bubbleItem = CitationDataManager.getItem({ dialogReferenceID });
-		PopupsHandler.openItemDetails(bubbleItem, Helpers.buildItemDescription(bubbleItem.item));
+		let topLevelItem = bubbleItem.item;
+		if (isAddingAnnotations) {
+			topLevelItem = bubbleItem.item.topLevelItem;
+		}
+		PopupsHandler.openItemDetails(bubbleItem, Helpers.buildItemDescription(topLevelItem));
 	},
 
 	_handleInput({ query, eventType }) {
