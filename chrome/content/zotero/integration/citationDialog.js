@@ -295,6 +295,14 @@ class LibraryLayout extends Layout {
 		if (isAddingAnnotations) {
 			_id("library-other-items").classList.add("tall");
 			this.collapsibleGroupID = "selectedAnnotations";
+			_id("annotations-list").annotationsAction = "plus";
+			_id("annotations-list").addEventListener("click", (event) => {
+				console.log("!", event);
+				if (!event.target.classList.contains("zotero-clicky-plus")) return;
+				let annotationRow = event.target.closest("annotation-row");
+				let item = Zotero.Items.get(annotationRow.annotation.id);
+				IOManager.addItemsToCitation(item);
+			});
 			// Show sidebar with annotations
 			_id("annotations-sidebar").hidden = false;
 			_id("annotations-sidebar-filter").addEventListener("input", (event) => {

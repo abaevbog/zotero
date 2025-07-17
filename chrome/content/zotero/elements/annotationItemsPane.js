@@ -47,6 +47,14 @@
 			this._filter = val;
 		}
 
+		get annotationsAction() {
+			return this._annotationsAction;
+		}
+
+		set annotationsAction(val) {
+			this._annotationsAction = val;
+		}
+
 		init() {
 			this._body = this.querySelector('.body');
 			this._notifierID = Zotero.Notifier.registerObserver(this, ['item']);
@@ -115,6 +123,9 @@
 					if (this.querySelector(`annotation-row[annotation-id="${annotation.id}"]`)) continue;
 					let row = document.createXULElement('annotation-row');
 					row.annotation = annotation;
+					if (this.annotationsAction) {
+						row.action = this.annotationsAction;
+					}
 					section.querySelector('.body').append(row);
 				}
 			}
