@@ -175,9 +175,12 @@ function onUnload() {
 
 function cleanupBeforeDialogClosing() {
 	if (!currentLayout || !libraryLayout) return;
-	Zotero.Prefs.set("integration.citationDialogLastUsedMode", currentLayout.type);
-	if (currentLayout.type == "library") {
-		Zotero.Prefs.set("integration.citationDialogCollectionLastSelected", libraryLayout.collectionsView.selectedTreeRow.id);
+	// Only list mode in annotations dialog
+	if (!isAddingAnnotations) {
+		Zotero.Prefs.set("integration.citationDialogLastUsedMode", currentLayout.type);
+		if (currentLayout.type == "library") {
+			Zotero.Prefs.set("integration.citationDialogCollectionLastSelected", libraryLayout.collectionsView.selectedTreeRow.id);
+		}
 	}
 	libraryLayout.collectionsView.unregister();
 	libraryLayout.itemsView.unregister();
@@ -1275,6 +1278,12 @@ const IOManager = {
 
 	// Set the initial dialog mode per user's preference
 	setInitialDialogMode() {
+		// For now, only library mode for annotations
+		if (isAddingAnnotations) {
+			this.toggleDialogMode("library");
+			_id("mode-button").hidden = true;
+			return;
+		}
 		let desiredMode = Zotero.Prefs.get("integration.citationDialogMode");
 		if (desiredMode == "last-used") {
 			desiredMode = Zotero.Prefs.get("integration.citationDialogLastUsedMode");
