@@ -28,7 +28,7 @@ const ItemTree = require('zotero/itemTree');
 const { getCSSIcon } = require('components/icons');
 const { COLUMNS } = require('zotero/itemTreeColumns');
 
-var doc, io, ioReadyPromise, isCitingNotes, accepted;
+var doc, io, ioReadyPromise, isCitingNotes, isAddingAnnotations, isCitingItems, accepted;
 
 // used for tests
 var loaded = false;
@@ -58,6 +58,8 @@ async function onLoad() {
 		ioReadyPromise = Zotero.Promise.resolve();
 	}
 	isCitingNotes = !!io.isCitingNotes;
+	isAddingAnnotations = !!io.isAddingAnnotations;
+	isCitingItems = !isCitingNotes && !isAddingAnnotations;
 	window.isPristine = true;
 
 	Zotero.debug("Citation Dialog: initializing");
@@ -65,15 +67,15 @@ async function onLoad() {
 	timer.start();
 
 	Helpers = new CitationDialogHelpers({ doc, io });
-	SearchHandler = new CitationDialogSearchHandler({ isCitingNotes, io });
+	SearchHandler = new CitationDialogSearchHandler({ io });
 	PopupsHandler = new CitationDialogPopupsHandler({ doc });
 	KeyboardHandler = new CitationDialogKeyboardHandler({ doc });
 
 	// Initial height for the dialog (search row with no bubbles)
 	window.resizeTo(window.innerWidth, Helpers.getSearchRowHeight());
 
-	_id("keepSorted").disabled = !io.sortable || isCitingNotes;
-	_id("keepSorted").checked = io.sortable && !io.citation.properties.unsorted;
+	_id("keepSorted").disabled = !io.sortable || isCitingNotes || isAddingAnnotations;
+	_id("keepSorted").checked = !_id("keepSorted").disabled && !io.citation.properties.unsorted;
 	let visibleSettings = !!_id("settings-popup").querySelector("input:not([disabled])");
 	_id("settings-button").hidden = !visibleSettings;
 
@@ -398,6 +400,10 @@ class LibraryLayout extends Layout {
 		await this._initCollectionTree();
 		// on mouse scrollwheel in suggested items, scroll the list horizontally
 		_id("library-other-items").addEventListener('wheel', this._scrollHorizontallyOnWheel);
+		if (isAddingAnnotations) {
+			// Annotaiton item cards are taller than regular, so suggested items area needs to be taller
+			_id("library-other-items").classList.add("tall");
+		}
 	}
 
 	// Create item node for an item group and store item ids in itemIDs attribute
@@ -414,11 +420,20 @@ class LibraryLayout extends Layout {
 		itemNode.setAttribute("itemID", id);
 		itemNode.setAttribute("role", "option");
 		itemNode.id = id;
-		let title = Helpers.createNode("div", {}, "title");
-		let description = Helpers.buildItemDescription(item);
-		Zotero.Utilities.Internal.renderItemTitle(item.getDisplayTitle(), title);
-
+		let title = Helpers.buildItemTitle(item);
+		let description = Helpers.buildItemDescription(item, true);
 		itemNode.append(title, description);
+
+		if (isAddingAnnotations) {
+			itemNode.classList.add("tall");
+			if (item.isAnnotation()) {
+				let attachment = Zotero.Items.get(item.parentItemID);
+				let topLevelItem = attachment.parentItemID ? Zotero.Items.get(attachment.parentItemID) : attachment;
+				let topLevelItemTitle = Helpers.buildItemTitle(topLevelItem);
+				topLevelItemTitle.classList.add("description");
+				itemNode.prepend(topLevelItemTitle);
+			}
+		}
 
 		if (index !== null) {
 			itemNode.style.setProperty('--deck-index', index);
@@ -553,13 +568,13 @@ class LibraryLayout extends Layout {
 		});
 		this.itemsView = await ItemTree.init(itemsTree, {
 			id: "citationDialog",
-			dragAndDrop: !isCitingNotes,
+			dragAndDrop: isCitingItems,
 			persistColumns: true,
 			columnPicker: true,
 			onSelectionChange: () => {
 				libraryLayout.updateSelectedItems();
 			},
-			regularOnly: !isCitingNotes,
+			regularOnly: isCitingItems,
 			multiSelect: !isCitingNotes,
 			onActivate: (event, items) => {
 				// Prevent Enter event from reaching KeyboardHandler which would accept the dialog
@@ -567,6 +582,8 @@ class LibraryLayout extends Layout {
 				event.stopPropagation();
 				let row = event.target;
 				let isClick = event.type == "dblclick";
+				if (isAddingAnnotations && items.some(item => !item.isAnnotation())) return;
+				if (isCitingNotes && items.some(item => !item.isNote())) return;
 				// on Enter, clear the selection and try to find
 				// the last item's row to keep it visible after items are added
 				if (!isClick) {
@@ -589,7 +606,8 @@ class LibraryLayout extends Layout {
 				if (key == "addToCitation") {
 					if (!(item instanceof Zotero.Item)) return null;
 					if (isCitingNotes && !item.isNote()) return null;
-					if (!isCitingNotes && !item.isRegularItem()) return null;
+					if (isCitingItems && !item.isRegularItem()) return null;
+					if (isAddingAnnotations && !item.isAnnotation()) return null;
 					// The returned value needs to be a string due to a call to .toLowerCase()
 					// in _handleTyping of virtualized-table. Otherwise, errors are thrown if you type
 					// when the addToCitation column is used for sorting.
@@ -664,6 +682,10 @@ class LibraryLayout extends Layout {
 				// when citing notes, only keep notes or note parents
 				if (isCitingNotes) {
 					items = items.filter(item => item.isNote() || item.getNotes().length);
+				}
+				// when adding annotations, only keep annotations, their attachments, and their top-level items
+				if (isAddingAnnotations) {
+					return SearchHandler.keepItemsWithAnnotations(items);
 				}
 				return items;
 			},
@@ -807,11 +829,11 @@ class ListLayout extends Layout {
 		let dataTypeLabel = item.getItemTypeIconName(true);
 		icon.setAttribute("data-item-type", dataTypeLabel);
 
-		let title = Helpers.createNode("div", {}, "title");
+		let title = Helpers.buildItemTitle(item);
 		let titleContent = Helpers.createNode("span", {}, "");
 		let description = Helpers.buildItemDescription(item);
 		Zotero.Utilities.Internal.renderItemTitle(item.getDisplayTitle(), titleContent);
-		title.append(icon, titleContent);
+		title.prepend(icon);
 		itemNode.append(title, description);
 		if (Zotero.Retractions.isRetracted(item)) {
 			let retractedIcon = getCSSIcon("cross");
@@ -1029,6 +1051,9 @@ const IOManager = {
 		if (accepted || SearchHandler.searching) return;
 		if (!Array.isArray(items)) {
 			items = [items];
+		}
+		if (isAddingAnnotations) {
+			items = items.filter(item => item.isAnnotation());
 		}
 		// if selecting a note, add it and immediately accept the dialog
 		if (isCitingNotes) {
@@ -1626,6 +1651,14 @@ const CitationDataManager = {
 	// Resorts the items in the citation
 	async sort() {
 		if (!_id("keepSorted").checked) return;
+		if (this.isAddingAnnotations) {
+			// Sort annotations but only within the same attachment
+			this.items.sort((a, b) => {
+				if (a.item.parentItemID !== b.item.parentItemID) return 0;
+				return (a.item.annotationSortIndex > b.item.annotationSortIndex) - (a.item.annotationSortIndex < b.item.annotationSortIndex);
+			});
+			return;
+		}
 		// It can take arbitrarily long time for documents with many cited items to load
 		// all data necessary to run io.sort().
 		// Do nothing if io.sort() is not yet ready to run.
