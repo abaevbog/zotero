@@ -775,6 +775,29 @@ Zotero.Integration.Interface.prototype.addNote = async function () {
 };
 
 /**
+ * Insert annotations combined into one note into the current document.
+ * @return {Promise}
+ */
+Zotero.Integration.Interface.prototype.addAnnotation = async function () {
+	await this._session.init(false, false);
+
+	if ((!await this._doc.canInsertField(this._session.data.prefs.fieldType))) {
+		throw new Zotero.Exception.Alert("integration.error.cannotInsertHere", [],
+			"integration.error.title");
+	}
+
+	let citations = await this._session.cite(null, false, true);
+	if (this._session.data.prefs.delayCitationUpdates) {
+		return Promise.all(citations.map((citation) => {
+			return this._session.writeDelayedCitation(citation.field, citation);
+		}));
+	}
+	else {
+		return this._session.updateDocument(FORCE_CITATIONS_FALSE, false, false);
+	}
+};
+
+/**
  * Adds a bibliography to the current document.
  * @return {Promise}
  */
