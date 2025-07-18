@@ -199,6 +199,7 @@ class Layout {
 	constructor(type) {
 		this.type = type;
 		this._searchDebouncePromise = null;
+		this.collapsibleGroupID = "selected";
 	}
 
 	// Re-render the items based on search results
@@ -212,7 +213,7 @@ class Layout {
 		let searchResultGroups = SearchHandler.getOrderedSearchResultGroups(citedIDs);
 		for (let { key, group, isLibrary } of searchResultGroups) {
 			// selected items become a collapsible deck/list if there are multiple items
-			let isGroupCollapsible = key == "selected" && group.length > 1;
+			let isGroupCollapsible = key == this.collapsibleGroupID && group.length > 1;
 			
 			// Construct each section and items
 			let sectionHeader = "";
@@ -403,6 +404,7 @@ class LibraryLayout extends Layout {
 		if (isAddingAnnotations) {
 			// Annotaiton item cards are taller than regular, so suggested items area needs to be taller
 			_id("library-other-items").classList.add("tall");
+			this.collapsibleGroupID = "selectedAnnotations";
 		}
 	}
 
@@ -1175,6 +1177,13 @@ const IOManager = {
 			let itemNodes = [..._id(`${currentLayout.type}-layout`).querySelectorAll(".item")];
 			let firstNode = _id(`${currentLayout.type}-layout`).querySelector(".item.selected") || itemNodes[0];
 			IOManager.selectItemNodesRange(firstNode, targetItem);
+			return;
+		}
+		// while adding annotations, clicking on selected non-annotation will select it in itemTree
+		let clickedItem = Zotero.Items.get(targetItem.getAttribute("itemID"));
+		if (isAddingAnnotations && !clickedItem.isAnnotation()) {
+			libraryLayout.itemsView.selectItem(clickedItem.id);
+			_id("zotero-items-tree").querySelector("[tabindex]").focus();
 			return;
 		}
 		// get itemIDs associated with the nodes
