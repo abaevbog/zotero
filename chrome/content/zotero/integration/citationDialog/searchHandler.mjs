@@ -284,6 +284,7 @@ export class CitationDialogSearchHandler {
 		// Fetch all cited items in the document, not just items currently in the dialog
 		let citedItems = await this.io.getItems();
 		if (this.isAddingAnnotations) {
+			citedItems = citedItems.filter(item => item.id);
 			// Only keep items that have actual annotations
 			await this._ensureRelevantItemsAreLoaded(citedItems);
 			citedItems = this.keepItemsWithAnnotations(citedItems);
@@ -340,14 +341,27 @@ export class CitationDialogSearchHandler {
 	_filterNonMatchingItems(items) {
 		let matchedItems = new Set();
 		let splits = Zotero.Fulltext.semanticSplitter(this.searchValue);
-		for (let item of items) {
-			// Generate a string to search for each item
-			let itemStr = item.getCreators()
+
+		let makeSearchString = (item) => {
+			return item.getCreators()
 				.map(creator => creator.firstName + " " + creator.lastName)
 				.concat([item.getField("title"), item.getField("date", true, true).substr(0, 4)])
 				.join(" ")
 				.toLowerCase();
-			
+		};
+		for (let item of items) {
+			// Generate a string to search for each item
+			let itemStr = makeSearchString(item);
+
+			if (this.isAddingAnnotations) {
+				if (item.isAnnotation()) {
+					// Include annotation text and comment
+					itemStr += " " + (item.annotationText || "").toLowerCase();
+					itemStr += " " + (item.annotationComment || "").toLowerCase();
+					// Also allow to search by the parent item's info
+					itemStr += " " + makeSearchString(item.topLevelItem);
+				}
+			}
 			// Include items that match every word that was typed
 			let allMatch = splits.every(split => itemStr.includes(split));
 			if (allMatch) {
