@@ -2615,6 +2615,7 @@ Zotero.Utilities.Internal.activate = new function () {
 	 */
 	function _X11BringToForeground(win, intervalID) {
 		try {
+			dump(" --- _X11BringToForeground ---\n");
 			var windowTitle = win.getInterface(Ci.nsIWebNavigation).title;
 			if (!windowTitle) {
 				windowTitle = win.document.title
@@ -2968,12 +2969,19 @@ Zotero.Utilities.Internal.activate = new function () {
 				}
 			}
 
-			win.addEventListener("load", function () {
-				var intervalID;
-				intervalID = win.setInterval(function () {
-					_X11BringToForeground(win, intervalID);
-				}, 50);
-			}, false);
+			if (win.document.readyState == "complete") {
+				dump(" -- Running _X11BringToForeground immediately \n");
+				_X11BringToForeground(win, null);
+			}
+			else {
+				dump(` -- Running _X11BringToForeground after delay. State: ${win.document.readyState} \n`);
+				win.addEventListener("load", function () {
+					var intervalID;
+					intervalID = win.setInterval(function () {
+						_X11BringToForeground(win, intervalID);
+					}, 50);
+				}, false);
+			}
 		}
 		else if ((Zotero.isWin || Zotero.isLinux) && win) {
 			// Try to focus the window. This is necessary as focusing a node inside

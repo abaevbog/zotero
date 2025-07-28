@@ -135,6 +135,7 @@ async function activateZoteroPane() {
 	// The main window is active from the start on Linux, but opens in the
 	// background on other platforms.
 	if (Services.focus.activeWindow === win) {
+		dump(" -- Window already active --\n");
 		return;
 	}
 	let activatePromise = new Promise(
@@ -142,7 +143,12 @@ async function activateZoteroPane() {
 	);
 	Zotero.Utilities.Internal.activate();
 	Zotero.Utilities.Internal.activate(win);
-	await activatePromise;
+	// On linux, activation of an opened window is synchronous and fires no activate event
+	if (!Zotero.isLinux) {
+		dump(" -- Waiting for activate --\n");
+		await activatePromise;
+		dump(" -- Activated --\n");
+	}
 }
 
 var loadPrefPane = async function (paneName) {
