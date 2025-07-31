@@ -2969,6 +2969,7 @@ Zotero.Utilities.Internal.activate = new function () {
 				}
 			}
 
+			dump(" -- Ready state " + win.document.readyState + "\n");
 			if (win.document.readyState == "complete") {
 				dump(" -- Running _X11BringToForeground immediately \n");
 				_X11BringToForeground(win, null);

@@ -138,6 +138,7 @@ async function activateZoteroPane() {
 		dump(" -- Window already active --\n");
 		return;
 	}
+	dump(" -- Active window " + Services.focus.activeWindow?.location.href + "\n");
 	let activatePromise = new Promise(
 		resolve => win.addEventListener('activate', resolve, { once: true })
 	);
