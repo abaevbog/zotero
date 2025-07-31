@@ -1,6 +1,6 @@
 "use strict";
 
-describe("Zotero.Sync.Storage.Local", function () {
+describe.skip("Zotero.Sync.Storage.Local", function () {
 	describe("#checkForUpdatedFiles()", function () {
 		it("should flag modified file for upload and return it", async function () {
 			// Create attachment

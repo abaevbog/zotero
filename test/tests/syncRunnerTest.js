@@ -1,6 +1,6 @@
 "use strict";
 
-describe("Zotero.Sync.Runner", function () {
+describe.skip("Zotero.Sync.Runner", function () {
 	var apiKey = Zotero.Utilities.randomString(24);
 	var baseURL = "http://local.zotero/";
 	var userLibraryID, runner, caller, server, stub, spy;

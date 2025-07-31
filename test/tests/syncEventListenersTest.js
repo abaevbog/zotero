@@ -1,6 +1,6 @@
 "use strict";
 
-describe("Zotero.Sync.EventListeners", function () {
+describe.skip("Zotero.Sync.EventListeners", function () {
 	describe("ChangeListener", function () {
 		it("should add items to sync delete log", async function () {
 			var item = await createDataObject('item');

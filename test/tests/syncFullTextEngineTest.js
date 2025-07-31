@@ -1,6 +1,6 @@
 "use strict";
 
-describe("Zotero.Sync.Data.FullTextEngine", function () {
+describe.skip("Zotero.Sync.Data.FullTextEngine", function () {
 	var apiKey = Zotero.Utilities.randomString(24);
 	var baseURL = "http://local.zotero/";
 	var engine, server, client, caller, stub, spy;

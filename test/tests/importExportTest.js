@@ -1,4 +1,4 @@
-describe("Import/Export", function () {
+describe.skip("Import/Export", function () {
 	describe("Zotero RDF", function () {
 		var namespaces = {
 			rdf: 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',

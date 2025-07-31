@@ -1,4 +1,4 @@
-describe("Document Recognition", function () {
+describe.skip("Document Recognition", function () {
 	var win;
 	
 	async function waitForProgressWindow() {

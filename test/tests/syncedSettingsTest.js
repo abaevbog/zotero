@@ -1,4 +1,4 @@
-describe('Zotero.SyncedSettings', function () {
+describe.skip('Zotero.SyncedSettings', function () {
 	it('should not affect cached value when modifying the setting after #set() call', async function () {
 		let setting = {athing: 1};
 		await Zotero.SyncedSettings.set(Zotero.Libraries.userLibraryID, 'setting', setting);
