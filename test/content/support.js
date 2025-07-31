@@ -160,8 +160,10 @@ function closeAllWindows() {
 	let allWindows = windowMediator.getEnumerator(null);
 	while (allWindows.hasMoreElements()) {
 		let win = allWindows.getNext();
-		dump(" -- Closing window " + win?.location.href + "\n");
-		win.close();
+		if (win.location.href != "chrome://zotero-unit/content/runtests.html") {
+			dump(" -- Closing window " + win?.location.href + "\n");
+			win.close();
+		}
 	}
 };
 
