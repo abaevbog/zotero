@@ -37,17 +37,21 @@ Zotero.ProgressQueueDialog = function (progressQueue) {
 	let _showMinimize = true;
 	
 	this.open = function () {
+		dump(" -- PROGRESS QUEUE DIALOG: open \n");
 		if (_progressWindow) {
+			dump(" -- PROGRESS QUEUE DIALOG: refocus \n");
 			_progressWindow.focus();
 			return;
 		}
 		
 		let win = Services.wm.getMostRecentWindow("navigator:browser");
 		if (win) {
+			dump(" -- PROGRESS QUEUE DIALOG: new 1 \n");
 			_progressWindow = win.openDialog("chrome://zotero/content/progressQueueDialog.xhtml",
 				"", "chrome,close=yes,resizable=yes,dependent,dialog,centerscreen", _io);
 		}
 		else {
+			dump(" -- PROGRESS QUEUE DIALOG: new 2 \n");
 			_progressWindow = Services.ww.openWindow(null, "chrome://zotero/content/progressQueueDialog.xhtml",
 				"", "chrome,close=yes,resizable=yes,dependent,dialog,centerscreen", _io);
 		}
