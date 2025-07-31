@@ -106,6 +106,8 @@ function loadZoteroWindow() {
  */
 var loadZoteroPane = async function (win) {
 	if (!win) {
+		// Ensure no other windows are open
+		closeAllWindows();
 		var win = await loadZoteroWindow();
 	}
 	Zotero.Prefs.clear('lastViewedFolder');
@@ -151,6 +153,17 @@ async function activateZoteroPane() {
 		dump(" -- Activated --\n");
 	}
 }
+
+function closeAllWindows() {
+	let windowMediator = Components.classes["@mozilla.org/appshell/window-mediator;1"]
+		.getService(Components.interfaces.nsIWindowMediator);
+	let allWindows = windowMediator.getEnumerator(null);
+	while (allWindows.hasMoreElements()) {
+		let win = allWindows.getNext();
+		dump(" -- Closing window " + win?.location.href + "\n");
+		win.close();
+	}
+};
 
 var loadPrefPane = async function (paneName) {
 	var id = 'zotero-prefpane-' + paneName;
