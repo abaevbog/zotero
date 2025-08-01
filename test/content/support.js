@@ -414,7 +414,7 @@ async function logWindows() {
 	while(enumerator.hasMoreElements()) {
 		var win = enumerator.getNext();
 		let href = win.location.href;
-		if (!href.includes("devtools") && !href.includes("runtest") && href.includes("hyphenationTest")) {
+		if (!href.includes("devtools") && !href.includes("runtest")) {
 			wins.push(win.location.href);
 		}
 	}
