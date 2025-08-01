@@ -413,7 +413,8 @@ async function logWindows() {
 	var wins = [];
 	while(enumerator.hasMoreElements()) {
 		var win = enumerator.getNext();
-		if (!win.location.href.includes("devtools") && !win.location.href.includes("runtest")) {
+		let href = win.location.href;
+		if (!href.includes("devtools") && !href.includes("runtest") && href.includes("hyphenationTest")) {
 			wins.push(win.location.href);
 		}
 	}
