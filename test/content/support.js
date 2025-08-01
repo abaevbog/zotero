@@ -407,6 +407,21 @@ function getWindows(uri) {
 	return wins;
 }
 
+async function logWindows() {
+	await Zotero.Promise.delay(100);
+	var enumerator = Services.wm.getEnumerator(null);
+	var wins = [];
+	while(enumerator.hasMoreElements()) {
+		var win = enumerator.getNext();
+		if (!win.location.href.includes("devtools") && !win.location.href.includes("runtest")) {
+			wins.push(win.location.href);
+		}
+	}
+	if (wins.length) {
+		dump(` --- Windows: ${wins.join(",")} --- \n`);
+	}
+}
+
 /**
  * Resolve a promise when a specified callback returns true. interval
  * specifies the interval between checks. timeout specifies when we

@@ -195,10 +195,10 @@ function resetPrefs() {
 	});
 }
 
-afterEach(function () {
+afterEach(async function () {
 	resetPrefs();
+	await logWindows();
 });
-
 
 var assert = chai.assert,
     expect = chai.expect;
