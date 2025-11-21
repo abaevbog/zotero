@@ -649,6 +649,32 @@ Zotero.Integration = new function () {
 		return [session, documentImported];
 	};
 	
+	// Display a warning stating that the user is citing from a library
+	// that is different from the library of all other items cited in the document
+	this.showCrossLibraryCitationWarning = function (citedLibraryNames) {
+		var ps = Services.prompt;
+		var buttonFlags = ps.BUTTON_POS_0 * ps.BUTTON_TITLE_IS_STRING
+			+ ps.BUTTON_POS_1 * ps.BUTTON_TITLE_CANCEL;
+		var title = Zotero.getString("integration-citationDialog-cross-lib-warning-title");
+		var text = Zotero.getString("integration-citationDialog-cross-lib-warning-line1") + ` ${citedLibraryNames.join(",")}.`;
+		text += `\n\n${Zotero.getString("integration-citationDialog-cross-lib-warning-line2")}`;
+		var result = ps.confirmEx(
+			null,
+			title,
+			text,
+			buttonFlags,
+			Zotero.getString('general.continue'),
+			null, null, null, {}
+		);
+
+		// Cancel
+		if (result == 1) {
+			return false;
+		}
+
+		// Cross-library citations allowed
+		return true;
+	};
 }
 
 Zotero.Integration.confirmExportDocument = function () {
@@ -897,6 +923,7 @@ Zotero.Integration.Interface.prototype.refresh = async function () {
 	await this._session.init(true, false);
 	this._session._shouldMerge = true;
 	
+	await this._session.checkCitedLibraries({ skipWarning: true });
 	this._session.rebuildCiteprocState = this._session.rebuildCiteprocState || this._session.data.prefs.delayCitationUpdates;
 	await this._session.updateFromDocument(FORCE_CITATIONS_REGENERATE);
 	await this._session.updateDocument(FORCE_CITATIONS_REGENERATE, true, false);
@@ -1478,6 +1505,40 @@ Zotero.Integration.Session.prototype._updateDocument = async function (forceCita
 	this.processIndices = {}
 }
 
+Zotero.Integration.Session.prototype.checkCitedLibraries = async function ({ skipWarning, skipUpdate } = {}) {
+	let citationsByItemID = await this.citationsByItemID;
+	let allCitedItems = Object.keys(citationsByItemID).map(id => Zotero.Cite.getItem(id));
+	let allCitedLibraries = new Set();
+	for (let citedItem of allCitedItems) {
+		if (citedItem.libraryID) {
+			allCitedLibraries.add(Zotero.URI.getLibraryURI(citedItem.libraryID));
+		}
+		else if (citedItem.cslURIs?.length) {
+			// Any reason for it to ever not be the first element?
+			let citedURI = citedItem.cslURIs[0];
+			// example: http://zotero.org/groups/{groupID}/items/{itemKey}
+			allCitedLibraries.add(citedURI.split("/items/")[0]);
+		}
+	}
+
+	let nowCitedLibs = new Set(Object.keys(this.data.citedLibraryURIs));
+	let newCitedLibs = allCitedLibraries.difference(nowCitedLibs);
+	if (!skipWarning && nowCitedLibs.size && newCitedLibs.size) {
+		let citedLibraryNames = Object.keys(this.data.citedLibraryURIs).map(uri => this.data.citedLibraryURIs[uri]);
+		let canCite = Zotero.Integration.showCrossLibraryCitationWarning(citedLibraryNames);
+		if (!canCite) {
+			throw new Zotero.Exception.UserCancelled("cross-library citation");
+		}
+	}
+	if (!skipUpdate) {
+		let newCitedLibsRecord = {};
+		for (let uri of [...allCitedLibraries]) {
+			newCitedLibsRecord[uri] = this.data.citedLibraryURIs[uri] || Zotero.URI.getLibraryInfoFromURI(uri)?.name;
+		}
+		this.data.citedLibraryURIs = newCitedLibsRecord;
+	}
+};
+
 /**
  * Insert a citation at cursor location or edit the existing one,
  * display the citation dialog and perform any field/text inserts after
@@ -1559,6 +1620,15 @@ Zotero.Integration.Session.prototype.cite = async function (field, addNote=false
 		fieldIndexPromise, citationsByItemIDPromise, previewFn
 	);
 	io.isCitingNotes = addNote;
+	let citedLibraryIDs = new Set();
+	for (let uri of [...this.data.citedLibraryURIs]) {
+		let library = Zotero.URI.getLibraryFromURI(uri);
+		if (library) {
+			citedLibraryIDs.add(library.libraryID);
+		}
+	}
+	io.citedLibraryIDs = citedLibraryIDs;
+
 	Zotero.debug(`Editing citation:`);
 	Zotero.debug(JSON.stringify(citation.toJSON()));
 
@@ -1589,6 +1659,8 @@ Zotero.Integration.Session.prototype.cite = async function (field, addNote=false
 	var fieldIndex = await fieldIndexPromise;
 	// Make sure session is updated
 	await citationsByItemIDPromise;
+
+	await this.checkCitedLibraries({ skipWarning: true });
 	
 	let citations = await this._insertCitingResult(fieldIndex, field, io.citation);
 	if (!this.data.prefs.delayCitationUpdates) {
@@ -1607,6 +1679,7 @@ Zotero.Integration.Session.prototype.cite = async function (field, addNote=false
 		}
 		await this.addCitation(citation.fieldIndex, await citation.field.getNoteIndex(), citation);
 	}
+	await this.checkCitedLibraries({ skipWarning: io.crossLibraryCitationsAllowed });
 	return citations;
 };
 
@@ -1726,6 +1799,8 @@ Zotero.Integration.CitationEditInterface = function (items, sortable, fieldIndex
 	this.previewFn = previewFn;
 	this._fieldIndexPromise = fieldIndexPromise;
 	this._citationsByItemIDPromise = citationsByItemIDPromise;
+
+	this.crossLibraryCitationsAllowed = false;
 	
 	// Not available in citationDialog.js if this unspecified
 	this.wrappedJSObject = this;
@@ -2607,6 +2682,7 @@ Zotero.Integration.BibliographyEditInterface.prototype.setCustomText = function 
 Zotero.Integration.DocumentData = function (string) {
 	this.style = {};
 	this.prefs = {};
+	this.citedLibraryURIs = {};
 	this.sessionID = null;
 	if (string) {
 		this.unserialize(string);
@@ -2627,6 +2703,7 @@ Zotero.Integration.DocumentData.prototype.serialize = function () {
 		return JSON.stringify({
 			style,
 			prefs: this.prefs,
+			citedLibraryURIs: this.citedLibraryURIs,
 			sessionID: this.sessionID,
 			zoteroVersion: Zotero.version,
 			dataVersion: 4
@@ -2639,10 +2716,15 @@ Zotero.Integration.DocumentData.prototype.serialize = function () {
 		prefs += `<pref name="${Zotero.Utilities.htmlSpecialChars(pref)}" `+
 			`value="${Zotero.Utilities.htmlSpecialChars(this.prefs[pref].toString())}"/>`;
 	}
+	let citedLibraries = [];
+	for (let uri of Object.keys(this.citedLibraryURIs)) {
+		citedLibraries.push(`${uri}:${this.citedLibraryURIs[uri]}`);
+	}
 	
 	return '<data data-version="'+Zotero.Utilities.htmlSpecialChars(`${DATA_VERSION}`)+'" '+
-		'zotero-version="'+Zotero.Utilities.htmlSpecialChars(Zotero.version)+'">'+
-			'<session id="'+Zotero.Utilities.htmlSpecialChars(this.sessionID)+'"/>'+
+		'zotero-version="'+Zotero.Utilities.htmlSpecialChars(Zotero.version)+'"'+
+		' cited-libraries="' + Zotero.Utilities.htmlSpecialChars(citedLibraries.join(',')) + '"' + '>'
+			+ '<session id="'+Zotero.Utilities.htmlSpecialChars(this.sessionID)+'"/>'+
 		'<style id="'+Zotero.Utilities.htmlSpecialChars(this.style.styleID)+'" '+
 			(this.style.locale ? 'locale="' + Zotero.Utilities.htmlSpecialChars(this.style.locale) + '" ': '') +
 			'hasBibliography="'+(this.style.hasBibliography ? "1" : "0")+'" '+
@@ -2658,6 +2740,8 @@ Zotero.Integration.DocumentData.prototype.unserializeXML = function (xmlData) {
 		doc = parser.parseFromString(xmlData, "application/xml");
 	
 	this.sessionID = Zotero.Utilities.xpathText(doc, '/data/session[1]/@id');
+	let citedLibraryURIsAttr = Zotero.Utilities.xpathText(doc, '/data/@cited-library-uris');
+	this.citedLibraryURIs = new Set(citedLibraryURIsAttr.split(',').map(id => parseInt(id)).filter(Boolean));
 	this.style = {"styleID":Zotero.Utilities.xpathText(doc, '/data/style[1]/@id'),
 		"locale":Zotero.Utilities.xpathText(doc, '/data/style[1]/@locale'),
 		"hasBibliography":(Zotero.Utilities.xpathText(doc, '/data/style[1]/@hasBibliography') == 1),

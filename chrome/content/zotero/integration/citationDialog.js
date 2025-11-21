@@ -620,12 +620,17 @@ class LibraryLayout extends Layout {
 	
 	async _initCollectionTree() {
 		const CollectionTree = require('zotero/collectionTree');
+		let topGroupConfig = null;
+		if (io.citedGroupIDs && io.citedGroupIDs.size) {
+			topGroupConfig = { groupIDs: io.citedGroupIDs, headerLabel: "Cited in this document" };
+		}
 		this.collectionsView = await CollectionTree.init(_id('zotero-collections-tree'), {
 			onSelectionChange: this._onCollectionSelection.bind(this),
 			hideSources: ['duplicates', 'trash', 'feeds'],
 			initialFolder: Zotero.Prefs.get("integration.citationDialogCollectionLastSelected"),
 			onActivate: () => {},
-			filterLibraryIDs: io.filterLibraryIDs
+			filterLibraryIDs: io.filterLibraryIDs,
+			topGroupConfig: topGroupConfig
 		});
 		// Add aria-description with instructions on what this collection tree is for
 		// Voiceover announces the description placed on the actual tree when focus enters it
@@ -1019,6 +1024,13 @@ const IOManager = {
 			items = items.filter(item => !(item.id && CitationDataManager.getItems({ itemID: item.id }).length));
 		}
 
+		// Potentially show an alert if the user is attempting a cross-library citation
+		let canProceed = await this.checkCrossLibraryCitations(items);
+		if (!canProceed) {
+			_id("bubble-input").refocusInput();
+			return;
+		}
+
 		// If the last input has a locator, add it into the item
 		let input = _id("bubble-input").getCurrentInput();
 		let inputValue = SearchHandler.cleanSearchQuery(input?.value || "");
@@ -1217,6 +1229,26 @@ const IOManager = {
 			desiredMode = "list";
 		}
 		this.toggleDialogMode(desiredMode);
+	},
+
+	// Check if provided items belong to a library different from
+	// the library of all other cited items. If so, show a warning message.
+	async checkCrossLibraryCitations(items) {
+		// If there is no single group that all cited items belong to, do nothing
+		if (!io.citedGroupIDs || !io.citedGroupIDs.size) return true;
+		// If the dialog was already shown and confirmed, do nothing
+		if (io.crossLibraryCitationsAllowed) return true;
+		let itemGroups = items.map(item => Zotero.Libraries.get(item.libraryID)).filter(Boolean);
+		let notCitedGroups = itemGroups.filter(group => !io.citedGroupIDs.has(group.id));
+		if (notCitedGroups.length === 0) return true;
+		Zotero.debug("Citation Dialog: show dialog to confirm cross-library citations");
+		// Show a confirmation dialog
+		let canProceed = Zotero.Integration.showCrossLibraryCitationWarning([...io.citedGroupIDs]);
+		if (canProceed) {
+			// If confirmed, set a flag to not show this warning again on Zotero.Integration level
+			io.crossLibraryCitationsAllowed = true;
+		}
+		return canProceed;
 	},
 	
 	// handle drag start of item nodes into bubble-input

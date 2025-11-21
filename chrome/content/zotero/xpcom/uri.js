@@ -374,6 +374,43 @@ Zotero.URI = new function () {
 		return uri.replace(ZOTERO_CONFIG.BASE_URI, ZOTERO_CONFIG.WWW_BASE_URL);
 	};
 	
+	this.getLibraryFromURI = function (uri) {
+		// "http://zotero.org/users/{USER_ID}"
+		if (uri.includes("/users")) {
+			let userID = uri.split("/users/")[1];
+			if (userID == `${Zotero.Users.getCurrentUserID()}`) {
+				return Zotero.Libraries.userLibraryID;
+			}
+		}
+		// "http://zotero.org/groups/{GROUP_ID}"
+		else if (uri.includes("/groups")) {
+			let groupID = uri.split("/groups/")[1];
+			let group = Zotero.Groups.get(groupID);
+			if (group) {
+				return group;
+			}
+		}
+		return null;
+	};
+
+	this.getLibraryInfoFromURI = function (uri) {
+		if (uri.includes("/groups/")) {
+			let groupID = uri.split("/groups/")[1];
+			let group = Zotero.Groups.get(groupID);
+			if (group) {
+				return { name: group.name, library: group, type: 'group' };
+			}
+		}
+		else if (uri.includes("/users/")) {
+			let userID = uri.split("/users/")[1];
+			let result = { name: Zotero.Users.getName(userID), library: null, type: 'library' };
+			if (userID == `${Zotero.Users.getCurrentUserID()}`) {
+				result.library = Zotero.Libraries.userLibrary;
+			}
+			return result;
+		}
+		return null;
+	};
 	
 	/**
 	 * Convert an object URI into an object containing libraryID and key

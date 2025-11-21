@@ -385,6 +385,33 @@ describe("Citation Dialog", function () {
 			let rowNode = dialog.document.getElementById(rowID);
 			assert.isTrue(rowNode.classList.contains("highlighted"));
 		});
+
+		it("should warn about cross-library citations", async function () {
+			let group = await createGroup();
+			let libraryItem = await createDataObject('item');
+			let groupItem = await createDataObject('item', { libraryID: group.libraryID });
+			// Pretend that libraryItem is cited in the document
+			io._citationsByItemIDPromise = Promise.resolve({ [libraryItem.id]: libraryItem });
+
+			// Try to add an item from another group to the citation
+			IOManager.addItemsToCitation([groupItem]);
+			// Warning should appear - do not allow to proceed
+			waitForDialog(null, 'cancel');
+
+			// Wait for the group item to be removed
+			while (CitationDataManager.items.length !== 0) {
+				await Zotero.Promise.delay(10);
+			}
+
+			// Try again, this time accept
+			IOManager.addItemsToCitation([groupItem]);
+			waitForDialog(null, 'accept');
+
+			// Group item should appear in the citation
+			assert.equal(CitationDataManager.items.length, 1);
+			assert.equal(CitationDataManager.items[0].id, groupItem.id);
+			io._citationsByItemIDPromise = undefined;
+		});
 	});
 
 	describe("Search", function () {
