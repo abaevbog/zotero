@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Transformers Loader</title>
+</head>
+<body>
+    <script type="module">
+		console.log("Loading transformers...");
+		
+		// Import the library
+		import { pipeline, env } from 'resource://zotero/transformers.js';
+		
+		// CRITICAL: Disable cache to prevent segfault
+		env.useBrowserCache = false;
+		
+		// Critical: Point to local runtime files
+		env.backends.onnx.wasm.wasmPaths = 'resource://zotero/onnx-runtime/';
+		
+		console.log("Environment configured");
+
+		console.log("Creating pipeline...");
+		let classifier = await pipeline('sentiment-analysis');
+		
+		console.log("Running inference...");
+		let result = await classifier('I love transformers!');
+		console.log("Result:", result);
+
+	</script>
+</body>
+</html>
