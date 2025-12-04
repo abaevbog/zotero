@@ -973,7 +973,13 @@ const IOManager = {
 		// if keep sorted was unchecked and then checked, resort items and update bubbles
 		_id("keepSorted").addEventListener("change", () => this._resortItems());
 
-		_id("dialog-mode-setting").addEventListener("click", event => this.toggleDialogMode(event.target.closest(".option").getAttribute("value")));
+		// Switch list/library mode on mouse down
+		_id("dialog-mode-setting").addEventListener("mousedown", event => this.toggleDialogMode(event.target.closest(".option").getAttribute("value")));
+		// Swtich list/library mode on click via keyboard
+		_id("dialog-mode-setting").addEventListener("click", (event) => {
+			if (event.pointerType === "mouse") return;
+			this.toggleDialogMode(event.target.closest(".option").getAttribute("value"));
+		});
 
 		// open settings popup on btn click
 		_id("settings-button").addEventListener("click", event => _id("settings-popup").openPopup(event.target, "before_end"));
@@ -982,7 +988,13 @@ const IOManager = {
 		this._initFocusRetention();
 		doc.addEventListener("focusin", this.resetSelectedAfterFocus);
 
-		_id("dialog-type-setting").addEventListener("click", event => setDialogType(event.target.closest(".option").getAttribute("value")));
+		// Switch dialog type on mouse down
+		_id("dialog-type-setting").addEventListener("mousedown", event => setDialogType(event.target.closest(".option").getAttribute("value")));
+		// Switch dialog type on click via keyboard
+		_id("dialog-type-setting").addEventListener("click", (event) => {
+			if (event.pointerType === "mouse") return;
+			setDialogType(event.target.closest(".option").getAttribute("value"));
+		});
 	},
 
 	// switch between list and library modes
