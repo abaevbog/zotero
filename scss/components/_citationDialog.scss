@@ -521,6 +521,14 @@
 
 				&:not(.active):hover {
 					background-color: var(--fill-quinary);
+					border-inline-start: 1px solid var(--color-border50);
+					border-inline-end: 1px solid var(--color-border50);
+					&:first-of-type {
+						border-inline-start-color: transparent;
+					}
+					&:last-of-type {
+						border-inline-end-color: transparent;
+					}
 				}
 			}
 
