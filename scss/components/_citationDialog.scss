@@ -519,16 +519,28 @@
 				border-inline-end: 1px solid transparent;
 				background-color: transparent;
 
+				// pull adjacent options together so borders sit next to each other instead of overlapping
+				&:not(:first-of-type) {
+					margin-inline-start: -1px;
+				}
+
 				&:not(.active):hover {
 					background-color: var(--fill-quinary);
 					border-inline-start: 1px solid var(--color-border50);
 					border-inline-end: 1px solid var(--color-border50);
+					// bring hovered option above active so its borders are visible
+					z-index: 2;
 					&:first-of-type {
 						border-inline-start-color: transparent;
 					}
 					&:last-of-type {
 						border-inline-end-color: transparent;
 					}
+				}
+
+				&:focus-visible {
+					// bring focused option above active its outline is visible
+					z-index: 2;
 				}
 			}
 
@@ -549,6 +561,8 @@
 				// Do not remove borders; only change colors so width stays constant
 				border-inline-start: var(--material-border);
 				border-inline-end: var(--material-border);
+				// bring active option to front so its borders are visible
+				z-index: 1;
 			}
 
 			/* avoid overlapping with the container border on edges (keep width, make color transparent) */
