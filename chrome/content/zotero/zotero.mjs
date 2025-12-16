@@ -98,6 +98,8 @@ const xpcomFilesLocal = [
 	'data/searchConditions',
 	'data/searches',
 	'data/tags',
+	'ml/manager',
+	'ml/embeddings',
 	'db',
 	'dictionaries',
 	'duplicates',
