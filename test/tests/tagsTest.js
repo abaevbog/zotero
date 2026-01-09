@@ -238,6 +238,10 @@ describe("Zotero.Tags", function () {
 		it("should return first emoji span for text with an emoji made up of multiple characters with ZWJ", function () {
 			assert.equal(Zotero.Tags.extractEmojiForItemsList("We are 👨‍🌾👨‍🌾. And I am a 👨‍🏫."), "👨‍🌾👨‍🌾");
 		});
+
+		it("should return first emoji span for text with an emoji made up of multiple regional indicators", function () {
+			assert.equal(Zotero.Tags.extractEmojiForItemsList("This is a flag 🇺🇸⭐️"), "🇺🇸⭐️");
+		});
 	});
 
 	describe("#compareTagsOrder()", function () {

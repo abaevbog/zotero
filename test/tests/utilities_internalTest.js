@@ -94,6 +94,10 @@ describe("Zotero.Utilities.Internal", function () {
 		it("should return true for text with an emoji with text representation that use Variation Selector-16", function () {
 			assert.isTrue(Zotero.Utilities.Internal.containsEmoji("This is a ⭐️"));
 		});
+
+		it("should return true for text with an emoji comprised of regional indicators (🇺🇸)", function () {
+			assert.isTrue(Zotero.Utilities.Internal.containsEmoji("This is a flag: 🇺🇸"));
+		});
 		
 		it("should return true for text with an emoji made up of multiple characters with ZWJ", function () {
 			assert.isTrue(Zotero.Utilities.Internal.containsEmoji("I am a 👨‍🌾"));

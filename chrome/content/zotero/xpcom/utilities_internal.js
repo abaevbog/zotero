@@ -388,14 +388,8 @@ Zotero.Utilities.Internal = {
 	},
 	
 	containsEmoji: function (str) {
-		let re = /\p{Extended_Pictographic}/gu;
+		let re = /\p{Extended_Pictographic}|(?:\p{Regional_Indicator})/gu;
 		return !!str.match(re);
-	},
-
-	includesEmoji: function (str) {
-		// Remove emoji, Zero Width Joiner, and Variation Selector-16 and compare lengths
-		const re = /\p{Extended_Pictographic}|\u200D|\uFE0F/gu;
-		return str.replace(re, '').length !== str.length;
 	},
 	
 	/**

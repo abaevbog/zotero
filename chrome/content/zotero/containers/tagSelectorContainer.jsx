@@ -413,7 +413,7 @@ Zotero.TagSelector = class TagSelectorContainer extends React.PureComponent {
 	 */
 	getTextWidth(text, font, forceUseDOM = false) {
 		let width;
-		const useDOM = forceUseDOM || (this.state.isHighDensity && Zotero.Utilities.Internal.includesEmoji(text));
+		const useDOM = forceUseDOM || (this.state.isHighDensity && Zotero.Utilities.Internal.containsEmoji(text));
 		if (useDOM) {
 			if (!this.divMeasure) {
 				this.divMeasure = document.createElement('div');

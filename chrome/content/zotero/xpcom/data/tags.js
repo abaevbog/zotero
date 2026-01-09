@@ -842,9 +842,9 @@ Zotero.Tags = new function () {
 	
 	// Return the first sequence of emojis from a string
 	this.extractEmojiForItemsList = function (str) {
-		// Split by anything that is not an emoji, Zero Width Joiner, or Variation Selector-16
+		// Split by anything that is not an emoji, regional indicator, Zero Width Joiner, or Variation Selector-16
 		// And return first continuous span of emojis
-		let re = /[^\p{Extended_Pictographic}\u200D\uFE0F]+/gu;
+		let re = /[^\p{Extended_Pictographic}\p{Regional_Indicator}\u200D\uFE0F]+/gu;
 		return str.split(re).filter(Boolean)[0] || null;
 	};
 
