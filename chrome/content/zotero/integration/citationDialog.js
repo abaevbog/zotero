@@ -90,8 +90,19 @@ async function onLoad() {
 	}
 	await setDialogType(initialType);
 
-	// Initial height for the dialog (search row with no bubbles)
-	window.resizeTo(window.innerWidth, Helpers.getSearchRowHeight());
+	// Restore the dimensions of the dialog in the specified mode.
+	// That way, opening "annotation" dialog (always library mode)
+	// will not conflict with how wide the "citation" dialog will be in list mode.
+	let initialMode = IOManager.getInitialDialogMode();
+	let savedParams = Helpers.fetchStoredWindowParams()[initialMode] || {};
+	let restoredWidth = savedParams.width || window.innerWidth;
+	let restoredHeight = savedParams.height || Helpers.getSearchRowHeight();
+	window.resizeTo(restoredWidth, restoredHeight);
+	// On windows, after initial window size is set, make sure we don't resize list
+	// mode when search results are ready for a moment to avoid blinking
+	if (Zotero.isWin && initialMode == "list") {
+		Helpers.delayNextSmoothResize(250);
+	}
 
 	libraryLayout = new LibraryLayout();
 	listLayout = new ListLayout();
@@ -117,7 +128,7 @@ async function onLoad() {
 	await SearchHandler.refreshSelectedAndOpenItems();
 	// some nodes (e.g. item-tree-menu-bar) are expected to be present to switch modes
 	// so this has to go after all layouts are loaded
-	await IOManager.setInitialDialogMode();
+	await IOManager.toggleDialogMode(initialMode);
 	// most of IO handling relies on currentLayout being defined so it must follow setInitialDialogMode
 	IOManager.init();
 	// explicitly focus bubble input so one can begin typing right away
@@ -155,6 +166,8 @@ async function accept() {
 	if (accepted || SearchHandler.searching || !CitationDataManager.items.length) return;
 	accepted = true;
 	Zotero.debug("Citation Dialog: accepted");
+
+	cleanupBeforeDialogClosing();
 	_id("library-layout").hidden = true;
 	_id("list-layout").hidden = true;
 	_id("bubble-input").hidden = true;
@@ -174,7 +187,6 @@ async function accept() {
 		await CitationDataManager.sort();
 	}
 	CitationDataManager.updateCitationObject(true);
-	cleanupBeforeDialogClosing();
 	io.accept((percent) => {
 		_id("progress").value = Math.round(percent);
 	});
@@ -195,6 +207,17 @@ function onUnload() {
 
 function cleanupBeforeDialogClosing() {
 	if (!currentLayout || !libraryLayout) return;
+	
+	// Save window params for current layout mode so we can restore it on next dialog open
+	let allParams = Helpers.fetchStoredWindowParams();
+	let params = { width: window.outerWidth };
+	// Only save height in library mode, since in list mode height varies
+	if (currentLayout.type == "library") {
+		params.height = window.outerHeight;
+	}
+	allParams[currentLayout.type] = params;
+	Zotero.Prefs.set("integration.citationDialog.windowParams", JSON.stringify(allParams));
+
 	// Only library mode in annotations dialog
 	if (!DIALOG_STATE.isAddingAnnotations()) {
 		Zotero.Prefs.set("integration.citationDialogLastUsedMode", currentLayout.type);
@@ -220,6 +243,8 @@ function _id(id) {
 async function setDialogType(type) {
 	if (type == DIALOG_STATE.type) return;
 	if (DIALOG_STATE.loaded && io.disableDialogTypeSwitch) return;
+	// If there is a running search, do nothing to avoid window resizing conflicts
+	if (SearchHandler.searching) return;
 	DIALOG_STATE.type = type;
 	document.documentElement.setAttribute("dialog-type", DIALOG_STATE.type);
 
@@ -487,6 +512,7 @@ class LibraryLayout extends Layout {
 	constructor() {
 		super("library");
 		this._scrolledToFirstCitedOnInit = false;
+		this.MIN_WIDTH = 1000; // min-width from _citationDialog.scss
 	}
 
 	async init() {
@@ -575,7 +601,8 @@ class LibraryLayout extends Layout {
 		IOManager.updateBubbleInput();
 	}
 
-	resizeWindow() {
+	async resizeWindow() {
+		await Helpers.smoothResizingPromise;
 		let bubbleInputHeight = Helpers.getSearchRowHeight();
 		let suggestedItemsHeight = _id("library-other-items").getBoundingClientRect().height;
 		let minTableHeight = 200;
@@ -590,10 +617,9 @@ class LibraryLayout extends Layout {
 			ignoreWindowResizing = true;
 			// pick the larger of minHeight or last height set by the user
 			let leastNeededHeight = Math.max(minHeight, lastSetWindowHeight);
-			window.resizeTo(window.innerWidth, leastNeededHeight);
-			setTimeout(() => {
-				ignoreWindowResizing = false;
-			}, 100);
+			Helpers.smoothResize(window.innerWidth, leastNeededHeight, {
+				onComplete: () => ignoreWindowResizing = false,
+			});
 		}
 	}
 
@@ -932,6 +958,7 @@ class LibraryLayout extends Layout {
 class ListLayout extends Layout {
 	constructor() {
 		super("list");
+		this.MIN_WIDTH = 800; // min-width from _citationDialog.scss
 	}
 
 	// Create item node for an item group and store item ids in itemIDs attribute
@@ -994,7 +1021,8 @@ class ListLayout extends Layout {
 		IOManager.updateBubbleInput();
 	}
 
-	resizeWindow() {
+	async resizeWindow() {
+		await Helpers.smoothResizingPromise;
 		let bubbleInputHeight = Helpers.getSearchRowHeight();
 
 		// height of all sections
@@ -1034,12 +1062,10 @@ class ListLayout extends Layout {
 		
 		// Timeout is required likely to allow minHeight update to settle
 		setTimeout(() => {
-			window.resizeTo(window.innerWidth, parseInt(autoHeight));
+			Helpers.smoothResize(window.innerWidth, autoHeight, {
+				onComplete: () => ignoreWindowResizing = false,
+			});
 		}, 10);
-
-		setTimeout(() => {
-			ignoreWindowResizing = false;
-		}, 100);
 	}
 
 	_markRoundedCorners() {
@@ -1144,6 +1170,8 @@ const IOManager = {
 
 	// switch between list and library modes
 	async toggleDialogMode(newMode) {
+		// If there is a running search, do nothing to avoid window resizing conflicts
+		if (SearchHandler.searching) return;
 		// Do nothing if switching to a mode that is already active
 		if (currentLayout?.type == newMode) return;
 		
@@ -1157,6 +1185,7 @@ const IOManager = {
 		}
 
 
+		document.documentElement.removeAttribute("dialog-mode");
 		let isInitialModeSetting = currentLayout === undefined;
 		currentLayout = newMode === "library" ? libraryLayout : listLayout;
 		// do not show View menubar with itemTree-specific options in list mode
@@ -1166,6 +1195,15 @@ const IOManager = {
 			// when switching from library to list, make sure all selected items are de-selected
 			libraryLayout.itemsView?.selection.clearSelection();
 			currentLayout.updateSelectedItems();
+			// Shrink the window since library layout is wider than list layout needs to be.
+			if (window.outerWidth > listLayout.MIN_WIDTH) {
+				Helpers.smoothResize(listLayout.MIN_WIDTH, window.innerHeight, {
+					onComplete: () => {
+						document.documentElement.setAttribute("dialog-mode", newMode);
+						_id("bubble-input").refocusInput();
+					},
+				});
+			}
 		}
 		// After switchingto list mode, the window is often resized, which causes the virtualized table
 		// to redraw and remove most of .row nodes. Then, if one switches back to library mode, the rows
@@ -1178,6 +1216,17 @@ const IOManager = {
 			currentLayout.forceUpdateTablesAfterRefresh = true;
 			// highlight items added in list in itemTree
 			currentLayout._refreshItemsViewHighlightedRows();
+			// Expand the window since library layout is wider than list layout.
+			// Set dialog-mode after resizing finishes to avoid the content jumping
+			// to the wider min-width before the window has caught up.
+			if (window.outerWidth < libraryLayout.MIN_WIDTH) {
+				Helpers.smoothResize(libraryLayout.MIN_WIDTH, window.innerHeight, {
+					onComplete: () => {
+						document.documentElement.setAttribute("dialog-mode", newMode);
+						_id("bubble-input").refocusInput();
+					}
+				});
+			}
 		}
 		await currentLayout.search(SearchHandler.searchValue, { skipDebounce: true });
 		// When library layout is opened for the first time (initial state or first switch from list mode),
@@ -1439,8 +1488,8 @@ const IOManager = {
 		}
 	},
 
-	// Set the initial dialog mode per user's preference
-	async setInitialDialogMode() {
+	// Get the initial dialog mode per user's preference
+	getInitialDialogMode() {
 		let desiredMode = Zotero.Prefs.get("integration.citationDialogMode");
 		if (desiredMode == "last-used") {
 			desiredMode = Zotero.Prefs.get("integration.citationDialogLastUsedMode");
@@ -1453,7 +1502,7 @@ const IOManager = {
 		if (DIALOG_STATE.isAddingAnnotations()) {
 			desiredMode = "library";
 		}
-		await this.toggleDialogMode(desiredMode);
+		return desiredMode;
 	},
 	
 	// handle drag start of item nodes into bubble-input
@@ -2023,6 +2072,8 @@ window.addEventListener("resize", () => {
 
 // When the dialog is re-focused, run the search again in case selected or opened items changed
 window.addEventListener("focus", async () => {
+	// Ensure search does not run on the first focus of the dialog from onLoad handling
+	if (!DIALOG_STATE.loaded) return;
 	// Wait a moment to allow accept button click event to fire.
 	// Without this, clicking accept button when the dialog is not focused
 	// would refocus the dialog, run the search below,
