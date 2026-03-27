@@ -465,6 +465,7 @@ export class CitationDialogHelpers {
 
 		let startWidth = win.innerWidth;
 		let startHeight = win.innerHeight;
+		let startX = win.screenX;
 		let startTime = null;
 
 		win.document.documentElement.setAttribute("resizing", "true");
@@ -477,6 +478,11 @@ export class CitationDialogHelpers {
 			let w = Math.round(startWidth + (targetWidth - startWidth) * ease);
 			let h = Math.round(startHeight + (targetHeight - startHeight) * ease);
 
+			// Move window left by half the width change so it resizes from both sides equally
+			let currentWidthDelta = (w + chromeWidth) - (startWidth + chromeWidth);
+			let x = Math.round(startX - currentWidthDelta / 2);
+
+			win.moveTo(x, win.screenY);
 			win.resizeTo(w + chromeWidth, h + chromeHeight);
 
 			if (progress < 1) {
