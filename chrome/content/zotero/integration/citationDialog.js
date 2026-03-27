@@ -607,18 +607,23 @@ class LibraryLayout extends Layout {
 		let suggestedItemsHeight = _id("library-other-items").getBoundingClientRect().height;
 		let minTableHeight = 200;
 		let bottomHeight = _id("bottom-area-wrapper").getBoundingClientRect().height;
-		
+
 		let minHeight = bubbleInputHeight + suggestedItemsHeight + bottomHeight + minTableHeight;
 		// set min-height to make sure suggested items and at least 200px of itemsView is always visible
 		doc.documentElement.style.minHeight = `${minHeight}px`;
 
-		// resize the window if it is too small
-		if (window.innerHeight < minHeight) {
+		let targetWidth = Math.max(window.innerWidth, this.MIN_WIDTH);
+		let targetHeight = Math.max(minHeight, lastSetWindowHeight);
+		let needsResize = window.innerHeight < minHeight || window.innerWidth < this.MIN_WIDTH;
+
+		if (needsResize) {
 			ignoreWindowResizing = true;
-			// pick the larger of minHeight or last height set by the user
-			let leastNeededHeight = Math.max(minHeight, lastSetWindowHeight);
-			Helpers.smoothResize(window.innerWidth, leastNeededHeight, {
-				onComplete: () => ignoreWindowResizing = false,
+			Helpers.smoothResize(targetWidth, targetHeight, {
+				onComplete: () => {
+					_id("bubble-input").refocusInput();
+					document.documentElement.setAttribute("dialog-layout", this.type);
+					ignoreWindowResizing = false;
+				},
 			});
 		}
 	}
@@ -1043,7 +1048,7 @@ class ListLayout extends Layout {
 
 		// height of the bottom section
 		let bottomHeight = _id("bottom-area-wrapper").getBoundingClientRect().height;
-		
+
 		// set min height and resize the window
 		let autoHeight = bubbleInputHeight + sectionsHeight + sectionsWrapperPadding + bottomHeight + marginOfError;
 		// window.resizeTo(X,Y) resizes the window so that it's outerHeight == Y. On mac and windows,
@@ -1058,12 +1063,17 @@ class ListLayout extends Layout {
 
 		// cap window height at the height last set by the user
 		autoHeight = Math.min(autoHeight, lastSetWindowHeight);
+		let targetWidth = Math.min(window.innerWidth, this.MIN_WIDTH);
 		ignoreWindowResizing = true;
-		
+
 		// Timeout is required likely to allow minHeight update to settle
 		setTimeout(() => {
-			Helpers.smoothResize(window.innerWidth, autoHeight, {
-				onComplete: () => ignoreWindowResizing = false,
+			Helpers.smoothResize(targetWidth, autoHeight, {
+				onComplete: () => {
+					_id("bubble-input").refocusInput();
+					document.documentElement.setAttribute("dialog-layout", this.type);
+					ignoreWindowResizing = false;
+				},
 			});
 		}, 10);
 	}
@@ -1185,7 +1195,7 @@ const IOManager = {
 		}
 
 
-		document.documentElement.removeAttribute("dialog-mode");
+		document.documentElement.removeAttribute("dialog-layout");
 		let isInitialModeSetting = currentLayout === undefined;
 		currentLayout = newMode === "library" ? libraryLayout : listLayout;
 		// do not show View menubar with itemTree-specific options in list mode
@@ -1195,15 +1205,6 @@ const IOManager = {
 			// when switching from library to list, make sure all selected items are de-selected
 			libraryLayout.itemsView?.selection.clearSelection();
 			currentLayout.updateSelectedItems();
-			// Shrink the window since library layout is wider than list layout needs to be.
-			if (window.outerWidth > listLayout.MIN_WIDTH) {
-				Helpers.smoothResize(listLayout.MIN_WIDTH, window.innerHeight, {
-					onComplete: () => {
-						document.documentElement.setAttribute("dialog-mode", newMode);
-						_id("bubble-input").refocusInput();
-					},
-				});
-			}
 		}
 		// After switchingto list mode, the window is often resized, which causes the virtualized table
 		// to redraw and remove most of .row nodes. Then, if one switches back to library mode, the rows
@@ -1216,17 +1217,6 @@ const IOManager = {
 			currentLayout.forceUpdateTablesAfterRefresh = true;
 			// highlight items added in list in itemTree
 			currentLayout._refreshItemsViewHighlightedRows();
-			// Expand the window since library layout is wider than list layout.
-			// Set dialog-mode after resizing finishes to avoid the content jumping
-			// to the wider min-width before the window has caught up.
-			if (window.outerWidth < libraryLayout.MIN_WIDTH) {
-				Helpers.smoothResize(libraryLayout.MIN_WIDTH, window.innerHeight, {
-					onComplete: () => {
-						document.documentElement.setAttribute("dialog-mode", newMode);
-						_id("bubble-input").refocusInput();
-					}
-				});
-			}
 		}
 		await currentLayout.search(SearchHandler.searchValue, { skipDebounce: true });
 		// When library layout is opened for the first time (initial state or first switch from list mode),

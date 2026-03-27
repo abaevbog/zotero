@@ -1,7 +1,7 @@
 #citation-dialog, #progress-bar {
 	min-width: 800px;
 
-	&[dialog-mode="library"] {
+	&[dialog-layout="library"] {
 		min-width: 1000px;
 	}
 	// during resizing, components of library mode have flexible height
