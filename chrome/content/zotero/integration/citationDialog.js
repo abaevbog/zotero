@@ -605,12 +605,11 @@ class LibraryLayout extends Layout {
 		await Helpers.smoothResizingPromise;
 		let bubbleInputHeight = Helpers.getSearchRowHeight();
 		let suggestedItemsHeight = _id("library-other-items").getBoundingClientRect().height;
-		let minTableHeight = 200;
+		let minTableHeight = 400;
 		let bottomHeight = _id("bottom-area-wrapper").getBoundingClientRect().height;
 
 		let minHeight = bubbleInputHeight + suggestedItemsHeight + bottomHeight + minTableHeight;
-		// set min-height to make sure suggested items and at least 200px of itemsView is always visible
-		doc.documentElement.style.minHeight = `${minHeight}px`;
+		doc.documentElement.style.removeProperty('min-height');
 
 		let targetWidth = Math.max(window.innerWidth, this.MIN_WIDTH);
 		let targetHeight = Math.max(minHeight, lastSetWindowHeight);
@@ -621,6 +620,7 @@ class LibraryLayout extends Layout {
 			Helpers.smoothResize(targetWidth, targetHeight, {
 				onComplete: () => {
 					_id("bubble-input").refocusInput();
+					doc.documentElement.style.minHeight = `${minHeight}px`;
 					document.documentElement.setAttribute("dialog-layout", this.type);
 					ignoreWindowResizing = false;
 				},
